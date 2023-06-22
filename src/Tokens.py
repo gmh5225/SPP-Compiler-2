@@ -84,6 +84,8 @@ class TokenType(Enum):
     KwAs = "as"
     KwSup = "sup"
     KwWith = "with"
+    KwBreak = "break"
+    KwContinue = "continue"
 
     LxIdentifier = r"[_a-zA-Z][_a-zA-Z0-9]*"
     LxBinDigits = r"0b[01]+"

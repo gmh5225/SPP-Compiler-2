@@ -4,6 +4,7 @@ from typing import Optional
 from dataclasses import dataclass
 from src.Tokens import Token
 
+
 @dataclass
 class ProgramAst:
     module: ModulePrototypeAst
@@ -181,6 +182,10 @@ class ParenthesizedExpressionAst:
     expression: ExpressionAst
 
 @dataclass
+class PlaceholderAst:
+    ...
+
+@dataclass
 class LambdaParameterAst:
     is_mutable: bool
     identifier: IdentifierAst
@@ -221,33 +226,41 @@ class IfStatementBranchAst:
     condition: ExpressionAst
     body: list[StatementAst]
 
+def ElseStatementBranchAst(body: list[StatementAst]):
+    return IfStatementBranchAst([], BoolLiteralAst(True), body)
+
 @dataclass
 class IfStatementAst:
-    branches: list[IfStatementBranchAst]
+    if_branches: IfStatementBranchAst
+    elif_branches: list[IfStatementBranchAst]
+    else_branch: Optional[StatementAst]
 
 @dataclass
 class WhileStatementAst:
     condition: ExpressionAst
+    tag: Optional[IdentifierAst]
     body: list[StatementAst]
 
 @dataclass
 class ForStatementAst:
     identifiers: list[LocalVariableAst]
     iterable: ExpressionAst
+    tag: Optional[IdentifierAst]
     body: list[StatementAst]
 
 @dataclass
 class DoWhileStatementAst:
     body: list[StatementAst]
     condition: ExpressionAst
+    tag: Optional[IdentifierAst]
 
 @dataclass
 class MatchStatementAst:
     value: ExpressionAst
-    cases: list[CaseStatements]
+    cases: list[CaseStatementAst]
 
 @dataclass
-class CaseStatements:
+class CaseStatementAst:
     pattern: ExpressionAst
     guard: Optional[ValueGuardAst]
     body: list[StatementAst]
@@ -267,9 +280,17 @@ class YieldStatementAst:
     value: list[ExpressionAst]
 
 @dataclass
-class TypedefAst:
+class TypedefStatementAst:
     new_type: GenericIdentifierAst
     old_type: TypeAst
+
+@dataclass
+class BreakStatementAst:
+    loop_tag: Optional[IdentifierAst]
+
+@dataclass
+class ContinueStatementAst:
+    loop_tag: Optional[IdentifierAst]
 
 @dataclass
 class LetStatementAst:
@@ -303,7 +324,7 @@ class SupMethodPrototypeAst(FunctionPrototypeAst):
     pass
 
 @dataclass
-class SupTypedefAst(TypedefAst):
+class SupTypedefAst(TypedefStatementAst):
     modifier: Optional[AccessModifierAst]
 
 @dataclass
@@ -407,9 +428,9 @@ GeneratorLiteralAst = IterableRangeAst | IterableComprehensionAst
 SetLiteralAst = IterableRangeAst | IterableFixedAst | IterableComprehensionAst
 NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiteralBase2Ast
 LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | ListLiteralAst | GeneratorLiteralAst | MapLiteralAst | SetLiteralAst | PairLiteralAst | RegexLiteralAst | TupleLiteralAst
-PrimaryExpressionAst = LiteralAst | IdentifierAst | ParenthesizedExpressionAst | LambdaAst
+PrimaryExpressionAst = LiteralAst | IdentifierAst | ParenthesizedExpressionAst | LambdaAst | PlaceholderAst
 ExpressionAst = UnaryExpressionAst | BinaryExpressionAst | PostfixExpressionAst | MultiAssignmentExpressionAst | PrimaryExpressionAst
-StatementAst = IfStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst | MatchStatementAst | WithStatementAst | ReturnStatementAst | YieldStatementAst | TypedefAst | LetStatementAst | ExpressionAst
+StatementAst = IfStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst | MatchStatementAst | WithStatementAst | ReturnStatementAst | YieldStatementAst | TypedefStatementAst | LetStatementAst | ExpressionAst
 ModuleMemberAst = EnumPrototypeAst | ClassPrototypeAst | FunctionPrototypeAst | SupPrototypeNormalAst | SupPrototypeInheritanceAst
 ClassAttributeAst = ClassInstanceAttributeAst | ClassStaticAttributeAst
 SupMemberAst = SupMethodPrototypeAst | SupTypedefAst
