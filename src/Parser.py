@@ -492,7 +492,7 @@ class Parser:
     def _parse_function_call_next_named_arguments(self) -> BoundParser:
         def parse_following() -> BoundParser:
             p1 = self._parse_token(TokenType.TkComma).parse_once()
-            p2 = self._parse_function_call_arguments_named().parse_once()
+            p2 = self._parse_function_call_argument_named().parse_once()
             return BoundParser(lambda x: x, self, [p1, p2])
 
         p3 = self._parse_function_call_argument_named().parse_once()
@@ -500,12 +500,12 @@ class Parser:
         return BoundParser(lambda x, y: [x] + y, self, [p3, p4])
 
     @parser
-    def _parse_function_call_arguments_normal(self) -> BoundParser:
+    def _parse_function_call_argument_normal(self) -> BoundParser:
         p1 = self._parse_expression().parse_once()
         return BoundParser(lambda x: FunctionArgumentAst(None, x), self, [p1])
 
     @parser
-    def _parse_function_call_arguments_named(self) -> BoundParser:
+    def _parse_function_call_argument_named(self) -> BoundParser:
         p1 = self._parse_identifier().parse_once()
         p2 = self._parse_token(TokenType.TkColon).parse_once()
         p3 = self._parse_expression().parse_once()
@@ -945,6 +945,79 @@ class Parser:
         p1 = self._parse_expression().parse_once()
         return BoundParser(lambda x: x, self, [p1])
 
+    """[TYPES]"""
+
+    @parser
+    def _parse_type_identifier(self) -> BoundParser:
+        p1 = self._parse_operator_identifier_unary_reference().parse_optional(remove_tokens=False)
+        p2 = self._parse_static_scoped_generic_identifier().parse_once()
+        return BoundParser(TypeAst, self, [p1, p2])
+
+    @parser
+    def _parse_type_identifiers(self) -> BoundParser:
+        def parse_next_type_identifier() -> BoundParser:
+            p3 = self._parse_token(TokenType.TkComma).parse_once()
+            p4 = self._parse_type_identifier().parse_once()
+            return BoundParser(lambda x, y: y, self, [p3, p4])
+
+        p1 = self._parse_type_identifier().parse_once()
+        p2 = parse_next_type_identifier().parse_zero_or_more()
+        return BoundParser(lambda x, y: [x] + y, self, [p1, p2])
+
+    @parser
+    def _parse_type_generic_arguments(self) -> BoundParser:
+        p1 = self._parse_token(TokenType.TkLeftAngleBracket).parse_once()
+        p2 = self._parse_type_generic_arguments_normal_then_named().parse_optional()
+        p3 = self._parse_token(TokenType.TkRightAngleBracket).parse_once()
+        return BoundParser(TypeGenericArgumentAst, self, [p1, p2, p3])
+
+    @parser
+    def _parse_type_generic_arguments_normal_then_named(self) -> BoundParser:
+        p1 = self._parse_type_generic_arguments_next_normal().delay_parse()
+        p2 = self._parse_type_generic_arguments_next_named().delay_parse()
+        p3 = (p1 | p2).parse_once()
+        return BoundParser(lambda x: x, self, [p3])
+
+    @parser
+    def _parse_type_generic_arguments_next_normal(self) -> BoundParser:
+        @parser
+        def parse_following() -> BoundParser:
+            p3 = self._parse_token(TokenType.TkComma).parse_once()
+            p4 = self._parse_type_generic_arguments_normal_then_named().parse_once()
+            return BoundParser(lambda x, y: y, self, [p3, p4])
+
+        p1 = self._parse_type_generic_argument_normal().parse_once()
+        p2 = parse_following().parse_optional()
+        return BoundParser(lambda x, y: [x] + y, self, [p1, p2])
+
+    @parser
+    def _parse_type_generic_arguments_next_named(self) -> BoundParser:
+        @parser
+        def parse_following() -> BoundParser:
+            p3 = self._parse_token(TokenType.TkComma).parse_once()
+            p4 = self._parse_type_generic_argument_named().parse_once()
+            return BoundParser(lambda x, y: y, self, [p3, p4])
+
+        p1 = self._parse_type_generic_argument_named().parse_once()
+        p2 = parse_following().parse_zero_or_more()
+        return BoundParser(lambda x, y: [x] + y, self, [p1, p2])
+
+    @parser
+    def _parse_type_generic_argument_normal(self) -> BoundParser:
+        p1 = self._parse_type_identifier().parse_once()
+        return BoundParser(TypeGenericArgumentAst_Normal, self, [p1])
+
+    @parser
+    def _parse_type_generic_argument_named(self) -> BoundParser:
+        p1 = self._parse_identifier().parse_once()
+        p2 = self._parse_token(TokenType.TkEqual).parse_once()
+        p3 = self._parse_type_identifier().parse_once()
+        return BoundParser(TypeGenericArgumentAst_Named, self, [p1, p2, p3])
+
+
+
+
+
 
     @parser
     def _parse_token(self, token: TokenType) -> BoundParser:
@@ -960,41 +1033,6 @@ class Parser:
     @parser
     def _parse_dot_scoped_identifier(self) -> BoundParser:
         return BoundParser(IdentifierAst, self, [])
-
-    """[TYPES]"""
-
-    @parser
-    def _parse_type_identifier(self) -> BoundParser:
-        p1 = self._parse_operator_identifier_unary_reference().parse_optional(remove_tokens=False)
-        p2 = self._parse_static_scoped_generic_identifier().parse_once()
-        p3 = self._parse_type_postfix().parse_zero_or_more()
-        return BoundParser(TypeAst, self, [p1, p2, p3])
-
-    @parser
-    def _parse_type_identifiers(self) -> BoundParser:
-        def parse_next_type_identifier() -> BoundParser:
-            p3 = self._parse_token(TokenType.TkComma).parse_once()
-            p4 = self._parse_type_identifier().parse_once()
-            return BoundParser(lambda x, y: y, self, [p3, p4])
-
-        p1 = self._parse_type_identifier().parse_once()
-        p2 = parse_next_type_identifier().parse_zero_or_more()
-        return BoundParser(lambda x, y: [x] + y, self, [p1, p2])
-
-    @parser
-    def _parse_type_postfix(self) -> BoundParser:
-        def parse_variant_type_postfix():
-            p3 = self._parse_token(TokenType.TkVerticalBar).parse_optional()
-            p4 = self._parse_type_identifier().parse_once()
-            return BoundParser(lambda x: x, self, [p3, p4])
-
-        p1 = self._parse_token(TokenType.TkQuestionMark)
-        p2 = self._parse_token(TokenType.TkExclamation)
-        p3 = parse_variant_type_postfix()
-
-
-
-
 
     def _skip(self, token: TokenType):
         while self._current < len(self._tokens) and self._tokens[self._current].token_type == token:
