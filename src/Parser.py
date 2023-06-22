@@ -888,7 +888,7 @@ class Parser:
         p1 = self._parse_token(TokenType.KwAsync).parse_optional(remove_tokens=False)
         p2 = self._parse_lambda_capture_list().parse_optional()
         p3 = self._parse_lambda_parameters().parse_once()
-        p4 = self._parse_token(TokenType.TkArrow).parse_once()
+        p4 = self._parse_token(TokenType.TkRightArrow).parse_once()
         p5 = self._parse_lambda_implementation().parse_once()
         return BoundParser(LambdaAst, self, [p1, p2, p3, p4, p5])
 
@@ -940,6 +940,11 @@ class Parser:
         p2 = self._parse_function_parameter_identifier().parse_once()
         return BoundParser(LambdaParameterAst, self, [p1, p2])
 
+    @parser
+    def _parse_lambda_implementation(self) -> BoundParser:
+        p1 = self._parse_expression().parse_once()
+        return BoundParser(lambda x: x, self, [p1])
+
 
     @parser
     def _parse_token(self, token: TokenType) -> BoundParser:
@@ -955,6 +960,39 @@ class Parser:
     @parser
     def _parse_dot_scoped_identifier(self) -> BoundParser:
         return BoundParser(IdentifierAst, self, [])
+
+    """[TYPES]"""
+
+    @parser
+    def _parse_type_identifier(self) -> BoundParser:
+        p1 = self._parse_operator_identifier_unary_reference().parse_optional(remove_tokens=False)
+        p2 = self._parse_static_scoped_generic_identifier().parse_once()
+        p3 = self._parse_type_postfix().parse_zero_or_more()
+        return BoundParser(TypeAst, self, [p1, p2, p3])
+
+    @parser
+    def _parse_type_identifiers(self) -> BoundParser:
+        def parse_next_type_identifier() -> BoundParser:
+            p3 = self._parse_token(TokenType.TkComma).parse_once()
+            p4 = self._parse_type_identifier().parse_once()
+            return BoundParser(lambda x, y: y, self, [p3, p4])
+
+        p1 = self._parse_type_identifier().parse_once()
+        p2 = parse_next_type_identifier().parse_zero_or_more()
+        return BoundParser(lambda x, y: [x] + y, self, [p1, p2])
+
+    @parser
+    def _parse_type_postfix(self) -> BoundParser:
+        def parse_variant_type_postfix():
+            p3 = self._parse_token(TokenType.TkVerticalBar).parse_optional()
+            p4 = self._parse_type_identifier().parse_once()
+            return BoundParser(lambda x: x, self, [p3, p4])
+
+        p1 = self._parse_token(TokenType.TkQuestionMark)
+        p2 = self._parse_token(TokenType.TkExclamation)
+        p3 = parse_variant_type_postfix()
+
+
 
 
 

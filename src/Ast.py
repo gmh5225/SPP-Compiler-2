@@ -210,8 +210,10 @@ class TypeGenericArgumentAst:
 
 @dataclass
 class TypeAst:
-    identifier: GenericIdentifierAst
     reference_type: TokenAst
+    identifier: GenericIdentifierAst
+    postfixes: list[TokenAst]
+    next_variant: Optional[TypeAst]
 
 @dataclass
 class IfStatementBranchAst:
