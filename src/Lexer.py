@@ -22,7 +22,7 @@ class Lexer:
             for token in tokens:
                 value = TokenType[token].value
                 if self._code[current:current + len(value)] == value:
-                    lexed_tokens.append(Token("", TokenType[token]))
+                    lexed_tokens.append(Token(value, TokenType[token]))
                     current += len(value)
                     f = True
                     break
@@ -32,7 +32,7 @@ class Lexer:
             for keyword in keywords:
                 value = TokenType[keyword].value
                 if self._code[current:current + len(value)] == value and not self._code[current + len(value)].isalpha():
-                    lexed_tokens.append(Token("", TokenType[keyword]))
+                    lexed_tokens.append(Token(value, TokenType[keyword]))
                     current += len(value)
                     f = True
                     break

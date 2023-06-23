@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 from dataclasses import dataclass
-from src.Tokens import Token
+from src.Tokens import TokenType
 
 
 @dataclass
@@ -11,8 +11,8 @@ class ProgramAst:
 
 @dataclass
 class TokenAst:
-    primary: Token
-    modifier: Optional[Token]
+    primary: TokenType
+    modifier: Optional[TokenType]
 
 @dataclass
 class AccessModifierAst:
@@ -59,7 +59,7 @@ def ImportTypesIndividualAst(individual_types: list[ImportTypeAst]):
 @dataclass
 class ImportDefinitionsAst:
     parent_directories: int
-    module: IdentifierAst
+    module: ModuleIdentifierAst
     what_to_import: ImportTypesAst
 
 @dataclass
@@ -74,7 +74,7 @@ class ModuleImplementationAst:
 @dataclass
 class ModulePrototypeAst:
     modifier: Optional[AccessModifierAst]
-    identifier: IdentifierAst
+    identifier: ModuleIdentifierAst
     body: ModuleImplementationAst
 
 @dataclass
