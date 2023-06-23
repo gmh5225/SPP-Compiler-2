@@ -21,12 +21,19 @@ class AccessModifierAst:
 @dataclass
 class IdentifierAst:
     identifier: str
-    separator: TokenAst
+
+@dataclass
+class ModuleIdentifierAst:
+    parts: list[IdentifierAst]
 
 @dataclass
 class GenericIdentifierAst:
     identifier: str
     generic: list[TypeGenericArgumentAst]
+
+@dataclass
+class ScopedGenericIdentifierAst:
+    parts: list[GenericIdentifierAst]
 
 @dataclass
 class MemberAccessAst:
@@ -143,8 +150,8 @@ class WhereBlockAst:
 
 @dataclass
 class WhereConstraintAst:
-    types_to_constrain: list[GenericIdentifierAst]
-    constraints: list[GenericIdentifierAst]
+    types_to_constrain: list[TypeAst]
+    constraints: list[ScopedGenericIdentifierAst]
 
 @dataclass
 class ValueGuardAst:
@@ -349,10 +356,15 @@ class PostfixSliceAccessAst:
 
 @dataclass
 class PostfixStructInitializerAst:
-    fields: dict[IdentifierAst | TokenAst, ExpressionAst]
+    fields: list[PostfixStructInitializerFieldAst]
 
 @dataclass
-class PostfixCastAst:
+class PostfixStructInitializerFieldAst:
+    identifier: IdentifierAst | TokenAst
+    value: Optional[ExpressionAst]
+
+@dataclass
+class PostfixTypeCastAst:
     cast_type: TypeAst
 
 @dataclass
@@ -386,6 +398,18 @@ class CharLiteralAst:
 @dataclass
 class BoolLiteralAst:
     value: bool
+
+@dataclass
+class ListLiteralAst:
+    iterable_build: IterableRangeAst | IterableFixedAst | IterableComprehensionAst
+
+@dataclass
+class SetLiteralAst:
+    iterable_build: IterableRangeAst | IterableFixedAst | IterableComprehensionAst
+
+@dataclass
+class GeneratorLiteralAst:
+    iterable_build: IterableRangeAst | IterableComprehensionAst
 
 @dataclass
 class MapLiteralAst:
@@ -422,10 +446,7 @@ class IterableComprehensionAst:
     guard: Optional[ExpressionAst]
 
 
-PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixIndexAccessAst | PostfixSliceAccessAst | PostfixStructInitializerAst | PostfixCastAst | TokenAst
-ListLiteralAst = IterableRangeAst | IterableFixedAst | IterableComprehensionAst
-GeneratorLiteralAst = IterableRangeAst | IterableComprehensionAst
-SetLiteralAst = IterableRangeAst | IterableFixedAst | IterableComprehensionAst
+PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixIndexAccessAst | PostfixSliceAccessAst | PostfixStructInitializerAst | PostfixTypeCastAst | TokenAst
 NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiteralBase2Ast
 LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | ListLiteralAst | GeneratorLiteralAst | MapLiteralAst | SetLiteralAst | PairLiteralAst | RegexLiteralAst | TupleLiteralAst
 PrimaryExpressionAst = LiteralAst | IdentifierAst | ParenthesizedExpressionAst | LambdaAst | PlaceholderAst
