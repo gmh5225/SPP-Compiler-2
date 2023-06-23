@@ -13,3 +13,6 @@ class Compiler:
         self._code = code
         self._tokens = Lexer(code).lex()
         self._ast = Parser(self._tokens).parse()
+
+        print("Successfully parsed AST")
+        pprint.pprint(self._ast)

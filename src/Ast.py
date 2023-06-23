@@ -50,6 +50,12 @@ class ImportTypesAst:
     individual_types: list[ImportTypeAst]
     import_all: bool
 
+def ImportTypesAllAst():
+    return ImportTypesAst([], True)
+
+def ImportTypesIndividualAst(individual_types: list[ImportTypeAst]):
+    return ImportTypesAst(individual_types, False)
+
 @dataclass
 class ImportDefinitionsAst:
     parent_directories: int
@@ -117,13 +123,28 @@ class FunctionArgumentAst:
     identifier: Optional[IdentifierAst]
     value: ExpressionAst
 
+def FunctionArgumentNamedAst(identifier: IdentifierAst, value: ExpressionAst):
+    return FunctionArgumentAst(identifier, value)
+
+def FunctionArgumentNormalAst(value: ExpressionAst):
+    return FunctionArgumentAst(None, value)
+
 @dataclass
 class FunctionParameterAst:
+    is_mutable: bool
     identifier: IdentifierAst
     type_annotation: TypeAst
     default_value: Optional[ExpressionAst]
-    is_mutable: bool
     is_variadic: bool
+
+def FunctionParameterRequiredAst(is_mutable: bool, identifier: IdentifierAst, type_annotation: TypeAst):
+    return FunctionParameterAst(is_mutable, identifier, type_annotation, None, False)
+
+def FunctionParameterOptionalAst(is_mutable: bool, identifier: IdentifierAst, type_annotation: TypeAst, default_value: ExpressionAst):
+    return FunctionParameterAst(is_mutable, identifier, type_annotation, default_value, False)
+
+def FunctionParameterVariadicAst(is_mutable: bool, identifier: IdentifierAst, type_annotation: TypeAst):
+    return FunctionParameterAst(is_mutable, identifier, type_annotation, None, True)
 
 @dataclass
 class FunctionImplementationAst:
@@ -215,10 +236,25 @@ class TypeGenericParameterAst:
     default: Optional[TypeAst]
     is_variadic: bool
 
+def TypeGenericParameterRequiredAst(identifier: IdentifierAst, constraints: list[GenericIdentifierAst]):
+    return TypeGenericParameterAst(identifier, constraints, None, False)
+
+def TypeGenericParameterOptionalAst(identifier: IdentifierAst, constraints: list[GenericIdentifierAst], default: TypeAst):
+    return TypeGenericParameterAst(identifier, constraints, default, False)
+
+def TypeGenericParameterVariadicAst(identifier: IdentifierAst, constraints: list[GenericIdentifierAst]):
+    return TypeGenericParameterAst(identifier, constraints, None, True)
+
 @dataclass
 class TypeGenericArgumentAst:
     identifier: Optional[IdentifierAst]
     value: TypeAst
+
+def TypeGenericArgumentNamedAst(identifier: IdentifierAst, value: TypeAst):
+    return TypeGenericArgumentAst(identifier, value)
+
+def TypeGenericArgumentNormalAst(value: TypeAst):
+    return TypeGenericArgumentAst(None, value)
 
 @dataclass
 class TypeAst:
@@ -443,7 +479,7 @@ class IterableComprehensionAst:
     expression: ExpressionAst
     variables: list[LocalVariableAst]
     iterating: ExpressionAst
-    guard: Optional[ExpressionAst]
+    guard: Optional[ValueGuardAst]
 
 
 PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixIndexAccessAst | PostfixSliceAccessAst | PostfixStructInitializerAst | PostfixTypeCastAst | TokenAst
