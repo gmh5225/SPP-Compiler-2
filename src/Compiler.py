@@ -2,7 +2,7 @@ from src.Ast import ProgramAst
 from src.Lexer import Lexer
 from src.Parser import Parser
 from src.Tokens import Token
-import pprint
+import pprint, dataclasses
 
 class Compiler:
     _code: str
@@ -15,4 +15,5 @@ class Compiler:
         self._ast = Parser(self._tokens).parse()
 
         print("Successfully parsed AST")
-        pprint.pprint(self._ast)
+        print(vars(self._ast))
+        pprint.pprint(dataclasses.asdict(self._ast), sort_dicts=False)

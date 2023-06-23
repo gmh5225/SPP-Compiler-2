@@ -15,12 +15,14 @@ class BoundParser:
     _rules: Rules
     _parser: Parser
     _delayed: bool
+    _ast: Optional[Any]
 
     def __init__(self, constructor: type | Callable, parser: Parser, rules: Rules):
         self._ctor = constructor
         self._rules = rules
         self._parser = parser
         self._delayed = False
+        self._ast = None
 
     def parse_once(self, remove_tokens: bool = True):
         results = []
@@ -30,15 +32,17 @@ class BoundParser:
         # remove the token results
         if remove_tokens:
             results = [result for result in results if not isinstance(result, TokenAst)]
-        return self._ctor(*results)
+        self._ast = self._ctor(*results)
+        return self._ast
 
     def parse_optional(self, remove_tokens: bool = True):
         restore_index = self._parser._current
         try:
-            results = self.parse_once(remove_tokens)
-            return results
+            result = self.parse_once(remove_tokens)
+            return result
         except ParseError:
             self._parser._current = restore_index
+            self._ast = None
             return None
 
     def parse_zero_or_more(self):
@@ -50,16 +54,18 @@ class BoundParser:
             except ParseError:
                 self._parser._current = restore_index
                 break
+        self._ast = results
+        return results
+
+    def parse_one_or_more(self):
+        results = [self.parse_once()]
+        results.extend(self.parse_zero_or_more())
+        self._ast = results
         return results
 
     def delay_parse(self) -> BoundParser:
         self._delayed = True
         return self
-
-    def parse_one_or_more(self):
-        results = [self.parse_once()]
-        results.extend(self.parse_zero_or_more())
-        return results
 
     def __or__(self, that: BoundParser) -> BoundParser:
         # Allow chaining n parsers, and one of them has to match
@@ -74,6 +80,7 @@ class BoundParser:
             if f is None:
                 raise ParseError("No valid parser found for selection")
             return f
+
         b = BoundParser(self._ctor, self._parser, [inner])
         b.delay_parse()
         return b
@@ -121,9 +128,14 @@ class Parser:
         self._dedents_expected = 0
 
     def parse(self) -> ProgramAst:
-        return self._parse_program().parse_once()
+        program = self._parse_root().parse_once()
+        return program
 
     """MODULES"""
+    @partial_parse
+    def _parse_root(self) -> BoundParser:
+        p1 = self._parse_program().parse_once()
+        return BoundParser(lambda x: x, self, [p1])
 
     @partial_parse
     def _parse_program(self) -> BoundParser:
@@ -1831,7 +1843,7 @@ class Parser:
 
     @partial_parse
     def _parse_token(self, token: TokenType) -> BoundParser:
-        print("parse_token", token)
+        # print("parse_token", token)
         if self._dedents_expected > 0:
             raise ParseError("Expected a dedent")
 
@@ -1843,14 +1855,14 @@ class Parser:
 
         current_token = self._tokens[self._current].token_type
         if current_token != token:
-            print([frame.function for frame in reversed(inspect.stack()) if frame.function not in [
-                "parse_once", "parse_optional", "parse_zero_or_more", "parse_one_or_more", "__or__",
-                "_internal_parser", "inner"]])
-            print(f"Expected {token}, got <{current_token}>\n")
+            # print([frame.function for frame in reversed(inspect.stack()) if frame.function not in [
+            #     "parse_once", "parse_optional", "parse_zero_or_more", "parse_one_or_more", "__or__",
+            #     "_internal_parser", "inner"]])
+            # print(f"Expected {token}, got <{current_token}>\n")
 
             raise ParseError(f"Expected {token}, got <{current_token}>")
         self._current += 1
-        print("parse_token", token, "success")
+        # print("parse_token", token, "success")
         return BoundParser(lambda t: TokenAst(t, None), self, [])
 
     @partial_parse
@@ -1866,10 +1878,10 @@ class Parser:
 
         current_lexeme = self._tokens[self._current].token_type
         if current_lexeme != lexeme:
-            print([frame.function for frame in reversed(inspect.stack()) if frame.function not in [
-                "parse_once", "parse_optional", "parse_zero_or_more", "parse_one_or_more", "__or__",
-                "_internal_parser", "inner"]])
-            print(f"Expected {lexeme}, got <{current_lexeme}>\n")
+            # print([frame.function for frame in reversed(inspect.stack()) if frame.function not in [
+            #     "parse_once", "parse_optional", "parse_zero_or_more", "parse_one_or_more", "__or__",
+            #     "_internal_parser", "inner"]])
+            # print(f"Expected {lexeme}, got <{current_lexeme}>\n")
             raise ParseError(f"Expected {lexeme}, got <{current_lexeme}>")
         self._current += 1
         return BoundParser(lambda: self._tokens[self._current - 1].token_metadata, self, [])
