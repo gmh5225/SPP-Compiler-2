@@ -137,3 +137,82 @@ class ParseImportTypeAlias(Parser[IdentifierAst]):
         p1 = ParseToken(TokenType.KwAs).parse_once()
         p2 = ParseIdentifier().parse_once()
         return p2
+
+
+class ParseAccessModifier(Parser[AccessModifierAst]):
+    def _parse(self) -> T:
+        p1 = ParseToken(TokenType.KwPub)
+        p2 = ParseToken(TokenType.KwPriv)
+        p3 = ParseToken(TokenType.KwProt)
+        p4 = (p1 | p2 | p3).parse_once()
+        return AccessModifierAst(p4)
+
+
+class ParseClassPrototype(Parser[ClassPrototypeAst]):
+    def _parse(self) -> T:
+        p1 = ParseDecorators().parse_optional()
+        p2 = ParseToken(TokenType.KwPart).parse_optional()
+        p3 = ParseAccessModifier().parse_optional()
+        p4 = ParseToken(TokenType.KwCls).parse_once()
+        p5 = ParseClassIdentifier().parse_once()
+        p6 = ParseTypeGenericParameters().parse_optional()
+        p7 = ParseWhereBlock().parse_optional()
+        p8 = ParseClassOrEmptyImplementation().parse_once()
+        return ClassPrototypeAst(p1, p2 is not None, p3, p5, p6, p7, p8)
+
+
+class ParseClassOrEmptyImplementation(Parser[ClassImplementationAst]):
+    class ParseNonEmptyPrep:
+        def _parse(self) -> T:
+            p1 = ParseToken(TokenType.TkColon).parse_once()
+            p2 = ParseIndent().parse_once()
+            p3 = ParseClassImplementation().parse_once()
+            p4 = ParseDedent().parse_once()
+            return p3
+
+    class ParseEmptyPrep:
+        def _parse(self) -> T:
+            p1 = ParseEmptyImplementation().parse_once()
+            return None
+
+    def _parse(self) -> T:
+        p1 = ParseNonEmptyPrep()
+        p2 = ParseEmptyPrep()
+        p3 = (p1 | p2).parse_once()
+        return p3
+
+
+class ParseClassImplementation(Parser[ClassImplementationAst]):
+    def _parse(self) -> T:
+        p1 = ParseClassMember().parse_zero_or_more()
+        return ClassImplementationAst(p1)
+
+
+class ParseClassMember(Parser[ClassAttributeAst]):
+    def _parse(self) -> T:
+        p1 = ParseClassAttribute()
+        p2 = ParseClassAttrributeStatic()
+        p3 = (p1 | p2).parse_once()
+        return p3
+
+
+class ParseClassAttribute(Parser[ClassInstanceAttributeAst]):
+    def _parse(self) -> T:
+        p1 = ParseAccessModifier().parse_optional()
+        p2 = ParseToken(TokenType.KwMut).parse_once()
+        p3 = ParseClassAttributeIdentifier().parse_once()
+        p4 = ParseToken(TokenType.TkColon).parse_once()
+        p5 = ParseTypeIdentifier().parse_once()
+        p6 = ParseToken(TokenType.TkSemicolon).parse_once()
+        return ClassInstanceAttributeAst(p1, p2 is not None, p3, p5)
+
+
+class ParseClassAttributeStatic(Parser[ClassStaticAttributeAst]):
+    def _parse(self) -> T:
+        p1 = ParseAccessModifier().parse_optional()
+        p2 = ParseToken(TokenType.KwMut).parse_once()
+        p3 = ParseClassAttributeIdentifier().parse_once()
+        p4 = ParseToken(TokenType.TkEqual).parse_once()
+        p5 = ParseExpression().parse_once()
+        p6 = ParseToken(TokenType.TkSemicolon).parse_once()
+        return ClassStaticAttributeAst(p1, p2 is not None, p3, p6)

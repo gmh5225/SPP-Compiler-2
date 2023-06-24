@@ -271,7 +271,7 @@ class Parser:
             return BoundParser(lambda impl: impl, self, [p4, p5, p6, p7])
 
         def parse_empty_prep():
-            p4 = self._parse_empty_implementation()
+            p4 = self._parse_empty_implementation().parse_once()
             return BoundParser(lambda: ClassImplementationAst([]), self, [p4])
 
         p1 = parse_empty_prep().delay_parse()
