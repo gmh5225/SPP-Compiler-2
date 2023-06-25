@@ -6,12 +6,15 @@ from src.Ast import *
 from src.Tokens import TokenType, Token
 import inspect
 
-class ParseError(Exception):
+class ParseSyntaxError(Exception):
+    ...
+
+class ParserError(Exception):
     ...
 
 Rule = Callable
 
-PREV_ERROR = ParseError("No previous error")
+PREV_ERROR = ""
 
 
 class ErrorFormatter:
@@ -71,7 +74,7 @@ class BoundParser:
         try:
             self.parse_once()
             return self.__ret_value()
-        except ParseError as e:
+        except ParseSyntaxError as e:
             global PREV_ERROR
             PREV_ERROR = e
             self._parser._current = restore_index
@@ -86,7 +89,7 @@ class BoundParser:
             try:
                 result = self.parse_once()
                 results.append(result)
-            except ParseError as e:
+            except ParseSyntaxError as e:
                 global PREV_ERROR
                 PREV_ERROR = e
                 self._parser._current = restore_index
@@ -101,7 +104,7 @@ class BoundParser:
             restore_index = self._parser._current
             try:
                 results.append(self.parse_once())
-            except ParseError as e:
+            except ParseSyntaxError as e:
                 global PREV_ERROR
                 PREV_ERROR = e
                 self._parser._current = restore_index
@@ -117,14 +120,15 @@ class BoundParser:
         # Allow chaining n parsers, and one of them has to match
         # Try to parse each one. if one is valid, return it
         # if none are valid, raise an error
-        assert self._delayed and that._delayed, "Both parsers must be delayed"
+        if not (self._delayed and that._delayed):
+            raise ParserError("Both parsers must be delayed")
 
         def parse_one_of_inner():
             f = self.parse_optional()
             if f is None:
                 f = that.parse_optional()
             if f is None:
-                raise ParseError(f"No valid parser found for selection\n{PREV_ERROR}")
+                raise ParseSyntaxError(f"No valid parser found for selection\n{PREV_ERROR}")
             return f
 
         b = BoundParser(self._parser, parse_one_of_inner)
@@ -888,129 +892,117 @@ class Parser:
         return self._parse_binary_expression(
             self._parse_null_coalescing_expression(),
             self._parse_operator_identifier_assignment(),
-            self._parse_assignment_expression())
+            self._parse_assignment_expression)
 
     def _parse_null_coalescing_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_logical_or_expression(),
             self._parse_operator_identifier_null_coalescing(),
-            self._parse_null_coalescing_expression())
+            self._parse_null_coalescing_expression)
 
     def _parse_logical_or_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_logical_and_expression(),
             self._parse_token(TokenType.TkDoubleVerticalBar),
-            self._parse_logical_or_expression())
+            self._parse_logical_or_expression)
 
     def _parse_logical_and_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_bitwise_or_expression(),
             self._parse_token(TokenType.TkDoubleAmpersand),
-            self._parse_logical_and_expression())
+            self._parse_logical_and_expression)
 
     def _parse_bitwise_or_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_bitwise_xor_expression(),
             self._parse_token(TokenType.TkVerticalBar),
-            self._parse_bitwise_or_expression())
+            self._parse_bitwise_or_expression)
 
     def _parse_bitwise_xor_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_bitwise_and_expression(),
             self._parse_token(TokenType.TkCaret),
-            self._parse_bitwise_xor_expression())
+            self._parse_bitwise_xor_expression)
 
     def _parse_bitwise_and_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_equality_expression(),
             self._parse_token(TokenType.TkAmpersand),
-            self._parse_bitwise_and_expression())
+            self._parse_bitwise_and_expression)
 
     def _parse_equality_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_relational_expression(),
             self._parse_operator_identifier_equality(),
-            self._parse_equality_expression())
+            self._parse_equality_expression)
 
     def _parse_relational_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_shift_expression(),
             self._parse_operator_identifier_relation(),
-            self._parse_relational_expression())
+            self._parse_relational_expression)
 
     def _parse_shift_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_rotate_expression(),
             self._parse_operator_identifier_shift(),
-            self._parse_shift_expression())
+            self._parse_shift_expression)
 
     def _parse_rotate_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_additive_expression(),
             self._parse_operator_identifier_rotate(),
-            self._parse_rotate_expression())
+            self._parse_rotate_expression)
 
     def _parse_additive_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_multiplicative_expression(),
             self._parse_operator_identifier_additive(),
-            self._parse_additive_expression())
+            self._parse_additive_expression)
 
     def _parse_multiplicative_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_power_expression(),
             self._parse_operator_identifier_multiplicative(),
-            self._parse_multiplicative_expression())
+            self._parse_multiplicative_expression)
 
     def _parse_power_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_pipe_expression(),
             self._parse_token(TokenType.TkDoubleAstrix),
-            self._parse_power_expression())
+            self._parse_power_expression)
 
     def _parse_pipe_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_unary_expression(),
             self._parse_token(TokenType.TkPipe),
-            self._parse_pipe_expression())
+            self._parse_pipe_expression)
 
     def _parse_unary_expression(self) -> BoundParser:
         def inner():
-            p1 = self._parse_unary_expression_internal()
-            p2 = self._parse_postfix_expression()
-            p3 = (p1 | p2).parse_once()
-            return p3
-        return BoundParser(self, inner)
-
-    def _parse_unary_expression_internal(self) -> BoundParser:
-        def inner():
-            p4 = self._parse_operator_identifier_unary().parse_once()
-            p5 = self._parse_unary_expression().parse_once()
-            return UnaryExpressionAst(p4, p5)
+            p1 = self._parse_operator_identifier_unary().parse_zero_or_more()
+            p2 = self._parse_postfix_expression().parse_once()
+            for op in reversed(p1):
+                p2 = UnaryExpressionAst(op, p2)
+            return p2
         return BoundParser(self, inner)
 
     def _parse_postfix_expression(self) -> BoundParser:
         def inner():
-            p1 = self._parse_postfix_expression_internal()
-            p2 = self._parse_primary_expression()
-            p3 = (p1 | p2).parse_once()
-            return p3
-        return BoundParser(self, inner)
-
-    def _parse_postfix_expression_internal(self) -> BoundParser:
-        def inner():
-            p4 = self._parse_postfix_expression().parse_once()
-            p5 = self._parse_operator_identifier_postfix().parse_once()
-            return PostfixExpressionAst(p4, p5)
+            p1 = self._parse_primary_expression().parse_once()
+            p2 = self._parse_operator_identifier_postfix().parse_zero_or_more()
+            for op in p2:
+                p1 = PostfixExpressionAst(p1, op)
+            return p1
         return BoundParser(self, inner)
 
     def _parse_primary_expression(self) -> BoundParser:
         def inner():
-            p1 = self._parse_lambda()
-            p2 = self._parse_literal()
-            p3 = self._parse_static_scoped_generic_identifier()
-            p4 = self._parse_parenthesized_expression()
-            p5 = self._parse_expression_placeholder()
+            p1 = self._parse_lambda().delay_parse()
+            p2 = self._parse_literal().delay_parse()
+            p3 = self._parse_static_scoped_generic_identifier().delay_parse()
+            p4 = self._parse_parenthesized_expression().delay_parse()
+            p5 = self._parse_expression_placeholder().delay_parse()
             p6 = (p1 | p2 | p3 | p4 | p5).parse_once()
             return p6
         return BoundParser(self, inner)
@@ -1019,13 +1011,13 @@ class Parser:
         def inner():
             p1 = lhs.parse_once()
             p2 = self._parse_binary_expression_rhs(op, rhs).parse_optional()
-            return lhs if not rhs else BinaryExpressionAst(lhs, op, rhs)
+            return p1 if not p2 else BinaryExpressionAst(p1, op, p2)
         return BoundParser(self, inner)
 
     def _parse_binary_expression_rhs(self, op, rhs) -> BoundParser:
         def inner():
             p3 = op.parse_once()
-            p4 = rhs.parse_once()
+            p4 = rhs().parse_once()
             return p3, p4
         return BoundParser(self, inner)
 
@@ -1577,20 +1569,20 @@ class Parser:
 
     def _parse_statement(self) -> BoundParser:
         def inner():
-            p1 = self._parse_statement_if()
-            p2 = self._parse_statement_while()
-            p3 = self._parse_statement_for()
-            p4 = self._parse_statement_do()
-            p5 = self._parse_statement_match()
-            p6 = self._parse_statement_with()
-            p7 = self._parse_statement_typedef()
-            p8 = self._parse_statement_return()
-            p9 = self._parse_statement_yield()
-            p10 = self._parse_statement_break()
-            p11 = self._parse_statement_continue()
-            p12 = self._parse_statement_let()
-            p13 = self._parse_statement_expression()
-            p14 = self._parse_function_prototype()
+            p1 = self._parse_statement_if().delay_parse()
+            p2 = self._parse_statement_while().delay_parse()
+            p3 = self._parse_statement_for().delay_parse()
+            p4 = self._parse_statement_do().delay_parse()
+            p5 = self._parse_statement_match().delay_parse()
+            p6 = self._parse_statement_with().delay_parse()
+            p7 = self._parse_statement_typedef().delay_parse()
+            p8 = self._parse_statement_return().delay_parse()
+            p9 = self._parse_statement_yield().delay_parse()
+            p10 = self._parse_statement_break().delay_parse()
+            p11 = self._parse_statement_continue().delay_parse()
+            p12 = self._parse_statement_let().delay_parse()
+            p13 = self._parse_statement_expression().delay_parse()
+            p14 = self._parse_function_prototype().delay_parse()
             p15 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12 | p13 | p14).parse_once()
             return p15
         return BoundParser(self, inner)
@@ -2048,8 +2040,8 @@ class Parser:
             p1 = self._parse_numeric_integer().parse_once()
             p2 = self._parse_numeric_decimal().parse_optional()
             p3 = self._parse_numeric_complex().parse_optional()
-            p4 = self._parse_numeric_exponent().parse_optional()
-            return NumberLiteralAst(p1, p2, p3, p4)
+            p4 = self._parse_numeric_exponent().parse_optional() is not None
+            return NumberLiteralBase10Ast(p1, p2, p3, p4)
         return BoundParser(self, inner)
 
     def _parse_numeric_integer(self) -> BoundParser:
@@ -2083,24 +2075,26 @@ class Parser:
 
     def _parse_token(self, token: TokenType) -> BoundParser:
         def inner():
+            print(f"parse_token: {token}")
             if self._dedents_expected > 0:
-                raise ParseError("Expected a dedent")
+                raise ParseSyntaxError("Expected a dedent")
 
             if token != TokenType.TkNewLine: self._skip(TokenType.TkNewLine)
             if token != TokenType.TkWhitespace: self._skip(TokenType.TkWhitespace)
 
             if self._current >= len(self._tokens):
-                raise ParseError(f"Expected <{token}>, got <EOF>")
+                raise ParseSyntaxError(f"Expected <{token}>, got <EOF>")
 
             current_token = self._tokens[self._current].token_type
             if current_token != token:
 
-                error = ParseError(
+                error = ParseSyntaxError(
                     ErrorFormatter(self._tokens).error(self._current) +
                     f"Expected <{token}>, got <{current_token}>\n" +
                     f"{' -> '.join(reversed([frame.function for frame in inspect.stack() if not frame.function.startswith('parse')]))}\n")
-                error_alt = PREV_ERROR
-                raise ParseError(str(error) + "\n" + str(error_alt))
+                # error_alt = PREV_ERROR
+                # raise ParseSyntaxError(str(error) + "\n" + str(error_alt))
+                raise error
 
             self._current += 1
             return TokenAst(self._tokens[self._current - 1], None)
@@ -2125,7 +2119,7 @@ class Parser:
             self._indent += 4
             p1 = self._parse_indented_whitespace().parse_optional()
             if self._tokens[self._current].token_type == TokenType.TkWhitespace:
-                raise ParseError("Unexpected whitespace")
+                raise ParseSyntaxError("Unexpected whitespace")
 
         return BoundParser(self, inner)
 
@@ -2151,6 +2145,6 @@ class Parser:
         def inner():
             p1 = self._parse_identifier().parse_once()
             if p1.identifier != character:
-                raise ParseError(f"Expected {character}, got {p1.value}")
+                raise ParseSyntaxError(f"Expected {character}, got {p1.value}")
             return p1
         return BoundParser(self, inner)
