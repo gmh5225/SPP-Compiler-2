@@ -271,11 +271,10 @@ class Parser:
 
     def _parse_access_modifier(self) -> BoundParser:
         def inner():
-            # p1 = self._parse_token(TokenType.KwPub).delay_parse()
-            # p2 = self._parse_token(TokenType.KwPriv).delay_parse()
-            # p3 = self._parse_token(TokenType.KwProt).delay_parse()
-            # p4 = (p1 | p2 | p3).parse_once()
-            p4 = self._parse_token(TokenType.KwPub).parse_once(keep_tokens=True)
+            p1 = self._parse_token(TokenType.KwPub).delay_parse()
+            p2 = self._parse_token(TokenType.KwPriv).delay_parse()
+            p3 = self._parse_token(TokenType.KwProt).delay_parse()
+            p4 = (p1 | p2 | p3).parse_once()
             return p4
         return BoundParser(self, inner)
 
@@ -2079,7 +2078,6 @@ class Parser:
 
     def _parse_token(self, token: TokenType) -> BoundParser:
         def inner():
-            print("parse_token", token)
             if self._dedents_expected > 0:
                 raise ParseError("Expected a dedent")
 
@@ -2091,10 +2089,6 @@ class Parser:
 
             current_token = self._tokens[self._current].token_type
             if current_token != token:
-                # print([frame.function for frame in reversed(inspect.stack()) if frame.function not in [
-                #     "parse_once", "parse_optional", "parse_zero_or_more", "parse_one_or_more", "__or__",
-                #     "_internal_parser", "inner"]])
-                # print(f"Expected {token}, got <{current_token}>\n")
 
                 raise ParseError(
                     ErrorFormatter(self._tokens).error(self._current) +
@@ -2102,9 +2096,7 @@ class Parser:
                     f"{' -> '.join(reversed([frame.function for frame in inspect.stack()]))}\n")
 
             self._current += 1
-            print("parse_token", self._tokens[self._current - 1], "success")
             return TokenAst(self._tokens[self._current - 1], None)
-            # return self._tokens[self._current - 1]
         return BoundParser(self, inner)
 
     def _parse_lexeme(self, lexeme: TokenType) -> BoundParser:
