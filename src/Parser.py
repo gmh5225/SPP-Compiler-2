@@ -858,8 +858,8 @@ class Parser:
 
     def _parse_assignment_expression(self) -> BoundParser:
         def inner():
-            p1 = self._parse_assignment_multiple().parse_once()
-            p2 = self._parse_assignment_single().parse_once()
+            p1 = self._parse_assignment_single().delay_parse()
+            p2 = self._parse_assignment_multiple().delay_parse()
             p3 = (p1 | p2).parse_once()
             return p3
         return BoundParser(self, inner)
@@ -998,28 +998,29 @@ class Parser:
 
     def _parse_primary_expression(self) -> BoundParser:
         def inner():
-            p1 = self._parse_lambda().delay_parse()
-            p2 = self._parse_literal().delay_parse()
-            p3 = self._parse_static_scoped_generic_identifier().delay_parse()
-            p4 = self._parse_parenthesized_expression().delay_parse()
-            p5 = self._parse_expression_placeholder().delay_parse()
-            p6 = (p1 | p2 | p3 | p4 | p5).parse_once()
+            p1 = self._parse_identifier().delay_parse()
+            p2 = self._parse_lambda().delay_parse()
+            p3 = self._parse_literal().delay_parse()
+            p4 = self._parse_static_scoped_generic_identifier().delay_parse()
+            p5 = self._parse_parenthesized_expression().delay_parse()
+            p6 = self._parse_expression_placeholder().delay_parse()
+            p7 = (p1 | p2 | p3 | p4 | p5 | p6).parse_once()
             return p6
         return BoundParser(self, inner)
 
-    def _parse_binary_expression(self, lhs, op, rhs) -> BoundParser:
-        def inner():
+    def _parse_binary_expression(self, __lhs, __op, __rhs) -> BoundParser:
+        def inner(lhs, op, rhs):
             p1 = lhs.parse_once()
             p2 = self._parse_binary_expression_rhs(op, rhs).parse_optional()
-            return p1 if not p2 else BinaryExpressionAst(p1, op, p2)
-        return BoundParser(self, inner)
+            return p1 if p2 is None else BinaryExpressionAst(p1, op, p2)
+        return BoundParser(self, functools.partial(inner, __lhs, __op, __rhs))
 
-    def _parse_binary_expression_rhs(self, op, rhs) -> BoundParser:
-        def inner():
+    def _parse_binary_expression_rhs(self, __op, __rhs) -> BoundParser:
+        def inner(op, rhs):
             p3 = op.parse_once()
             p4 = rhs().parse_once()
             return p3, p4
-        return BoundParser(self, inner)
+        return BoundParser(self, functools.partial(inner, __op, __rhs))
 
     def _parse_parenthesized_expression(self) -> BoundParser:
         def inner():
@@ -1854,7 +1855,7 @@ class Parser:
             p9 = self._parse_literal_tuple().delay_parse()
             p10 = self._parse_literal_regex().delay_parse()
             p11 = self._parse_literal_generator().delay_parse()
-            p12 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11).parse_once()
+            p12 = (p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11).parse_once()
             return p12
         return BoundParser(self, inner)
 
@@ -2075,7 +2076,7 @@ class Parser:
 
     def _parse_token(self, token: TokenType) -> BoundParser:
         def inner():
-            print(f"parse_token: {token}")
+            # print(f"parse_token: {token}")
             if self._dedents_expected > 0:
                 raise ParseSyntaxError("Expected a dedent")
 
