@@ -103,7 +103,8 @@ class BoundParser:
         while True:
             restore_index = self._parser._current
             try:
-                results.append(self.parse_once())
+                result = self.parse_once()
+                results.append(result)
             except ParseSyntaxError as e:
                 global PREV_ERROR
                 PREV_ERROR = e
@@ -128,7 +129,7 @@ class BoundParser:
             if f is None:
                 f = that.parse_optional()
             if f is None:
-                raise ParseSyntaxError(f"No valid parser found for selection\n{PREV_ERROR}")
+                raise ParseSyntaxError(f"No valid parser found for selection")
             return f
 
         b = BoundParser(self._parser, parse_one_of_inner)
@@ -604,7 +605,7 @@ class Parser:
     def _parse_function_call_arguments(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
-            p2 = self._parse_function_call_arguments_normal_then_named().parse_optional()
+            p2 = self._parse_function_call_arguments_normal_then_named().parse_optional() or []
             p3 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
             return p2
         return BoundParser(self, inner)
@@ -664,7 +665,7 @@ class Parser:
     def _parse_function_parameters(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
-            p2 = self._parse_function_parameters_required_then_optional().parse_optional()
+            p2 = self._parse_function_parameters_required_then_optional().parse_optional() or []
             p3 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
             return p2
         return BoundParser(self, inner)
@@ -1005,7 +1006,7 @@ class Parser:
             p5 = self._parse_parenthesized_expression().delay_parse()
             p6 = self._parse_expression_placeholder().delay_parse()
             p7 = (p1 | p2 | p3 | p4 | p5 | p6).parse_once()
-            return p6
+            return p7
         return BoundParser(self, inner)
 
     def _parse_binary_expression(self, __lhs, __op, __rhs) -> BoundParser:
@@ -1081,7 +1082,7 @@ class Parser:
     def _parse_lambda_parameters(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
-            p2 = self._parse_lambda_parameters_required().parse_once()
+            p2 = self._parse_lambda_parameters_required().parse_optional() or []
             p3 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
             return p2
         return BoundParser(self, inner)
@@ -1141,7 +1142,7 @@ class Parser:
     def _parse_type_generic_arguments(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkLeftAngleBracket).parse_once()
-            p2 = self._parse_type_generic_arguments_normal_then_named().parse_optional()
+            p2 = self._parse_type_generic_arguments_normal_then_named().parse_optional() or []
             p3 = self._parse_token(TokenType.TkRightAngleBracket).parse_once()
             return p2
         return BoundParser(self, inner)
@@ -1201,7 +1202,7 @@ class Parser:
     def _parse_type_generic_parameters(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkLeftAngleBracket).parse_once()
-            p2 = self._parse_type_generic_parameters_required_then_optional().parse_optional()
+            p2 = self._parse_type_generic_parameters_required_then_optional().parse_optional() or []
             p3 = self._parse_token(TokenType.TkRightAngleBracket).parse_once()
             return p2
         return BoundParser(self, inner)
@@ -1621,7 +1622,7 @@ class Parser:
     def _parse_postfix_operator_function_call(self) -> BoundParser:
         def inner():
             p1 = self._parse_function_call_arguments().parse_once()
-            p2 = self._parse_operator_identifier_variadic().parse_optional()
+            p2 = self._parse_operator_identifier_variadic().parse_optional() is not None
             return PostfixFunctionCallAst(p1, p2)
         return BoundParser(self, inner)
 

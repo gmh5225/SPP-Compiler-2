@@ -150,7 +150,7 @@ def FunctionParameterVariadicAst(parameter: FunctionParameterAst):
 
 @dataclass
 class FunctionImplementationAst:
-    body: list[StatementAst]
+    statements: list[StatementAst]
 
 @dataclass
 class EnumMemberAst:
@@ -204,8 +204,8 @@ class MultiAssignmentExpressionAst:
 
 @dataclass
 class PostfixExpressionAst:
-    op: TokenAst
     lhs: ExpressionAst
+    op: TokenAst
 
 @dataclass
 class ParenthesizedExpressionAst:
