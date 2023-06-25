@@ -4,7 +4,6 @@ import functools
 from typing import Optional, Generic, TypeVar, Callable, Any
 from src.Ast import *
 from src.Tokens import TokenType, Token
-import inspect
 
 class ParseSyntaxError(Exception):
     ...
@@ -1459,15 +1458,15 @@ class Parser:
 
     def _parse_tag_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_identifier().parse_once()
-            return p1
+            p1 = self._parse_lexeme(TokenType.LxTag).parse_once()
+            return TagIdentifierAst(p1)
         return BoundParser(self, inner)
 
     def _parse_statement_block(self) -> BoundParser:
         def inner():
-            p1 = self._parse_statement_block_multiple_lines()
-            p2 = self._parse_statement_block_single_line()
-            p3 = self._parse_empty_implementation()
+            p1 = self._parse_statement_block_multiple_lines().delay_parse()
+            p2 = self._parse_statement_block_single_line().delay_parse()
+            p3 = self._parse_empty_implementation().delay_parse()
             p4 = (p1 | p2 | p3).parse_once()
             return p4
         return BoundParser(self, inner)
@@ -2092,8 +2091,7 @@ class Parser:
 
                 error = ParseSyntaxError(
                     ErrorFormatter(self._tokens).error(self._current) +
-                    f"Expected <{token}>, got <{current_token}>\n" +
-                    f"{' -> '.join(reversed([frame.function for frame in inspect.stack() if not frame.function.startswith('parse')]))}\n")
+                    f"Expected <{token}>, got <{current_token}>\n")
                 # error_alt = PREV_ERROR
                 # raise ParseSyntaxError(str(error) + "\n" + str(error_alt))
                 raise error

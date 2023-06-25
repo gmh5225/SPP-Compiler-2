@@ -23,6 +23,10 @@ class IdentifierAst:
     identifier: str
 
 @dataclass
+class TagIdentifierAst:
+    tag: str
+
+@dataclass
 class ModuleIdentifierAst:
     parts: list[IdentifierAst]
 
@@ -289,21 +293,21 @@ class IfStatementAst:
 @dataclass
 class WhileStatementAst:
     condition: ExpressionAst
-    tag: Optional[IdentifierAst]
+    tag: Optional[TagIdentifierAst]
     body: list[StatementAst]
 
 @dataclass
 class ForStatementAst:
     identifiers: list[LocalVariableAst]
     iterable: ExpressionAst
-    tag: Optional[IdentifierAst]
+    tag: Optional[TagIdentifierAst]
     body: list[StatementAst]
 
 @dataclass
 class DoWhileStatementAst:
     body: list[StatementAst]
     condition: ExpressionAst
-    tag: Optional[IdentifierAst]
+    tag: Optional[TagIdentifierAst]
 
 @dataclass
 class MatchStatementAst:
@@ -337,11 +341,11 @@ class TypedefStatementAst:
 
 @dataclass
 class BreakStatementAst:
-    loop_tag: Optional[IdentifierAst]
+    loop_tag: Optional[TagIdentifierAst]
 
 @dataclass
 class ContinueStatementAst:
-    loop_tag: Optional[IdentifierAst]
+    loop_tag: Optional[TagIdentifierAst]
 
 @dataclass
 class LetStatementAst:
