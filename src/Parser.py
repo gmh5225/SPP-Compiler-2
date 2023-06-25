@@ -61,7 +61,8 @@ class BoundParser:
         return self._ast
 
     def add_err(self, error: str) -> BoundParser:
-        self._err += "- " + error
+        num_tabs = self._err.split("\n")[-1].count("\t")
+        self._err += "\t" * num_tabs + "- " + error
         return self
 
     def opt_err(self) -> BoundParser:
@@ -223,7 +224,7 @@ class Parser:
             p2 = self._parse_enum_prototype().add_err("Error parsing ... | <EnumPrototype> | ... for <ModuleMember>").delay_parse()
             p3 = self._parse_class_prototype().add_err("Error parsing ... | <ClassPrototype> | ... for <ModuleMember>").delay_parse()
             p4 = self._parse_sup_prototype().add_err("Error parsing ... | <SupPrototype> | ... for <ModuleMember>").delay_parse()
-            p5 = (p1 | p2 | p3 | p4).add_err("Error parsing selection for <ModuleMember>").parse_once()
+            p5 = (p1 | p2 | p3 | p4).add_err("Error parsing selection for <ModuleMember>:").parse_once()
             return p5
         return BoundParser(self, inner)
 
@@ -253,41 +254,41 @@ class Parser:
         def inner():
             p1 = self._parse_import_all_types().add_err("Error parsing <ImportAllTypes> for <ImportIdentifiers>").delay_parse()
             p2 = self._parse_import_individual_types().add_err("Error parsing <ImportIndividualTypes> for <ImportIdentifiers>").delay_parse()
-            p3 = (p1 | p2).add_err("Error parsing selection for <ImportIdentifiers>").parse_once()
+            p3 = (p1 | p2).add_err("Error parsing selection for <ImportIdentifiers>:").parse_once()
             return p3
         return BoundParser(self, inner)
 
     def _parse_import_all_types(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkAsterisk).parse_once()
+            p1 = self._parse_token(TokenType.TkAsterisk).add_err("Error parsing '*' for <ImportAllTypes>").parse_once()
             return ImportTypesAllAst()
         return BoundParser(self, inner)
 
     def _parse_import_individual_types(self) -> BoundParser:
         def inner():
-            p1 = self._parse_import_individual_type().parse_once()
-            p2 = self._parse_import_individual_type_next().parse_zero_or_more()
+            p1 = self._parse_import_individual_type().add_err("Error parsing <ImportIndividualType> for <ImportIndividualTypes>").parse_once()
+            p2 = self._parse_import_individual_type_next().add_err("Error parsing <ImportIndividualTypeNext>* for <ImportIndividualTypes>").parse_zero_or_more()
             return ImportTypesIndividualAst([p1, *p2])
         return BoundParser(self, inner)
 
     def _parse_import_individual_type_next(self):
         def inner():
-            p1 = self._parse_token(TokenType.TkComma).parse_once()
-            p2 = self._parse_import_individual_type().parse_once()
+            p1 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <ImportIndividualTypeNext>").parse_once()
+            p2 = self._parse_import_individual_type().add_err("Error parsing <ImportIndividualType> for <ImportIndividualTypeNext>").parse_once()
             return p2
         return BoundParser(self, inner)
 
     def _parse_import_individual_type(self) -> BoundParser:
         def inner():
-            p1 = self._parse_identifier().parse_once()
-            p2 = self._parse_import_individual_type_alias().parse_optional()
+            p1 = self._parse_identifier().add_err("Error parsing <Identifier> for <ImportIndividualTypes>").parse_once()
+            p2 = self._parse_import_individual_type_alias().add_err("Error parsing <ImportIndividualTypeAlias> for <ImportIndividualType>").parse_optional()
             return ImportTypeAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_import_individual_type_alias(self) -> BoundParser:
         def inner():
-            p3 = self._parse_token(TokenType.KwAs).parse_once()
-            p4 = self._parse_identifier().parse_once()
+            p3 = self._parse_token(TokenType.KwAs).add_err("Error parsing 'as' for <ImportIndividualTypeAlias>").parse_once()
+            p4 = self._parse_identifier().add_err("Error parsing <Identifier> for <ImportIndividualTypeAlias>").parse_once()
             return p4
         return BoundParser(self, inner)
 
