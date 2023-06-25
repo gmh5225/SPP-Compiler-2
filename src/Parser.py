@@ -13,7 +13,7 @@ class ParserError(Exception):
 
 Rule = Callable
 
-PREV_ERROR = ""
+OPT_ERR = None
 
 
 class ErrorFormatter:
@@ -22,10 +22,9 @@ class ErrorFormatter:
 
     def error(self, start_token_index: int) -> str:
         error_position = start_token_index
-        error_length = len(self._tokens[error_position].token_metadata)
-
-        while self._tokens[start_token_index].token_type != TokenType.TkNewLine and start_token_index > 0:
+        while start_token_index > 0 and self._tokens[start_token_index].token_type != TokenType.TkNewLine:
             start_token_index -= 1
+
         end_token_index = start_token_index + 1
         while end_token_index < len(self._tokens) and self._tokens[end_token_index].token_type != TokenType.TkNewLine:
             end_token_index += 1
@@ -34,11 +33,12 @@ class ErrorFormatter:
         current_line_string = "".join([token.token_metadata for token in tokens])
 
         spaces = 0
-        for token in tokens:
+        for token in tokens[:error_position - start_token_index]:
             spaces += len(token.token_metadata)
 
-        error_line_string = "".join([" " * spaces, "^" * error_length])
-        final_string = "\n".join(["\n\n", current_line_string, error_line_string, ""])
+        error_length = len(self._tokens[error_position].token_metadata)
+        error_line_string = "".join([" " * spaces, "^" * error_length]) + " <- "
+        final_string = "\n".join(["", current_line_string, error_line_string])
         return final_string
 
 
@@ -48,18 +48,35 @@ class BoundParser:
     _parser: Parser
     _delayed: bool
     _ast: Optional[Any]
+    _err: str
 
     def __init__(self, parser: Parser, rule: Rule):
         self._rule = rule
         self._parser = parser
         self._delayed = False
         self._ast = None
+        self._err = ""
 
     def __ret_value(self):
         return self._ast
 
+    def add_err(self, error: str) -> BoundParser:
+        self._err += "- " + error
+        return self
+
+    def opt_err(self) -> BoundParser:
+        if OPT_ERR is not None:
+            alternative_err = str(OPT_ERR)
+            alternative_err += "\n########## Alternative Error ##########\n"
+            self._err = alternative_err + self._err
+        return self
+
     def parse_once(self):
-        results = self._rule()
+        try:
+            results = self._rule()
+        except ParseSyntaxError as e:
+            self._err += "\n" + str(e)
+            raise ParseSyntaxError(self._err)
 
         while isinstance(results, list) and None in results:
             results.remove(None)
@@ -74,8 +91,7 @@ class BoundParser:
             self.parse_once()
             return self.__ret_value()
         except ParseSyntaxError as e:
-            global PREV_ERROR
-            PREV_ERROR = e
+            global OPT_ERR; OPT_ERR = e
             self._parser._current = restore_index
             self._ast = None
             return self.__ret_value()
@@ -89,8 +105,7 @@ class BoundParser:
                 result = self.parse_once()
                 results.append(result)
             except ParseSyntaxError as e:
-                global PREV_ERROR
-                PREV_ERROR = e
+                global OPT_ERR; OPT_ERR = e
                 self._parser._current = restore_index
                 break
         self._ast = results
@@ -105,8 +120,7 @@ class BoundParser:
                 result = self.parse_once()
                 results.append(result)
             except ParseSyntaxError as e:
-                global PREV_ERROR
-                PREV_ERROR = e
+                global OPT_ERR; OPT_ERR = e
                 self._parser._current = restore_index
                 break
         self._ast = results
@@ -128,7 +142,7 @@ class BoundParser:
             if f is None:
                 f = that.parse_optional()
             if f is None:
-                raise ParseSyntaxError(f"No valid parser found for selection")
+                raise ParseSyntaxError(f"\n\t" + self._err + "\n\t" + that._err)
             return f
 
         b = BoundParser(self._parser, parse_one_of_inner)
@@ -151,7 +165,8 @@ class Parser:
         program = self._parse_root().parse_once()
         return program
 
-    """MODULES"""
+    # Modules
+
     def _parse_root(self) -> BoundParser:
         def inner():
             p1 = self._parse_program().parse_once()
@@ -161,7 +176,7 @@ class Parser:
     def _parse_program(self) -> BoundParser:
         def inner():
             p1 = self._parse_module_prototype().parse_once()
-            p2 = self._parse_eof().parse_once()
+            p2 = self._parse_eof().opt_err().parse_once()
             return ProgramAst(p1)
         return BoundParser(self, inner)
 
@@ -173,72 +188,72 @@ class Parser:
 
     def _parse_module_prototype(self) -> BoundParser:
         def inner():
-            p1 = self._parse_access_modifier().parse_optional()
-            p2 = self._parse_token(TokenType.KwMod).parse_once()
-            p3 = self._parse_module_identifier().parse_once()
-            p4 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            p5 = self._parse_module_implementation().parse_once()
+            p1 = self._parse_access_modifier().add_err("Error parsing <AccessModifier>? for <ModulePrototype>").parse_optional()
+            p2 = self._parse_token(TokenType.KwMod).add_err("Error parsing 'mod' for <ModulePrototype>").opt_err().parse_once()
+            p3 = self._parse_module_identifier().add_err("Error parsing <ModuleIdentifier> for <ModulePrototype>").parse_once()
+            p4 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <ModulePrototype>").parse_once()
+            p5 = self._parse_module_implementation().add_err("Error parsing <ModuleImplementation> for <ModulePrototype>").parse_once()
             return ModulePrototypeAst(p1, p3, p5)
         return BoundParser(self, inner)
 
     def _parse_module_implementation(self) -> BoundParser:
         def inner():
-            p1 = self._parse_import_block().parse_optional()
-            p2 = self._parse_module_member().parse_zero_or_more()
+            p1 = self._parse_import_block().add_err("Error parsing <ImportBlock> for <ModuleImplementation>").parse_optional()
+            p2 = self._parse_module_member().add_err("Error parsing <ModuleMember>+ for <ModuleImplementation>").opt_err().parse_zero_or_more()
             return ModuleImplementationAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_module_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_identifier().parse_once()
-            p2 = self._parse_module_identifier_next_part().parse_zero_or_more()
+            p1 = self._parse_identifier().add_err("Error parsing <Identifier> for <ModuleIdentifier>").parse_once()
+            p2 = self._parse_module_identifier_next_part().add_err("Error parsing <ModuleIdentifierNextPart>* for <ModuleIdentifier>").parse_zero_or_more()
             return ModuleIdentifierAst([p1, *p2])
         return BoundParser(self, inner)
 
     def _parse_module_identifier_next_part(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkDot).parse_once()
-            p2 = self._parse_identifier().parse_once()
+            p1 = self._parse_token(TokenType.TkDot).add_err("Error parsing '.' for <ModuleIdentifierNextPart>").parse_once()
+            p2 = self._parse_identifier().add_err("Error parsing <Identifier> for <ModuleIdentifierNextPart>").parse_once()
             return p2
         return BoundParser(self, inner)
 
     def _parse_module_member(self) -> BoundParser:
         def inner():
-            p1 = self._parse_function_prototype().delay_parse()
-            p2 = self._parse_enum_prototype().delay_parse()
-            p3 = self._parse_class_prototype().delay_parse()
-            p4 = self._parse_sup_prototype().delay_parse()
-            p5 = (p1 | p2 | p3 | p4).parse_once()
+            p1 = self._parse_function_prototype().add_err("Error parsing ... | <FunctionPrototype> | ... for <ModuleMember>").delay_parse()
+            p2 = self._parse_enum_prototype().add_err("Error parsing ... | <EnumPrototype> | ... for <ModuleMember>").delay_parse()
+            p3 = self._parse_class_prototype().add_err("Error parsing ... | <ClassPrototype> | ... for <ModuleMember>").delay_parse()
+            p4 = self._parse_sup_prototype().add_err("Error parsing ... | <SupPrototype> | ... for <ModuleMember>").delay_parse()
+            p5 = (p1 | p2 | p3 | p4).add_err("Error parsing selection for <ModuleMember>").parse_once()
             return p5
         return BoundParser(self, inner)
 
-    """IMPORTS"""
+    # Imports
 
     def _parse_import_block(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwUse).parse_once()
-            p2 = self._parse_token(TokenType.TkColon).parse_once()
-            p3 = self._parse_indent().parse_once()
-            p4 = self._parse_import_definition().parse_one_or_more()
-            p5 = self._parse_dedent().parse_once()
+            p1 = self._parse_token(TokenType.KwUse).add_err("Error parsing 'use' for <ImportBlock>").parse_once()
+            p2 = self._parse_token(TokenType.TkColon).add_err("Error parsing ':' for <ImportBlock>").parse_once()
+            p3 = self._parse_indent().add_err("Error parsing <Indent> for <ImportBlock>").parse_once()
+            p4 = self._parse_import_definition().add_err("Error parsing <ImportDefinition>+ for <ImportBlock>").parse_one_or_more()
+            p5 = self._parse_dedent().add_err("Error parsing <Dedent> for <ImportBlock>").opt_err().parse_once()
             return ImportBlockAst(p4)
         return BoundParser(self, inner)
 
     def _parse_import_definition(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkDot).parse_zero_or_more()
-            p2 = self._parse_module_identifier().parse_once()
-            p3 = self._parse_token(TokenType.TkRightArrow).parse_once()
-            p4 = self._parse_import_identifiers().parse_once()
-            p5 = self._parse_token(TokenType.TkSemicolon).parse_once()
+            p1 = self._parse_token(TokenType.TkDot).add_err("Error parsing '.' for <ImportDefinition> (parent dir count)").parse_zero_or_more()
+            p2 = self._parse_module_identifier().add_err("Error parsing <ModuleIdentifier> for <ImportDefinition>").opt_err().parse_once()
+            p3 = self._parse_token(TokenType.TkRightArrow).add_err("Error parsing '->' for <ImportDefinition>").parse_once()
+            p4 = self._parse_import_identifiers().add_err("Error parsing <ImportIdentifiers> for <ImportDefinition>").parse_once()
+            p5 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <ImportDefinition>").parse_once()
             return ImportDefinitionsAst(p1, p2, p4)
         return BoundParser(self, inner)
 
     def _parse_import_identifiers(self) -> BoundParser:
         def inner():
-            p1 = self._parse_import_all_types().delay_parse()
-            p2 = self._parse_import_individual_types().delay_parse()
-            p3 = (p1 | p2).parse_once()
+            p1 = self._parse_import_all_types().add_err("Error parsing <ImportAllTypes> for <ImportIdentifiers>").delay_parse()
+            p2 = self._parse_import_individual_types().add_err("Error parsing <ImportIndividualTypes> for <ImportIdentifiers>").delay_parse()
+            p3 = (p1 | p2).add_err("Error parsing selection for <ImportIdentifiers>").parse_once()
             return p3
         return BoundParser(self, inner)
 
@@ -621,7 +636,7 @@ class Parser:
         def inner():
             p3 = self._parse_function_call_normal_argument().parse_once()
             p4 = self._parse_function_call_rest_of_normal_arguments().parse_optional()
-            return [p3, *p4]
+            return [p3, p4]
         return BoundParser(self, inner)
 
     def _parse_function_call_rest_of_normal_arguments(self) -> BoundParser:
@@ -1158,7 +1173,7 @@ class Parser:
         def inner():
             p1 = self._parse_type_generic_normal_argument().parse_once()
             p2 = self._parse_type_generic_rest_of_normal_arguments().parse_optional()
-            return [p1, *p2]
+            return [p1, p2]
         return BoundParser(self, inner)
 
     def _parse_type_generic_rest_of_normal_arguments(self) -> BoundParser:
@@ -1294,7 +1309,8 @@ class Parser:
             return p4
         return BoundParser(self, inner)
 
-    """[STATEMENTS]"""
+    # Statements
+
     def _parse_statement_inline_definitions(self) -> BoundParser:
         def inner():
             p5 = self._parse_statement_let().parse_once()
@@ -1583,8 +1599,8 @@ class Parser:
             p11 = self._parse_statement_continue().delay_parse()
             p12 = self._parse_statement_let().delay_parse()
             p13 = self._parse_statement_expression().delay_parse()
-            p14 = self._parse_function_prototype().delay_parse()
-            p15 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12 | p13 | p14).parse_once()
+            # p14 = self._parse_function_prototype().delay_parse()
+            p15 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12 | p13).parse_once()
             return p15
         return BoundParser(self, inner)
 
@@ -2080,6 +2096,16 @@ class Parser:
             if self._dedents_expected > 0:
                 raise ParseSyntaxError("Expected a dedent")
 
+            if self._current < len(self._tokens) and \
+                    self._tokens[self._current].token_type == TokenType.TkSemicolon \
+                    and self._tokens[self._current + 1].token_type == TokenType.TkNewLine \
+                    and token == TokenType.TkSemicolon:
+                self._current += 2
+                for _ in range(self._indent):
+                    self._parse_token(TokenType.TkWhitespace)
+                return TokenAst(Token(";", TokenType.TkSemicolon), None)
+
+
             if token != TokenType.TkNewLine: self._skip(TokenType.TkNewLine)
             if token != TokenType.TkWhitespace: self._skip(TokenType.TkWhitespace)
 
@@ -2092,11 +2118,10 @@ class Parser:
                 error = ParseSyntaxError(
                     ErrorFormatter(self._tokens).error(self._current) +
                     f"Expected <{token}>, got <{current_token}>\n")
-                # error_alt = PREV_ERROR
-                # raise ParseSyntaxError(str(error) + "\n" + str(error_alt))
                 raise error
 
             self._current += 1
+
             return TokenAst(self._tokens[self._current - 1], None)
         return BoundParser(self, inner)
 
@@ -2117,7 +2142,7 @@ class Parser:
 
         def inner():
             self._indent += 4
-            p1 = self._parse_indented_whitespace().parse_optional()
+            p1 = self._parse_indented_whitespace().parse_once()
             if self._tokens[self._current].token_type == TokenType.TkWhitespace:
                 raise ParseSyntaxError("Unexpected whitespace")
 
