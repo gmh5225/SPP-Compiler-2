@@ -629,7 +629,7 @@ class Parser:
     def _parse_function_call_arguments_normal_then_named(self) -> BoundParser:
         def inner():
             p1 = self._parse_function_call_normal_arguments().add_err("Error parsing ... | <FunctionCallNormalArguments> | ... for <FunctionCallArgumentsNormalThenNamed>").delay_parse()
-            p2 = self._parse_function_call_named_arguments().add_err("Error parsing ... | <FunctionCallNamedArguments> | ... for <FunctionCallArgumentsNormalThenNamed>").opt_err().delay_parse()
+            p2 = self._parse_function_call_named_arguments().add_err("Error parsing ... | <FunctionCallNamedArguments> | ... for <FunctionCallArgumentsNormalThenNamed>").delay_parse()
             p3 = (p1 | p2).add_err("Error parsing selection for <FunctionCallArgumentsNormalThenNamed>").parse_once()
             return p3
         return BoundParser(self, inner)
@@ -680,88 +680,88 @@ class Parser:
 
     def _parse_function_parameters(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
-            p2 = self._parse_function_parameters_required_then_optional().parse_optional() or []
-            p3 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
+            p1 = self._parse_token(TokenType.TkLeftParenthesis).add_err("Error parsing '(' for <FunctionParameters>").parse_once()
+            p2 = self._parse_function_parameters_required_then_optional().add_err("Error parsing <FunctionParametersRequiredThenOptional>? for <FunctionParameters>").parse_optional() or []
+            p3 = self._parse_token(TokenType.TkRightParenthesis).add_err("Error parsing ')' for <FunctionParameters>").opt_err().parse_once()
             return p2
         return BoundParser(self, inner)
 
     def _parse_function_parameters_required_then_optional(self) -> BoundParser:
         def inner():
-            p1 = self._parse_function_required_parameters().delay_parse()
-            p2 = self._parse_function_optional_parameters().delay_parse()
-            p3 = self._parse_function_variadic_parameter().delay_parse()
-            p4 = (p1 | p2 | p3).parse_once()
+            p1 = self._parse_function_required_parameters().add_err("Error parsing ... | <FunctionRequiredParameters> | ... for <FunctionParametersRequiredThenOptional>").delay_parse()
+            p2 = self._parse_function_optional_parameters().add_err("Error parsing ... | <FunctionOptionalParameters> | ... for <FunctionParametersRequiredThenOptional>").delay_parse()
+            p3 = self._parse_function_variadic_parameter().add_err("Error parsing ... | <FunctionVariadicParameter> | ... for <FunctionParametersRequiredThenOptional>").delay_parse()
+            p4 = (p1 | p2 | p3).add_err("Error parsing selection for <FunctionParametersRequiredThenOptional>").parse_once()
             return p4
         return BoundParser(self, inner)
 
     def _parse_function_parameters_optional_then_variadic(self) -> BoundParser:
         def inner():
-            p1 = self._parse_function_optional_parameters().delay_parse()
-            p2 = self._parse_function_variadic_parameter().delay_parse()
-            p3 = (p1 | p2).parse_once()
+            p1 = self._parse_function_optional_parameters().add_err("Error parsing ... | <FunctionOptionalParameters> | ... for <FunctionParametersOptionalThenVariadic>").delay_parse()
+            p2 = self._parse_function_variadic_parameter().add_err("Error parsing ... | <FunctionVariadicParameter> | ... for <FunctionParametersOptionalThenVariadic>").delay_parse()
+            p3 = (p1 | p2).add_err("Error parsing selection for <FunctionParametersOptionalThenVariadic>").parse_once()
             return p3
         return BoundParser(self, inner)
 
     def _parse_function_required_parameters(self) -> BoundParser:
         def inner():
-            p3 = self._parse_function_required_parameter().parse_once()
-            p4 = self._parse_function_rest_of_required_parameters().parse_optional()
+            p3 = self._parse_function_required_parameter().add_err("Error parsing <FunctionRequiredParameter> for <FunctionRequiredParameters>").parse_once()
+            p4 = self._parse_function_rest_of_required_parameters().add_err("Error parsing <FunctionRestOfRequiredParameters>? for <FunctionRequiredParameters>").parse_optional()
             return [p3, p4]
         return BoundParser(self, inner)
 
     def _parse_function_rest_of_required_parameters(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkComma).parse_once()
-            p2 = self._parse_function_parameters_required_then_optional().parse_once()
+            p1 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <FunctionRestOfRequiredParameters>").parse_once()
+            p2 = self._parse_function_parameters_required_then_optional().add_err("Error parsing <FunctionParametersRequiredThenOptional> for <FunctionRestOfRequiredParameters>").parse_once()
             return p2
         return BoundParser(self, inner)
 
     def _parse_function_optional_parameters(self) -> BoundParser:
         def inner():
-            p3 = self._parse_function_optional_parameter().parse_once()
-            p4 = self._parse_function_rest_of_optional_parameters().parse_optional()
+            p3 = self._parse_function_optional_parameter().add_err("Error parsing <FunctionOptionalParameter> for <FunctionOptionalParameters>").parse_once()
+            p4 = self._parse_function_rest_of_optional_parameters().add_err("Error parsing <FunctionRestOfOptionalParameters>? for <FunctionOptionalParameters>").parse_optional()
             return [p3, p4]
         return BoundParser(self, inner)
 
     def _parse_function_rest_of_optional_parameters(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkComma).parse_once()
-            p2 = self._parse_function_parameters_optional_then_variadic().parse_once()
+            p1 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <FunctionRestOfOptionalParameters>").parse_once()
+            p2 = self._parse_function_parameters_optional_then_variadic().add_err("Error parsing <FunctionParametersOptionalThenVariadic> for <FunctionRestOfOptionalParameters>").parse_once()
             return p2
         return BoundParser(self, inner)
 
     def _parse_function_required_parameter(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwMut).parse_optional()
-            p2 = self._parse_function_parameter_identifier().parse_once()
-            p3 = self._parse_token(TokenType.TkColon).parse_once()
-            p4 = self._parse_type_identifier().parse_once()
+            p1 = self._parse_token(TokenType.KwMut).add_err("Error parsing 'mut'? for <FunctionRequiredParameter>").parse_optional()
+            p2 = self._parse_function_parameter_identifier().add_err("Error parsing <FunctionParameterIdentifier> for <FunctionRequiredParameter>").opt_err().parse_once()
+            p3 = self._parse_token(TokenType.TkColon).add_err("Error parsing ':' for <FunctionRequiredParameter>").parse_once()
+            p4 = self._parse_type_identifier().add_err("Error parsing <TypeIdentifier> for <FunctionRequiredParameter>").parse_once()
             return FunctionParameterRequiredAst(p1 is not None, p2, p4)
         return BoundParser(self, inner)
 
     def _parse_function_optional_parameter(self) -> BoundParser:
         def inner():
-            p1 = self._parse_function_required_parameter().parse_once()
-            p2 = self._parse_token(TokenType.TkEqual).parse_once()
-            p3 = self._parse_expression().parse_once()
+            p1 = self._parse_function_required_parameter().add_err("Error parsing <FunctionRequiredParameter> for <FunctionOptionalParameter>").parse_once()
+            p2 = self._parse_token(TokenType.TkEqual).add_err("Error parsing '=' for <FunctionOptionalParameter>").parse_once()
+            p3 = self._parse_expression().add_err("Error parsing <Expression> for <FunctionOptionalParameter>").parse_once()
             return FunctionParameterOptionalAst(p1, p3)
         return BoundParser(self, inner)
 
     def _parse_function_variadic_parameter(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkTripleDot).parse_once()
-            p2 = self._parse_function_required_parameter().parse_once()
+            p1 = self._parse_token(TokenType.TkTripleDot).add_err("Error parsing '...' for <FunctionVariadicParameter>").parse_once()
+            p2 = self._parse_function_required_parameter().add_err("Error parsing <FunctionRequiredParameter> for <FunctionVariadicParameter>").parse_once()
             return FunctionParameterVariadicAst(p2)
         return BoundParser(self, inner)
 
     def _parse_function_parameter_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_identifier().parse_once()
+            p1 = self._parse_identifier().add_err("Error parsing <Identifier> for <FunctionParameterIdentifier>").parse_once()
             return p1
         return BoundParser(self, inner)
 
-    """[TYPE & VALUE GUARD]"""
+    # Type Constraints & Value Guard
 
     def _parse_where_block(self) -> BoundParser:
         def inner():
