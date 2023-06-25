@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 from dataclasses import dataclass
-from src.Tokens import TokenType
+from src.Tokens import Token
 
 
 @dataclass
@@ -11,8 +11,8 @@ class ProgramAst:
 
 @dataclass
 class TokenAst:
-    primary: TokenType
-    modifier: Optional[TokenType]
+    primary: Token
+    modifier: Optional[Token]
 
 @dataclass
 class AccessModifierAst:
