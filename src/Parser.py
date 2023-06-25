@@ -11,7 +11,7 @@ class ParseError(Exception):
 
 Rule = Callable
 
-PREV_ERROR = None
+PREV_ERROR = ParseError("No previous error")
 
 
 class ErrorFormatter:
@@ -56,19 +56,20 @@ class BoundParser:
     def __ret_value(self):
         return self._ast
 
-    def parse_once(self, keep_tokens=False):
+    def parse_once(self):
         results = self._rule()
-        # if not keep_tokens:
-        #     results = [r for r in results if not isinstance(r, TokenAst)]
+
+        while isinstance(results, list) and None in results:
+            results.remove(None)
 
         self._ast = results
         return self.__ret_value()
 
-    def parse_optional(self, keep_tokens=False):
+    def parse_optional(self):
         restore_index = self._parser._current
 
         try:
-            self.parse_once(keep_tokens=keep_tokens)
+            self.parse_once()
             return self.__ret_value()
         except ParseError as e:
             global PREV_ERROR
@@ -77,15 +78,17 @@ class BoundParser:
             self._ast = None
             return self.__ret_value()
 
-    def parse_zero_or_more(self, keep_tokens=False):
+    def parse_zero_or_more(self):
         results = []
 
         while True:
             restore_index = self._parser._current
             try:
-                result = self.parse_once(keep_tokens=keep_tokens)
+                result = self.parse_once()
                 results.append(result)
             except ParseError as e:
+                global PREV_ERROR
+                PREV_ERROR = e
                 self._parser._current = restore_index
                 break
         self._ast = results
@@ -98,7 +101,9 @@ class BoundParser:
             restore_index = self._parser._current
             try:
                 results.append(self.parse_once())
-            except ParseError:
+            except ParseError as e:
+                global PREV_ERROR
+                PREV_ERROR = e
                 self._parser._current = restore_index
                 break
         self._ast = results
@@ -164,7 +169,7 @@ class Parser:
 
     def _parse_module_prototype(self) -> BoundParser:
         def inner():
-            p1 = self._parse_access_modifier().parse_optional(keep_tokens=True)
+            p1 = self._parse_access_modifier().parse_optional()
             p2 = self._parse_token(TokenType.KwMod).parse_once()
             p3 = self._parse_module_identifier().parse_once()
             p4 = self._parse_token(TokenType.TkSemicolon).parse_once()
@@ -281,7 +286,7 @@ class Parser:
     def _parse_class_prototype(self) -> BoundParser:
         def inner():
             p1 = self._parse_decorators().parse_optional()
-            p2 = self._parse_token(TokenType.KwPart).parse_once()
+            p2 = self._parse_token(TokenType.KwPart).parse_optional()
             p3 = self._parse_access_modifier().parse_optional()
             p4 = self._parse_token(TokenType.KwCls).parse_once()
             p5 = self._parse_class_identifier().parse_once()
@@ -322,8 +327,8 @@ class Parser:
 
     def _parse_class_member(self) -> BoundParser:
         def inner():
-            p1 = self._parse_class_attribute()
-            p2 = self._parse_class_attribute_static()
+            p1 = self._parse_class_attribute().delay_parse()
+            p2 = self._parse_class_attribute_static().delay_parse()
             p3 = (p1 | p2).parse_once()
             return p3
         return BoundParser(self, inner)
@@ -681,7 +686,7 @@ class Parser:
         def inner():
             p3 = self._parse_function_required_parameter().parse_once()
             p4 = self._parse_function_rest_of_required_parameters().parse_optional()
-            return [p3, *p4]
+            return [p3, p4]
         return BoundParser(self, inner)
 
     def _parse_function_rest_of_required_parameters(self) -> BoundParser:
@@ -695,7 +700,7 @@ class Parser:
         def inner():
             p3 = self._parse_function_optional_parameter().parse_once()
             p4 = self._parse_function_rest_of_optional_parameters().parse_optional()
-            return [p3, *p4]
+            return [p3, p4]
         return BoundParser(self, inner)
 
     def _parse_function_rest_of_optional_parameters(self) -> BoundParser:
@@ -711,7 +716,7 @@ class Parser:
             p2 = self._parse_function_parameter_identifier().parse_once()
             p3 = self._parse_token(TokenType.TkColon).parse_once()
             p4 = self._parse_type_identifier().parse_once()
-            return FunctionParameterRequiredAst(p1, p2, p4)
+            return FunctionParameterRequiredAst(p1 is not None, p2, p4)
         return BoundParser(self, inner)
 
     def _parse_function_optional_parameter(self) -> BoundParser:
@@ -1202,9 +1207,9 @@ class Parser:
 
     def _parse_type_generic_parameters(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
+            p1 = self._parse_token(TokenType.TkLeftAngleBracket).parse_once()
             p2 = self._parse_type_generic_parameters_required_then_optional().parse_optional()
-            p3 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
+            p3 = self._parse_token(TokenType.TkRightAngleBracket).parse_once()
             return p2
         return BoundParser(self, inner)
 
@@ -1229,7 +1234,7 @@ class Parser:
         def inner():
             p3 = self._parse_type_generic_required_parameter().parse_once()
             p4 = self._parse_type_generic_rest_of_required_parameters().parse_optional()
-            return [p3, *p4]
+            return [p3, p4]
         return BoundParser(self, inner)
 
     def _parse_type_generic_rest_of_required_parameters(self) -> BoundParser:
@@ -1594,7 +1599,7 @@ class Parser:
 
     def _parse_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_lexeme(TokenType.LxIdentifier).parse_once(keep_tokens=True)
+            p1 = self._parse_lexeme(TokenType.LxIdentifier).parse_once()
             return IdentifierAst(p1)
         return BoundParser(self, inner)
 
@@ -2090,10 +2095,12 @@ class Parser:
             current_token = self._tokens[self._current].token_type
             if current_token != token:
 
-                raise ParseError(
+                error = ParseError(
                     ErrorFormatter(self._tokens).error(self._current) +
                     f"Expected <{token}>, got <{current_token}>\n" +
-                    f"{' -> '.join(reversed([frame.function for frame in inspect.stack()]))}\n")
+                    f"{' -> '.join(reversed([frame.function for frame in inspect.stack() if not frame.function.startswith('parse')]))}\n")
+                error_alt = PREV_ERROR
+                raise ParseError(str(error) + "\n" + str(error_alt))
 
             self._current += 1
             return TokenAst(self._tokens[self._current - 1], None)
@@ -2116,7 +2123,7 @@ class Parser:
 
         def inner():
             self._indent += 4
-            p1 = self._parse_indented_whitespace().parse_optional(keep_tokens=True)
+            p1 = self._parse_indented_whitespace().parse_optional()
             if self._tokens[self._current].token_type == TokenType.TkWhitespace:
                 raise ParseError("Unexpected whitespace")
 
@@ -2125,7 +2132,7 @@ class Parser:
     def _parse_indented_whitespace(self) -> BoundParser:
         def inner():
             for i in range(self._indent):
-                self._parse_token(TokenType.TkWhitespace).parse_once(keep_tokens=True)
+                self._parse_token(TokenType.TkWhitespace).parse_once()
         return BoundParser(self, inner)
 
     def _parse_dedent(self) -> BoundParser:
@@ -2136,7 +2143,7 @@ class Parser:
 
     def _parse_empty_implementation(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkSemicolon).parse_once(keep_tokens=True)
+            p1 = self._parse_token(TokenType.TkSemicolon).parse_once()
             return p1
         return BoundParser(self, inner)
 
