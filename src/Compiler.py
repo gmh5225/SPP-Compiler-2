@@ -12,8 +12,10 @@ class Compiler:
     def __init__(self, code: str):
         self._code = code
         self._tokens = Lexer(code).lex()
-        self._ast = Parser(self._tokens).parse()
+        self._parser = Parser(self._tokens)
+        self._ast = self._parser.parse()
 
         print("Successfully parsed AST")
-        print(vars(self._ast))
+        print(self._ast)
+        print(type(self._ast))
         pprint.pprint(dataclasses.asdict(self._ast), sort_dicts=False)

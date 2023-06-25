@@ -68,8 +68,8 @@ class ImportBlockAst:
 
 @dataclass
 class ModuleImplementationAst:
-    members: list[ModuleMemberAst]
     imports: ImportBlockAst
+    members: list[ModuleMemberAst]
 
 @dataclass
 class ModulePrototypeAst:
@@ -140,11 +140,13 @@ class FunctionParameterAst:
 def FunctionParameterRequiredAst(is_mutable: bool, identifier: IdentifierAst, type_annotation: TypeAst):
     return FunctionParameterAst(is_mutable, identifier, type_annotation, None, False)
 
-def FunctionParameterOptionalAst(is_mutable: bool, identifier: IdentifierAst, type_annotation: TypeAst, default_value: ExpressionAst):
-    return FunctionParameterAst(is_mutable, identifier, type_annotation, default_value, False)
+def FunctionParameterOptionalAst(parameter: FunctionParameterAst, default_value: ExpressionAst):
+    parameter.default_value = default_value
+    return parameter
 
-def FunctionParameterVariadicAst(is_mutable: bool, identifier: IdentifierAst, type_annotation: TypeAst):
-    return FunctionParameterAst(is_mutable, identifier, type_annotation, None, True)
+def FunctionParameterVariadicAst(parameter: FunctionParameterAst):
+    parameter.is_variadic = True
+    return parameter
 
 @dataclass
 class FunctionImplementationAst:
@@ -225,6 +227,7 @@ class LambdaCaptureItemAst:
 
 @dataclass
 class LambdaAst:
+    is_async: bool
     captures: list[LambdaCaptureItemAst]
     parameters: list[LambdaParameterAst]
     expression: ExpressionAst
@@ -239,11 +242,13 @@ class TypeGenericParameterAst:
 def TypeGenericParameterRequiredAst(identifier: IdentifierAst, constraints: list[GenericIdentifierAst]):
     return TypeGenericParameterAst(identifier, constraints, None, False)
 
-def TypeGenericParameterOptionalAst(identifier: IdentifierAst, constraints: list[GenericIdentifierAst], default: TypeAst):
-    return TypeGenericParameterAst(identifier, constraints, default, False)
+def TypeGenericParameterOptionalAst(parameter: TypeGenericParameterAst, default: TypeAst):
+    parameter.default = default
+    return parameter
 
-def TypeGenericParameterVariadicAst(identifier: IdentifierAst, constraints: list[GenericIdentifierAst]):
-    return TypeGenericParameterAst(identifier, constraints, None, True)
+def TypeGenericParameterVariadicAst(parameter: TypeGenericParameterAst):
+    parameter.is_variadic = True
+    return parameter
 
 @dataclass
 class TypeGenericArgumentAst:
@@ -260,14 +265,17 @@ def TypeGenericArgumentNormalAst(value: TypeAst):
 class TypeAst:
     reference_type: TokenAst
     identifier: GenericIdentifierAst
-    postfixes: list[TokenAst]
-    next_variant: Optional[TypeAst]
+    # postfixes: list[TokenAst]
+    # next_variant: Optional[TypeAst]
 
 @dataclass
 class IfStatementBranchAst:
     definitions: list[LetStatementAst]
     condition: ExpressionAst
     body: list[StatementAst]
+
+def ElifStatementBranchAst(definitions: list[LetStatementAst], condition: ExpressionAst, body: list[StatementAst]):
+    return IfStatementBranchAst(definitions, condition, body)
 
 def ElseStatementBranchAst(body: list[StatementAst]):
     return IfStatementBranchAst([], BoolLiteralAst(True), body)
@@ -415,7 +423,7 @@ class NumberLiteralBase16Ast:
     value: str
 
 @dataclass
-class NumberLiteralBase2Ast:
+class NumberLiteralBase02Ast:
     value: str
 
 @dataclass
@@ -483,7 +491,7 @@ class IterableComprehensionAst:
 
 
 PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixIndexAccessAst | PostfixSliceAccessAst | PostfixStructInitializerAst | PostfixTypeCastAst | TokenAst
-NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiteralBase2Ast
+NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiteralBase02Ast
 LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | ListLiteralAst | GeneratorLiteralAst | MapLiteralAst | SetLiteralAst | PairLiteralAst | RegexLiteralAst | TupleLiteralAst
 PrimaryExpressionAst = LiteralAst | IdentifierAst | ParenthesizedExpressionAst | LambdaAst | PlaceholderAst
 ExpressionAst = UnaryExpressionAst | BinaryExpressionAst | PostfixExpressionAst | MultiAssignmentExpressionAst | PrimaryExpressionAst
