@@ -1013,7 +1013,7 @@ class Parser:
         def inner(lhs, op, rhs):
             p1 = lhs.parse_once()
             p2 = self._parse_binary_expression_rhs(op, rhs).parse_optional()
-            return p1 if p2 is None else BinaryExpressionAst(p1, op, p2)
+            return p1 if p2 is None else BinaryExpressionAst(p1, p2[0], p2[1])
         return BoundParser(self, functools.partial(inner, __lhs, __op, __rhs))
 
     def _parse_binary_expression_rhs(self, __op, __rhs) -> BoundParser:

@@ -193,8 +193,8 @@ class UnaryExpressionAst:
 
 @dataclass
 class BinaryExpressionAst:
-    op: TokenAst
     lhs: ExpressionAst
+    op: TokenAst
     rhs: ExpressionAst
 
 @dataclass
