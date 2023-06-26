@@ -77,8 +77,8 @@ class BoundParser:
         global OPT_ERR
         if OPT_ERR is not None:
             alternative_err = str(OPT_ERR)
-            alternative_err += "\n########## Alternative Error ##########\n"
-            self._err = alternative_err + self._err
+            self._err += "\n########## Alternative Error ##########\n"
+            self._err += alternative_err
             OPT_ERR = None
             # self._err = self._err if self._err.count("\n") > alternative_err.count("\n") else alternative_err
         return self
@@ -86,7 +86,7 @@ class BoundParser:
     def parse_once(self):
         try:
             results = self._rule()
-            # remove previous "opt err" from error
+            # remove previous "opt err" from error message?
 
         except ParseSyntaxError as e:
             self._err += "\n" + str(e)
@@ -1596,15 +1596,15 @@ class Parser:
 
     def _parse_statement_let_value(self) -> BoundParser:
         def inner():
-            p6 = self._parse_token(TokenType.TkEqual).parse_once()
-            p7 = self._parse_expressions().parse_once()
+            p6 = self._parse_token(TokenType.TkEqual).add_err("Error parsing '=' for <StatementLetValue>").parse_once()
+            p7 = self._parse_expressions().add_err("Error parsing <Expressions> for <StatementLetValue>").parse_once()
             return p7
         return BoundParser(self, inner)
 
     def _parse_statement_let_type_annotation(self) -> BoundParser:
         def inner():
-            p6 = self._parse_token(TokenType.TkColon).parse_once()
-            p7 = self._parse_type_identifier().parse_once()
+            p6 = self._parse_token(TokenType.TkColon).add_err("Error parsing ':' for <StatementLetTypeAnnotation>").parse_once()
+            p7 = self._parse_type_identifier().add_err("Error parsing <TypeIdentifier> for <StatementLetTypeAnnotation>").parse_once()
             return p7
         return BoundParser(self, inner)
 
@@ -1617,15 +1617,15 @@ class Parser:
 
     def _parse_local_variable_identifiers(self) -> BoundParser:
         def inner():
-            p1 = self._parse_local_variable_identifier().parse_once()
-            p2 = self._parse_local_variable_identifier_next().parse_zero_or_more()
+            p1 = self._parse_local_variable_identifier().add_err("Error parsing <LocalVariableIdentifier> for <LocalVariableIdentifiers>").parse_once()
+            p2 = self._parse_local_variable_identifier_next().add_err("Error parsing <LocalVariableIdentifierNext>* for <LocalVariableIdentifiers>").parse_zero_or_more()
             return [p1, *p2]
         return BoundParser(self, inner)
 
     def _parse_local_variable_identifier_next(self) -> BoundParser:
         def inner():
-            p3 = self._parse_token(TokenType.TkComma).parse_once()
-            p4 = self._parse_local_variable_identifier().parse_once()
+            p3 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <LocalVariableIdentifierNext>").parse_once()
+            p4 = self._parse_local_variable_identifier().add_err("Error parsing <LocalVariableIdentifier> for <LocalVariableIdentifierNext>").parse_once()
             return p4
         return BoundParser(self, inner)
 
@@ -1656,7 +1656,7 @@ class Parser:
             return p15
         return BoundParser(self, inner)
 
-    """[IDENTIFIERS]"""
+    # Identifiers
 
     def _parse_identifier(self) -> BoundParser:
         def inner():
@@ -1666,15 +1666,15 @@ class Parser:
 
     def _parse_generic_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_lexeme(TokenType.LxIdentifier).parse_once()
-            p2 = self._parse_type_generic_arguments().parse_optional()
+            p1 = self._parse_lexeme(TokenType.LxIdentifier).add_err("Error parsing <Lexeme> for <GenericIdentifier>").parse_once()
+            p2 = self._parse_type_generic_arguments().add_err("Error parsing <TypeGenericArguments> for <GenericIdentifier>").parse_optional()
             return GenericIdentifierAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_static_scoped_generic_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_generic_identifier().parse_once()
-            p2 = self._parse_static_scoped_generic_identifier_next().parse_zero_or_more()
+            p1 = self._parse_generic_identifier().add_err("Error parsing <GenericIdentifier> for <StaticScopedGenericIdentifier>").parse_once()
+            p2 = self._parse_static_scoped_generic_identifier_next().add_err("Error parsing <StaticScopedGenericIdentifierNext>* for <StaticScopedGenericIdentifier>").parse_zero_or_more()
             return ScopedGenericIdentifierAst([p1, *p2])
         return BoundParser(self, inner)
 
@@ -1685,7 +1685,8 @@ class Parser:
             return p4
         return BoundParser(self, inner)
 
-    """[POSTFIX OPERATIONS]"""
+    # Postfix operations
+
     def _parse_postfix_operator_function_call(self) -> BoundParser:
         def inner():
             p1 = self._parse_function_call_arguments().parse_once()
@@ -2167,8 +2168,8 @@ class Parser:
             if current_token.token_type != token:
 
                 error = ParseSyntaxError(
-                    # ErrorFormatter(self._tokens).error(self._current) +
-                    f"! Expected <{token}>, got: <{current_token.token_type}> => '{current_token.token_metadata}'\n")
+                    ErrorFormatter(self._tokens).error(self._current) +
+                    f"Expected <{token}>, got: <{current_token.token_type}> => '{current_token.token_metadata}'\n")
                 raise error
 
             self._current += 1
