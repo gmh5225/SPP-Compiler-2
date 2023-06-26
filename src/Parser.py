@@ -71,6 +71,7 @@ class BoundParser:
             alternative_err = str(OPT_ERR)
             alternative_err += "\n########## Alternative Error ##########\n"
             self._err = alternative_err + self._err
+            # self._err = self._err if len(self._err) > len(alternative_err) else alternative_err
         return self
 
     def parse_once(self):
@@ -691,7 +692,7 @@ class Parser:
             p1 = self._parse_function_required_parameters().add_err("Error parsing ... | <FunctionRequiredParameters> | ... for <FunctionParametersRequiredThenOptional>").delay_parse()
             p2 = self._parse_function_optional_parameters().add_err("Error parsing ... | <FunctionOptionalParameters> | ... for <FunctionParametersRequiredThenOptional>").delay_parse()
             p3 = self._parse_function_variadic_parameter().add_err("Error parsing ... | <FunctionVariadicParameter> | ... for <FunctionParametersRequiredThenOptional>").delay_parse()
-            p4 = (p1 | p2 | p3).add_err("Error parsing selection for <FunctionParametersRequiredThenOptional>").parse_once()
+            p4 = (p3 | p2 | p1).add_err("Error parsing selection for <FunctionParametersRequiredThenOptional>").parse_once()
             return p4
         return BoundParser(self, inner)
 
@@ -699,7 +700,7 @@ class Parser:
         def inner():
             p1 = self._parse_function_optional_parameters().add_err("Error parsing ... | <FunctionOptionalParameters> | ... for <FunctionParametersOptionalThenVariadic>").delay_parse()
             p2 = self._parse_function_variadic_parameter().add_err("Error parsing ... | <FunctionVariadicParameter> | ... for <FunctionParametersOptionalThenVariadic>").delay_parse()
-            p3 = (p1 | p2).add_err("Error parsing selection for <FunctionParametersOptionalThenVariadic>").parse_once()
+            p3 = (p2 | p1).add_err("Error parsing selection for <FunctionParametersOptionalThenVariadic>").parse_once()
             return p3
         return BoundParser(self, inner)
 
@@ -1229,7 +1230,7 @@ class Parser:
             p1 = self._parse_type_generic_required_parameters().add_err("Error parsing ... | <TypeGenericRequiredParameters> | ... for <TypeGenericParametersRequiredThenOptional>").delay_parse()
             p2 = self._parse_type_generic_optional_parameters().add_err("Error parsing ... | <TypeGenericOptionalParameters> | ... for <TypeGenericParametersRequiredThenOptional>").delay_parse()
             p3 = self._parse_type_generic_variadic_parameters().add_err("Error parsing ... | <TypeGenericVariadicParameters> | ... for <TypeGenericParametersRequiredThenOptional>").delay_parse()
-            p4 = (p1 | p2 | p3).add_err("Error parsing selection for <TypeGenericParametersRequiredThenOptional>").parse_once()
+            p4 = (p3 | p2 | p1).add_err("Error parsing selection for <TypeGenericParametersRequiredThenOptional>").parse_once()
             return p4
         return BoundParser(self, inner)
 
@@ -1237,7 +1238,7 @@ class Parser:
         def inner():
             p1 = self._parse_type_generic_optional_parameters().add_err("Error parsing ... | <TypeGenericOptionalParameters> | ... for <TypeGenericParametersOptionalThenVariadic>").delay_parse()
             p2 = self._parse_type_generic_variadic_parameters().add_err("Error parsing ... | <TypeGenericVariadicParameters> | ... for <TypeGenericParametersOptionalThenVariadic>").delay_parse()
-            p3 = (p1 | p2).add_err("Error parsing selection for <TypeGenericParametersOptionalThenVariadic>").parse_once()
+            p3 = (p2 | p1).add_err("Error parsing selection for <TypeGenericParametersOptionalThenVariadic>").parse_once()
             return p3
         return BoundParser(self, inner)
 
@@ -1259,7 +1260,7 @@ class Parser:
         def inner():
             p3 = self._parse_type_generic_optional_parameter().add_err("Error parsing <TypeGenericOptionalParameter> for <TypeGenericOptionalParameters>").parse_once()
             p4 = self._parse_type_generic_rest_of_optional_parameters().add_err("Error parsing <TypeGenericRestOfOptionalParameters>? for <TypeGenericOptionalParameters>").parse_optional()
-            return [p3, *p4]
+            return [p3, p4]
         return BoundParser(self, inner)
 
     def _parse_type_generic_rest_of_optional_parameters(self) -> BoundParser:
@@ -2119,8 +2120,8 @@ class Parser:
             if current_token != token:
 
                 error = ParseSyntaxError(
-                    ErrorFormatter(self._tokens).error(self._current) +
-                    f"Expected <{token}>, got <{current_token}>\n")
+                    # ErrorFormatter(self._tokens).error(self._current) +
+                    f"! Expected <{token}>, got <{current_token}>\n")
                 raise error
 
             self._current += 1
