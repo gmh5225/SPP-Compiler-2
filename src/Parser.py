@@ -14,6 +14,7 @@ class ParserError(Exception):
 Rule = Callable
 
 OPT_ERR = None
+SHOULD_OPT_ERR = False
 
 # todo
 #   - only use .opt-err() following a .parse-optional/one-or-more/zero-or-more => remove otherwise
@@ -73,25 +74,35 @@ class BoundParser:
         return self
 
     def opt_err(self) -> BoundParser:
+        global OPT_ERR
         if OPT_ERR is not None:
             alternative_err = str(OPT_ERR)
             alternative_err += "\n########## Alternative Error ##########\n"
             self._err = alternative_err + self._err
+            OPT_ERR = None
             # self._err = self._err if self._err.count("\n") > alternative_err.count("\n") else alternative_err
         return self
 
     def parse_once(self):
         try:
             results = self._rule()
+            # remove previous "opt err" from error
+
         except ParseSyntaxError as e:
             self._err += "\n" + str(e)
+            global SHOULD_OPT_ERR
+            if SHOULD_OPT_ERR:
+                self.opt_err()
+                SHOULD_OPT_ERR = False
+
             raise ParseSyntaxError(self._err)
 
         while isinstance(results, list) and None in results:
             results.remove(None)
 
         self._ast = results
-        return self.__ret_value()
+        result = self.__ret_value()
+        return result
 
     def parse_optional(self):
         restore_index = self._parser._current
@@ -101,6 +112,7 @@ class BoundParser:
             return self.__ret_value()
         except ParseSyntaxError as e:
             global OPT_ERR; OPT_ERR = e
+            global SHOULD_OPT_ERR; SHOULD_OPT_ERR = True
             self._parser._current = restore_index
             self._ast = None
             return self.__ret_value()
@@ -115,8 +127,10 @@ class BoundParser:
                 results.append(result)
             except ParseSyntaxError as e:
                 global OPT_ERR; OPT_ERR = e
+                global SHOULD_OPT_ERR; SHOULD_OPT_ERR = True
                 self._parser._current = restore_index
                 break
+
         self._ast = results
         return self.__ret_value()
 
@@ -130,8 +144,10 @@ class BoundParser:
                 results.append(result)
             except ParseSyntaxError as e:
                 global OPT_ERR; OPT_ERR = e
+                global SHOULD_OPT_ERR; SHOULD_OPT_ERR = True
                 self._parser._current = restore_index
                 break
+
         self._ast = results
         return self.__ret_value()
 
@@ -147,9 +163,12 @@ class BoundParser:
             raise ParserError("Both parsers must be delayed")
 
         if isinstance(self, MultiBoundParser):
+            # that.opt_err()
             self.add_bound_parser(that)
             return self
         else:
+            # self.opt_err()
+            # that.opt_err()
             multi_bound_parser = MultiBoundParser(self._parser)
             multi_bound_parser.delay_parse()
             multi_bound_parser.add_bound_parser(self)
@@ -177,9 +196,9 @@ class MultiBoundParser(BoundParser):
             except ParseSyntaxError as e:
                 self._parser._current = restore_index
                 errors.append(str(e))
-        current_indent = errors[0].split("\n")[-1].count("\t") + 1
-        errors = [error.replace("\n", "\n" + "\t" * current_indent) for error in errors]
-        raise ParseSyntaxError("\n" + "\n".join(errors))
+        new_indent = errors[0].split("\n")[-1].count("\t") + 1
+        errors = [error.replace("\n", "\n" + "\t" * new_indent) for error in errors]
+        raise ParseSyntaxError(max(errors, key=lambda x: x.count("\n")))
 
 class Parser:
     _tokens: list[Token]
@@ -221,7 +240,7 @@ class Parser:
     def _parse_module_prototype(self) -> BoundParser:
         def inner():
             p1 = self._parse_access_modifier().add_err("Error parsing <AccessModifier>? for <ModulePrototype>").parse_optional()
-            p2 = self._parse_token(TokenType.KwMod).add_err("Error parsing 'mod' for <ModulePrototype>").opt_err().parse_once()
+            p2 = self._parse_token(TokenType.KwMod).add_err("Error parsing 'mod' for <ModulePrototype>").parse_once()
             p3 = self._parse_module_identifier().add_err("Error parsing <ModuleIdentifier> for <ModulePrototype>").parse_once()
             p4 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <ModulePrototype>").parse_once()
             p5 = self._parse_module_implementation().add_err("Error parsing <ModuleImplementation> for <ModulePrototype>").parse_once()
@@ -231,8 +250,7 @@ class Parser:
     def _parse_module_implementation(self) -> BoundParser:
         def inner():
             p1 = self._parse_import_block().add_err("Error parsing <ImportBlock> for <ModuleImplementation>").parse_optional()
-            p2 = self._parse_module_member().add_err("Error parsing <ModuleMember>+ for <ModuleImplementation>").opt_err().parse_zero_or_more()
-            __ = self._parse_dummy().opt_err().parse_once()
+            p2 = self._parse_module_member().add_err("Error parsing <ModuleMember>+ for <ModuleImplementation>").parse_zero_or_more()
             return ModuleImplementationAst(p1, p2)
         return BoundParser(self, inner)
 
@@ -240,7 +258,6 @@ class Parser:
         def inner():
             p1 = self._parse_identifier().add_err("Error parsing <Identifier> for <ModuleIdentifier>").parse_once()
             p2 = self._parse_module_identifier_next_part().add_err("Error parsing <ModuleIdentifierNextPart>* for <ModuleIdentifier>").parse_zero_or_more()
-            __ = self._parse_dummy().opt_err().parse_once()
             return ModuleIdentifierAst([p1, *p2])
         return BoundParser(self, inner)
 
@@ -269,14 +286,14 @@ class Parser:
             p2 = self._parse_token(TokenType.TkColon).add_err("Error parsing ':' for <ImportBlock>").parse_once()
             p3 = self._parse_indent().add_err("Error parsing <Indent> for <ImportBlock>").parse_once()
             p4 = self._parse_import_definition().add_err("Error parsing <ImportDefinition>+ for <ImportBlock>").parse_one_or_more()
-            p5 = self._parse_dedent().add_err("Error parsing <Dedent> for <ImportBlock>").opt_err().parse_once()
+            p5 = self._parse_dedent().add_err("Error parsing <Dedent> for <ImportBlock>").parse_once()
             return ImportBlockAst(p4)
         return BoundParser(self, inner)
 
     def _parse_import_definition(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkDot).add_err("Error parsing '.' for <ImportDefinition> (parent dir count)").parse_zero_or_more()
-            p2 = self._parse_module_identifier().add_err("Error parsing <ModuleIdentifier> for <ImportDefinition>").opt_err().parse_once()
+            p2 = self._parse_module_identifier().add_err("Error parsing <ModuleIdentifier> for <ImportDefinition>").parse_once()
             p3 = self._parse_token(TokenType.TkRightArrow).add_err("Error parsing '->' for <ImportDefinition>").parse_once()
             p4 = self._parse_import_identifiers().add_err("Error parsing <ImportIdentifiers> for <ImportDefinition>").parse_once()
             p5 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <ImportDefinition>").parse_once()
@@ -301,7 +318,6 @@ class Parser:
         def inner():
             p1 = self._parse_import_individual_type().add_err("Error parsing <ImportIndividualType> for <ImportIndividualTypes>").parse_once()
             p2 = self._parse_import_individual_type_next().add_err("Error parsing <ImportIndividualTypeNext>* for <ImportIndividualTypes>").parse_zero_or_more()
-            __ = self._parse_dummy().opt_err().parse_once()
             return ImportTypesIndividualAst([p1, *p2])
         return BoundParser(self, inner)
 
@@ -316,7 +332,6 @@ class Parser:
         def inner():
             p1 = self._parse_identifier().add_err("Error parsing <Identifier> for <ImportIndividualTypes>").parse_once()
             p2 = self._parse_import_individual_type_alias().add_err("Error parsing <ImportIndividualTypeAlias> for <ImportIndividualType>").parse_optional()
-            __ = self._parse_dummy().opt_err().parse_once()
             return ImportTypeAst(p1, p2)
         return BoundParser(self, inner)
 
@@ -335,20 +350,19 @@ class Parser:
             p2 = self._parse_token(TokenType.KwPriv).add_err("Error parsing  ... | 'priv' | ... for <AccessModifier>").delay_parse()
             p3 = self._parse_token(TokenType.KwProt).add_err("Error parsing ... | 'prot' | ... for <AccessModifier>").delay_parse()
             p4 = (p1 | p2 | p3).add_err("Error parsing selection for <AccessModifier>:").parse_optional()
-            __ = self._parse_dummy().opt_err().parse_once()
             return p4
         return BoundParser(self, inner)
 
     def _parse_class_prototype(self) -> BoundParser:
         def inner():
             p1 = self._parse_decorators().add_err("error parsing <Decorators>? for <ClassPrototype>").parse_optional()
-            p2 = self._parse_token(TokenType.KwPart).add_err("Error parsing 'part'? for <ClassPrototype>").opt_err().parse_optional()
-            p3 = self._parse_access_modifier().add_err("Error parsing <AccessModifier>? for <ClassPrototype>").opt_err().parse_optional()
-            p4 = self._parse_token(TokenType.KwCls).add_err("Error parsing 'cls' for <ClassPrototype>").opt_err().parse_once()
+            p2 = self._parse_token(TokenType.KwPart).add_err("Error parsing 'part'? for <ClassPrototype>").parse_optional()
+            p3 = self._parse_access_modifier().add_err("Error parsing <AccessModifier>? for <ClassPrototype>").parse_optional()
+            p4 = self._parse_token(TokenType.KwCls).add_err("Error parsing 'cls' for <ClassPrototype>").parse_once()
             p5 = self._parse_class_identifier().add_err("Error parsing <ClassIdentifier> for <ClassPrototype>").parse_once()
             p6 = self._parse_type_generic_parameters().add_err("Error parsing <TypeGenericParameters>? for <ClassPrototype>").parse_optional()
-            p7 = self._parse_where_block().add_err("Error parsing <WhereBlock>? for <ClassPrototype>").opt_err().parse_optional()
-            p8 = self._parse_class_or_empty_implementation().add_err("Error parsing <ClassOrEmptyImplementation> for <ClassPrototype>").opt_err().parse_once()
+            p7 = self._parse_where_block().add_err("Error parsing <WhereBlock>? for <ClassPrototype>").parse_optional()
+            p8 = self._parse_class_or_empty_implementation().add_err("Error parsing <ClassOrEmptyImplementation> for <ClassPrototype>").parse_once()
             return ClassPrototypeAst(p1, p3, p5, p6, p6, p7, p8)
         return BoundParser(self, inner)
 
@@ -378,7 +392,6 @@ class Parser:
     def _parse_class_implementation(self) -> BoundParser:
         def inner():
             p1 = self._parse_class_member().add_err("Error parsing <ClassMember>+ for <ClassImplementation>").parse_one_or_more()
-            __ = self._parse_dummy().opt_err().parse_once()
             return ClassImplementationAst(p1)
         return BoundParser(self, inner)
 
@@ -393,8 +406,8 @@ class Parser:
     def _parse_class_attribute(self) -> BoundParser:
         def inner():
             p1 = self._parse_access_modifier().add_err("Error parsing <AccessModifier>? for <ClassAttribute>").parse_optional()
-            p2 = self._parse_token(TokenType.KwMut).add_err("Error parsing 'mut'? for <ClassAttribute>").opt_err().parse_optional()
-            p3 = self._parse_class_attribute_identifier().add_err("Error parsing <ClassAttributeIdentifier> for <ClassAttribute>").opt_err().parse_once()
+            p2 = self._parse_token(TokenType.KwMut).add_err("Error parsing 'mut'? for <ClassAttribute>").parse_optional()
+            p3 = self._parse_class_attribute_identifier().add_err("Error parsing <ClassAttributeIdentifier> for <ClassAttribute>").parse_once()
             p4 = self._parse_token(TokenType.TkColon).add_err("Error parsing ':' for <ClassAttribute>").parse_once()
             p5 = self._parse_type_identifier().add_err("Error parsing <TypeIdentifier> for <ClassAttribute>").parse_once()
             p6 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <ClassAttribute>").parse_once()
@@ -404,8 +417,8 @@ class Parser:
     def _parse_class_attribute_static(self) -> BoundParser:
         def inner():
             p1 = self._parse_access_modifier().add_err("Error parsing <AccessModifier>? for <ClassAttributeStatic>").parse_optional()
-            p2 = self._parse_token(TokenType.KwMut).add_err("Error parsing 'mut'? for <ClassAttributeStatic>").opt_err().parse_optional()
-            p3 = self._parse_class_attribute_static_identifier().add_err("Error parsing <ClassAttributeStaticIdentifier> for <ClassAttributeStatic>").opt_err().parse_once()
+            p2 = self._parse_token(TokenType.KwMut).add_err("Error parsing 'mut'? for <ClassAttributeStatic>").parse_optional()
+            p3 = self._parse_class_attribute_static_identifier().add_err("Error parsing <ClassAttributeStaticIdentifier> for <ClassAttributeStatic>").parse_once()
             p4 = self._parse_token(TokenType.TkEqual).add_err("Error parsing '=' for <ClassAttributeStatic>").parse_once()
             p5 = self._parse_expression().add_err("Error parsing <Expression> for <ClassAttributeStatic>").parse_once()
             p6 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <ClassAttributeStatic>").parse_once()
@@ -444,20 +457,20 @@ class Parser:
     def _parse_sup_prototype_normal(self):
         def inner():
             p5 = self._parse_type_generic_parameters().add_err("Error parsing <TypeGenericParameters>? for <SupPrototypeNormal>").parse_optional()
-            p6 = self._parse_sup_identifier().add_err("Error parsing <SupIdentifier> for <SupPrototypeNormal>").opt_err().parse_once()
+            p6 = self._parse_sup_identifier().add_err("Error parsing <SupIdentifier> for <SupPrototypeNormal>").parse_once()
             p7 = self._parse_where_block().add_err("Error parsing <WhereBlock>? for <SupPrototypeNormal>").parse_optional()
-            p8 = self._parse_sup_or_empty_implementation().add_err("Error parsing <SupOrEmptyImplementation> for <SupPrototypeNormal>").opt_err().parse_once()
+            p8 = self._parse_sup_or_empty_implementation().add_err("Error parsing <SupOrEmptyImplementation> for <SupPrototypeNormal>").parse_once()
             return SupPrototypeNormalAst(p5, p6, p7, p8)
         return BoundParser(self, inner)
 
     def _parse_sup_prototype_with_inherit(self):
         def inner():
             p5 = self._parse_type_generic_parameters().add_err("Error parsing <TypeGenericParameters>? for <SupPrototypeWithInheritance>").parse_optional()
-            p6 = self._parse_sup_identifier().add_err("Error parsing <SupIdentifier> for <SupPrototypeWithInheritance>").opt_err().parse_once()
+            p6 = self._parse_sup_identifier().add_err("Error parsing <SupIdentifier> for <SupPrototypeWithInheritance>").parse_once()
             p7 = self._parse_token(TokenType.KwFor).add_err("Error parsing 'for' for <SupPrototypeWithInheritance>").parse_once()
             p8 = self._parse_sup_identifier().add_err("Error parsing <SupIdentifier> for <SupPrototypeWithInheritance>").parse_once()
             p9 = self._parse_where_block().add_err("Error parsing <WhereBlock>? for <SupPrototypeWithInheritance>").parse_optional()
-            p10 = self._parse_sup_or_empty_implementation().add_err("Error parsing <SupOrEmptyImplementation> for <SupPrototypeWithInheritance>").opt_err().parse_once()
+            p10 = self._parse_sup_or_empty_implementation().add_err("Error parsing <SupOrEmptyImplementation> for <SupPrototypeWithInheritance>").parse_once()
             return SupPrototypeInheritanceAst(p5, p6, p8, p9, p10)
         return BoundParser(self, inner)
 
@@ -487,7 +500,6 @@ class Parser:
     def _parse_sup_implementation(self) -> BoundParser:
         def inner():
             p1 = self._parse_sup_member().add_err("Error parsing <SupImplementation>+ for <SupImplementation>").parse_one_or_more()
-            __ = self._parse_dummy().opt_err().parse_once()
             return p1
         return BoundParser(self, inner)
 
@@ -508,7 +520,7 @@ class Parser:
     def _parse_sup_typedef(self) -> BoundParser:
         def inner():
             p1 = self._parse_access_modifier().add_err("Error parsing <AccessModifier>? for <SupTypedef>").parse_optional()
-            p2 = self._parse_statement_typedef().add_err("Error parsing <StatementTypedef> for <SupTypedef>").opt_err().parse_once()
+            p2 = self._parse_statement_typedef().add_err("Error parsing <StatementTypedef> for <SupTypedef>").parse_once()
             return SupTypedefAst(p1, p2.old_type, p2.new_type)
         return BoundParser(self, inner)
 
@@ -523,7 +535,7 @@ class Parser:
     def _parse_enum_prototype(self) -> BoundParser:
         def inner():
             p1 = self._parse_access_modifier().add_err("Error parsing <AccessModifier>? for <EnumPrototype>").parse_optional()
-            p2 = self._parse_token(TokenType.KwEnum).add_err("Error parsing 'enum' for <EnumPrototype>").opt_err().parse_once()
+            p2 = self._parse_token(TokenType.KwEnum).add_err("Error parsing 'enum' for <EnumPrototype>").parse_once()
             p3 = self._parse_enum_identifier().add_err("Error parsing <EnumIdentifier> for <EnumPrototype>").parse_once()
             p4 = self._parse_enum_or_empty_implementation().add_err("Error parsing <EnumOrEmptyImplementation> for <EnumPrototype>").parse_once()
             return EnumPrototypeAst(p1, p3, p4)
@@ -556,7 +568,7 @@ class Parser:
         def inner():
             p1 = self._parse_enum_member().add_err("Error parsing <EnumMember> for <EnumImplementation>").parse_once()
             p2 = self._parse_enum_member_next().add_err("Error parsing <EnumMemberNext>* for <EnumImplementation>").parse_zero_or_more()
-            p3 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <EnumImplementation>").opt_err().parse_once()
+            p3 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <EnumImplementation>").parse_once()
             return EnumImplementationAst([p1, *p2])
         return BoundParser(self, inner)
 
@@ -571,7 +583,6 @@ class Parser:
         def inner():
             p1 = self._parse_enum_member_identifier().add_err("Error parsing <EnumMemberIdentifier> for <EnumMember>").parse_once()
             p2 = self._parse_enum_member_value_wrapper().add_err("Error parsing <EnumMemberValueWrapper>? for <EnumMember>").parse_optional()
-            __ = self._parse_dummy().opt_err().parse_once()
             return EnumMemberAst(p1, p2)
         return BoundParser(self, inner)
 
@@ -605,17 +616,17 @@ class Parser:
     def _parse_function_prototype(self) -> BoundParser:
         def inner():
             p1 = self._parse_decorators().add_err("Error parsing <Decorators>? for <FunctionPrototype>").parse_optional()
-            p2 = self._parse_access_modifier().add_err("Error parsing <AccessModifier>? for <FunctionPrototype>").opt_err().parse_optional()
-            p3 = self._parse_token(TokenType.KwAsync).add_err("Error parsing 'async'? for <FunctionPrototype>").opt_err().parse_optional()
-            p4 = self._parse_token(TokenType.KwFun).add_err("Error parsing 'fun' for <FunctionPrototype>").opt_err().parse_once()
+            p2 = self._parse_access_modifier().add_err("Error parsing <AccessModifier>? for <FunctionPrototype>").parse_optional()
+            p3 = self._parse_token(TokenType.KwAsync).add_err("Error parsing 'async'? for <FunctionPrototype>").parse_optional()
+            p4 = self._parse_token(TokenType.KwFun).add_err("Error parsing 'fun' for <FunctionPrototype>").parse_once()
             p5 = self._parse_function_identifier().add_err("Error parsing <FunctionIdentifier> for <FunctionPrototype>").parse_once()
             p6 = self._parse_type_generic_parameters().add_err("Error parsing <TypeGenericParameters>? for <FunctionPrototype>").parse_optional()
-            p7 = self._parse_function_parameters().add_err("Error parsing <FunctionParameters> for <FunctionPrototype>").opt_err().parse_once()
+            p7 = self._parse_function_parameters().add_err("Error parsing <FunctionParameters> for <FunctionPrototype>").parse_once()
             p8 = self._parse_token(TokenType.TkRightArrow).add_err("Error parsing '->' for <FunctionPrototype>").parse_once()
             p9 = self._parse_type_identifiers().add_err("Error parsing <TypeIdentifiers> for <FunctionPrototype>").parse_once()
             p10 = self._parse_where_block().add_err("Error parsing <WhereBlock>? for <FunctionPrototype>").parse_optional()
-            p11 = self._parse_value_guard().add_err("Error parsing <ValueGuard>? for <FunctionPrototype>").opt_err().parse_optional()
-            p12 = self._parse_function_or_empty_implementation().add_err("Error parsing <FunctionOrEmptyImplementation> for <FunctionPrototype>").opt_err().parse_once()
+            p11 = self._parse_value_guard().add_err("Error parsing <ValueGuard>? for <FunctionPrototype>").parse_optional()
+            p12 = self._parse_function_or_empty_implementation().add_err("Error parsing <FunctionOrEmptyImplementation> for <FunctionPrototype>").parse_once()
             return FunctionPrototypeAst(p1, p2, p3, p5, p6, p7, p9, p10, p11, p12)
         return BoundParser(self, inner)
 
@@ -645,7 +656,6 @@ class Parser:
     def _parse_function_implementation(self) -> BoundParser:
         def inner():
             p1 = self._parse_statement().add_err("Error parsing <Statement>+ for <FunctionImplementation>").parse_one_or_more()
-            __ = self._parse_dummy().opt_err().parse_once()
             return FunctionImplementationAst(p1)
         return BoundParser(self, inner)
 
@@ -661,7 +671,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.TkLeftParenthesis).add_err("Error parsing '(' for <FunctionCallArguments>").parse_once()
             p2 = self._parse_function_call_arguments_normal_then_named().add_err("Error parsing <FunctionCallArgumentsNormalThenNamed>? for <FunctionCallArguments>").parse_optional() or []
-            p3 = self._parse_token(TokenType.TkRightParenthesis).add_err("Error parsing ')' for <FunctionCallArguments>").opt_err().parse_once()
+            p3 = self._parse_token(TokenType.TkRightParenthesis).add_err("Error parsing ')' for <FunctionCallArguments>").parse_once()
             return p2
         return BoundParser(self, inner)
 
@@ -677,7 +687,6 @@ class Parser:
         def inner():
             p3 = self._parse_function_call_normal_argument().add_err("Error parsing <FunctionCallNormalArgument> for <FunctionCallNormalArguments>").parse_once()
             p4 = self._parse_function_call_rest_of_normal_arguments().add_err("Error parsing <FunctionCallRestOfNormalArguments>? for <FunctionCallNormalArguments>").parse_optional()
-            __ = self._parse_dummy().opt_err().parse_once()
             return [p3, p4]
         return BoundParser(self, inner)
 
@@ -692,7 +701,6 @@ class Parser:
         def inner():
             p3 = self._parse_function_call_named_argument().add_err("Error parsing <FunctionCallNamedArgument> for <FunctionCallNamedArguments>").parse_once()
             p4 = self._parse_function_call_next_named_argument().add_err("Error parsing <FunctionCallNextNamedArgument>* for <FunctionCallNamedArguments>").parse_zero_or_more()
-            __ = self._parse_dummy().opt_err().parse_once()
             return [p3, *p4]
         return BoundParser(self, inner)
 
@@ -723,7 +731,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.TkLeftParenthesis).add_err("Error parsing '(' for <FunctionParameters>").parse_once()
             p2 = self._parse_function_parameters_required_then_optional().add_err("Error parsing <FunctionParametersRequiredThenOptional>? for <FunctionParameters>").parse_optional() or []
-            p3 = self._parse_token(TokenType.TkRightParenthesis).add_err("Error parsing ')' for <FunctionParameters>").opt_err().parse_once()
+            p3 = self._parse_token(TokenType.TkRightParenthesis).add_err("Error parsing ')' for <FunctionParameters>").parse_once()
             return p2
         return BoundParser(self, inner)
 
@@ -748,7 +756,6 @@ class Parser:
         def inner():
             p3 = self._parse_function_required_parameter().add_err("Error parsing <FunctionRequiredParameter> for <FunctionRequiredParameters>").parse_once()
             p4 = self._parse_function_rest_of_required_parameters().add_err("Error parsing <FunctionRestOfRequiredParameters>? for <FunctionRequiredParameters>").parse_optional()
-            __ = self._parse_dummy().opt_err().parse_once()
             return [p3, p4]
         return BoundParser(self, inner)
 
@@ -763,7 +770,6 @@ class Parser:
         def inner():
             p3 = self._parse_function_optional_parameter().add_err("Error parsing <FunctionOptionalParameter> for <FunctionOptionalParameters>").parse_once()
             p4 = self._parse_function_rest_of_optional_parameters().add_err("Error parsing <FunctionRestOfOptionalParameters>? for <FunctionOptionalParameters>").parse_optional()
-            __ = self._parse_dummy().opt_err().parse_once()
             return [p3, p4]
         return BoundParser(self, inner)
 
@@ -777,7 +783,7 @@ class Parser:
     def _parse_function_required_parameter(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwMut).add_err("Error parsing 'mut'? for <FunctionRequiredParameter>").parse_optional()
-            p2 = self._parse_function_parameter_identifier().add_err("Error parsing <FunctionParameterIdentifier> for <FunctionRequiredParameter>").opt_err().parse_once()
+            p2 = self._parse_function_parameter_identifier().add_err("Error parsing <FunctionParameterIdentifier> for <FunctionRequiredParameter>").parse_once()
             p3 = self._parse_token(TokenType.TkColon).add_err("Error parsing ':' for <FunctionRequiredParameter>").parse_once()
             p4 = self._parse_type_identifier().add_err("Error parsing <TypeIdentifier> for <FunctionRequiredParameter>").parse_once()
             return FunctionParameterRequiredAst(p1 is not None, p2, p4)
@@ -819,7 +825,6 @@ class Parser:
         def inner():
             p1 = self._parse_where_constraint().add_err("Error parsing <WhereConstraint> for <WhereConstraints>").parse_once()
             p2 = self._parse_where_constraint_next().add_err("Error parsing <WhereConstraintNext>* for <WhereConstraints>").parse_zero_or_more()
-            __ = self._parse_dummy().opt_err().parse_once()
             return [p1, *p2]
         return BoundParser(self, inner)
 
@@ -842,7 +847,6 @@ class Parser:
         def inner():
             p3 = self._parse_where_constraint_chain_element().add_err("Error parsing <WhereConstraintChainElement> for <WhereConstraintChain>").parse_once()
             p4 = self._parse_where_constraint_chain_element_next().add_err("Error parsing <WhereConstraintChainElementNext>* for <WhereConstraintChain>").parse_zero_or_more()
-            __ = self._parse_dummy().opt_err().parse_once()
             return [p3, *p4]
         return BoundParser(self, inner)
 
@@ -874,7 +878,6 @@ class Parser:
             p2 = self._parse_decorator_identifier().add_err("Error parsing <DecoratorIdentifier> for <Decorator>").parse_once()
             p3 = self._parse_type_generic_arguments().add_err("Error parsing <TypeGenericArguments>? for <Decorator>").parse_optional()
             p4 = self._parse_function_call_arguments().add_err("Error parsing <FunctionCallArguments>? for <Decorator>").parse_optional()
-            __ = self._parse_dummy().opt_err().parse_once()
             return DecoratorAst(p2, p3, p4)
         return BoundParser(self, inner)
 
@@ -882,7 +885,6 @@ class Parser:
         def inner():
             p1 = self._parse_decorator().add_err("Error parsing <Decorator> for <Decorators>").parse_once()
             p2 = self._parse_decorator_next().add_err("Error parsing <DecoratorNext>* for <Decorators>").parse_zero_or_more()
-            __ = self._parse_dummy().opt_err().parse_once()
             return [p1, *p2]
         return BoundParser(self, inner)
 
@@ -905,7 +907,6 @@ class Parser:
         def inner():
             p1 = self._parse_expression().add_err("Error parsing <Expression> for <Expressions>").parse_once()
             p2 = self._parse_expression_next().add_err("Error parsing <ExpressionNext>* for <Expressions>").parse_zero_or_more()
-            __ = self._parse_dummy().opt_err().parse_once()
             return [p1, *p2]
         return BoundParser(self, inner)
 
@@ -934,10 +935,9 @@ class Parser:
         def inner():
             p4 = self._parse_null_coalescing_expression().add_err("Error parsing <NullCoalescingExpression> for <AssignmentMultiple>").parse_once()
             p5 = self._parse_assignment_multiple_lhs().add_err("Error parsing <AssignmentMultipleLhs>* for <AssignmentMultiple>").parse_zero_or_more()
-            p6 = self._parse_token(TokenType.TkEqual).add_err("Error parsing '=' for <AssignmentMultiple>").opt_err().parse_once()
+            p6 = self._parse_token(TokenType.TkEqual).add_err("Error parsing '=' for <AssignmentMultiple>").parse_once()
             p7 = self._parse_assignment_expression().add_err("Error parsing <AssignmentExpression> for <AssignmentMultiple>").parse_once()
             p8 = self._parse_assignment_multiple_rhs().add_err("Error parsing <AssignmentMultipleRhs>* for <AssignmentMultiple>").parse_zero_or_more()
-            __ = self._parse_dummy().opt_err().parse_once()
             return MultiAssignmentExpressionAst([p4, *p5], [p7, *p8])
         return BoundParser(self, inner)
 
@@ -1047,8 +1047,8 @@ class Parser:
 
     def _parse_unary_expression(self) -> BoundParser:
         def inner():
-            p1 = self._parse_operator_identifier_unary().parse_zero_or_more()
-            p2 = self._parse_postfix_expression().parse_once()
+            p1 = self._parse_operator_identifier_unary().add_err("Error parsing <OperatorIdentifierUnary>* for <UnaryExpression>").parse_zero_or_more()
+            p2 = self._parse_postfix_expression().add_err("Error parsing <PostfixExpression> for <UnaryExpression>").parse_once()
             for op in reversed(p1):
                 p2 = UnaryExpressionAst(op, p2)
             return p2
@@ -1056,8 +1056,8 @@ class Parser:
 
     def _parse_postfix_expression(self) -> BoundParser:
         def inner():
-            p1 = self._parse_primary_expression().parse_once()
-            p2 = self._parse_operator_identifier_postfix().parse_zero_or_more()
+            p1 = self._parse_primary_expression().add_err("Error parsing <PrimaryExpression> for <PostfixExpression>").parse_once()
+            p2 = self._parse_operator_identifier_postfix().add_err("Error parsing <OperatorIdentifierPostfix>* for <PostfixExpression>").parse_zero_or_more()
             for op in p2:
                 p1 = PostfixExpressionAst(p1, op)
             return p1
@@ -1065,27 +1065,27 @@ class Parser:
 
     def _parse_primary_expression(self) -> BoundParser:
         def inner():
-            p1 = self._parse_identifier().delay_parse()
-            p2 = self._parse_lambda().delay_parse()
-            p3 = self._parse_literal().delay_parse()
-            p4 = self._parse_static_scoped_generic_identifier().delay_parse()
-            p5 = self._parse_parenthesized_expression().delay_parse()
-            p6 = self._parse_expression_placeholder().delay_parse()
-            p7 = (p1 | p2 | p3 | p4 | p5 | p6).parse_once()
+            p1 = self._parse_identifier().add_err("Error parsing <Identifier> for <PrimaryExpression>").parse_once()
+            p2 = self._parse_lambda().add_err("Error parsing <Lambda> for <PrimaryExpression>").parse_once()
+            p3 = self._parse_literal().add_err("Error parsing <Literal> for <PrimaryExpression>").delay_parse()
+            p4 = self._parse_static_scoped_generic_identifier().add_err("Error parsing StaticScopedGenericIdentifier for <PrimaryExpression>").delay_parse()
+            p5 = self._parse_parenthesized_expression().add_err("Error parsing <ParenthesizedExpression> for <PrimaryExpression>").delay_parse()
+            p6 = self._parse_expression_placeholder().add_err("Error parsing <ExpressionPlaceholder> for <PrimaryExpression>").delay_parse()
+            p7 = (p1 | p2 | p3 | p4 | p5 | p6).add_err("Error parsing selection for <PrimaryExpression>").parse_once()
             return p7
         return BoundParser(self, inner)
 
     def _parse_binary_expression(self, __lhs, __op, __rhs) -> BoundParser:
         def inner(lhs, op, rhs):
-            p1 = lhs.parse_once()
+            p1 = lhs.add_err("Error parsing LHS of binary op").parse_once()
             p2 = self._parse_binary_expression_rhs(op, rhs).parse_optional()
             return p1 if p2 is None else BinaryExpressionAst(p1, p2[0], p2[1])
         return BoundParser(self, functools.partial(inner, __lhs, __op, __rhs))
 
     def _parse_binary_expression_rhs(self, __op, __rhs) -> BoundParser:
         def inner(op, rhs):
-            p3 = op.parse_once()
-            p4 = rhs().parse_once()
+            p3 = op.add_err("Error parsing OP of binary op").parse_once()
+            p4 = rhs().add_err("Error parsing RHS of binary op").parse_once()
             return p3, p4
         return BoundParser(self, functools.partial(inner, __op, __rhs))
 
@@ -1103,31 +1103,31 @@ class Parser:
             return PlaceholderAst()
         return BoundParser(self, inner)
 
-    """[LAMBDA]"""
+    # Lambda
 
     def _parse_lambda(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwAsync).parse_optional()
-            p2 = self._parse_lambda_capture_list().parse_optional()
-            p3 = self._parse_lambda_parameters().parse_once()
-            p4 = self._parse_token(TokenType.TkRightArrow).parse_once()
-            p5 = self._parse_lambda_implementation().parse_once()
+            p1 = self._parse_token(TokenType.KwAsync).add_err("Error parsing 'async'? for <Lambda>").parse_optional()
+            p2 = self._parse_lambda_capture_list().add_err("Error parsing <LambdaCaptureList>? for <Lambda>").parse_optional()
+            p3 = self._parse_lambda_parameters().add_err("Error parsing <LambdaParameters> for <Lambda>").parse_once()
+            p4 = self._parse_token(TokenType.TkRightArrow).add_err("Error parsing '->' for <Lambda>").parse_once()
+            p5 = self._parse_lambda_implementation().add_err("Error parsing <LambdaImplementation> for <Lambda>").parse_once()
             return LambdaAst(p1, p2, p3, p5)
         return BoundParser(self, inner)
 
     def _parse_lambda_capture_list(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkLeftBracket).parse_once()
-            p2 = self._parse_lambda_capture_item().parse_optional()
-            p3 = self._parse_lambda_capture_item_next().parse_zero_or_more()
-            p4 = self._parse_token(TokenType.TkRightBracket).parse_once()
+            p1 = self._parse_token(TokenType.TkLeftBracket).add_err("Error parsing '[' for <LambdaCaptureList>").parse_once()
+            p2 = self._parse_lambda_capture_item().add_err("Error parsing <LambdaCaptureItem> for <LambdaCaptureList>").parse_once()
+            p3 = self._parse_lambda_capture_item_next().add_err("Error parsing <LambdaCaptureItemNext>* for <LambdaCaptureList>").parse_zero_or_more()
+            p4 = self._parse_token(TokenType.TkRightBracket).add_err("Error parsing ']' for <LambdaCaptureList>").parse_once()
             return [p2, *p3]
         return BoundParser(self, inner)
 
     def _parse_lambda_capture_item_next(self) -> BoundParser:
         def inner():
-            p5 = self._parse_token(TokenType.TkComma).parse_once()
-            p6 = self._parse_lambda_capture_item().parse_once()
+            p5 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <LambdaCaptureItemNext>").parse_once()
+            p6 = self._parse_lambda_capture_item().add_err("Error parsing <LambdaCaptureItem> for <LambdaCaptureItemNext>").parse_once()
             return p6
         return BoundParser(self, inner)
 
@@ -1184,22 +1184,22 @@ class Parser:
 
     def _parse_type_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_unary_operator_reference().parse_optional()
-            p2 = self._parse_static_scoped_generic_identifier().parse_once()
+            p1 = self._parse_unary_operator_reference().add_err("Error parsing <UnaryOperatorReference> for <TypeIdentifier>").parse_optional()
+            p2 = self._parse_static_scoped_generic_identifier().add_err("Error parsing <StaticScopedGenericIdentifier> for <TypeIdentifier>").parse_once()
             return TypeAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_type_identifiers(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_identifier().parse_once()
-            p2 = self._parse_type_identifier_next().parse_zero_or_more()
+            p1 = self._parse_type_identifier().add_err("Error parsing <TypeIdentifier> for <TypeIdentifiers>").parse_once()
+            p2 = self._parse_type_identifier_next().add_err("Error parsing <TypeIdentifierNext>* for <TypeIdentifiers>").parse_zero_or_more()
             return [p1, *p2]
         return BoundParser(self, inner)
 
     def _parse_type_identifier_next(self) -> BoundParser:
         def inner():
-            p3 = self._parse_token(TokenType.TkComma).parse_once()
-            p4 = self._parse_type_identifier().parse_once()
+            p3 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <TypeIdentifierNext>").parse_once()
+            p4 = self._parse_type_identifier().add_err("Error parsing <TypeIdentifier> for <TypeIdentifierNext>").parse_once()
             return p4
         return BoundParser(self, inner)
 
@@ -1207,59 +1207,59 @@ class Parser:
 
     def _parse_type_generic_arguments(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkLeftAngleBracket).parse_once()
-            p2 = self._parse_type_generic_arguments_normal_then_named().parse_optional() or []
-            p3 = self._parse_token(TokenType.TkRightAngleBracket).parse_once()
+            p1 = self._parse_token(TokenType.TkLeftAngleBracket).add_err("Error parsing '<' for <TypeGenericArguments>").parse_once()
+            p2 = self._parse_type_generic_arguments_normal_then_named().add_err("Error parsing <TypeGenericArgumentsNormalThenNamed>? for <TypeGenericArguments>").parse_optional() or []
+            p3 = self._parse_token(TokenType.TkRightAngleBracket).add_err("Error parsing '>' for <TypeGenericArguments>").parse_once()
             return p2
         return BoundParser(self, inner)
 
     def _parse_type_generic_arguments_normal_then_named(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_generic_normal_arguments().delay_parse()
-            p2 = self._parse_type_generic_named_arguments().delay_parse()
-            p3 = (p1 | p2).parse_once()
+            p1 = self._parse_type_generic_normal_arguments().add_err("Error parsing ... | <TypeGenericNormalArguments | ... for <TypeGenericArgumentsNormalThenNamed>").delay_parse()
+            p2 = self._parse_type_generic_named_arguments().add_err("Error parsing ... | <TypeGenericNamedArguments | ... for <TypeGenericArgumentsNormThenNamed>").delay_parse()
+            p3 = (p1 | p2).add_err("Error parsing selection for <TypeGenericArgumentsNormalThenNamed>").parse_once()
             return p3
         return BoundParser(self, inner)
 
     def _parse_type_generic_normal_arguments(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_generic_normal_argument().parse_once()
-            p2 = self._parse_type_generic_rest_of_normal_arguments().parse_optional()
+            p1 = self._parse_type_generic_normal_argument().add_err("Error parsing <TypeGenericNormalArgument> for <TypeGenericNormalArguments>").parse_once()
+            p2 = self._parse_type_generic_rest_of_normal_arguments().add_err("Error parsing <TypeGenericRestOfNormalArguments>? for <TypeGenericNormalArguments>").parse_optional()
             return [p1, p2]
         return BoundParser(self, inner)
 
     def _parse_type_generic_rest_of_normal_arguments(self) -> BoundParser:
         def inner():
-            p3 = self._parse_token(TokenType.TkComma).parse_once()
-            p4 = self._parse_type_generic_arguments_normal_then_named().parse_once()
+            p3 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <TypeGenericRestOfNormalArguments>").parse_once()
+            p4 = self._parse_type_generic_arguments_normal_then_named().add_err("Error parsing <TypeGenericArgumentsNormalThenNamed> for <TypeGenericRestOfNormalArguments>").parse_once()
             return p4
         return BoundParser(self, inner)
 
     def _parse_type_generic_named_arguments(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_generic_named_argument().parse_once()
-            p2 = self._parse_type_generic_next_named_argument().parse_zero_or_more()
+            p1 = self._parse_type_generic_named_argument().add_err("Error parsing <TypeGenericNamedArgument> for <TypeGenericNamedArguments>").parse_once()
+            p2 = self._parse_type_generic_next_named_argument().add_err("Error parsing <TypeGenericNextNamedArgument>* for <TypeGenericNamedArguments>").parse_zero_or_more()
             return [p1, *p2]
         return BoundParser(self, inner)
 
     def _parse_type_generic_next_named_argument(self) -> BoundParser:
         def inner():
-            p3 = self._parse_token(TokenType.TkComma).parse_once()
-            p4 = self._parse_type_generic_named_argument().parse_once()
+            p3 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <TypeGenericNextNamedArgument>").parse_once()
+            p4 = self._parse_type_generic_named_argument().add_err("Error parsing <TypeGenericNamedArgument> for <TypeGenericNextNamedArgument>").parse_once()
             return p4
         return BoundParser(self, inner)
 
     def _parse_type_generic_normal_argument(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_identifier().parse_once()
+            p1 = self._parse_type_identifier().add_err("Error parsing <TypeIdentifier> for <TypeGenericNormalArgument>").parse_once()
             return TypeGenericArgumentNormalAst(p1)
         return BoundParser(self, inner)
 
     def _parse_type_generic_named_argument(self) -> BoundParser:
         def inner():
-            p1 = self._parse_identifier().parse_once()
-            p2 = self._parse_token(TokenType.TkEqual).parse_once()
-            p3 = self._parse_type_identifier().parse_once()
+            p1 = self._parse_identifier().add_err("Error parsing <Identifier> for <TypeGenericNamedArgument>").parse_once()
+            p2 = self._parse_token(TokenType.TkEqual).add_err("Error parsing '=' for <TypeGenericNamedArgument>").parse_once()
+            p3 = self._parse_type_identifier().add_err("Error parsing <TypeIdentifier> for <TypeGenericNamedArgument>").parse_once()
             return TypeGenericArgumentNamedAst(p1, p3)
         return BoundParser(self, inner)
 
@@ -1269,7 +1269,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.TkLeftAngleBracket).add_err("Error parsing '<' for <TypeGenericParameters>").parse_once()
             p2 = self._parse_type_generic_parameters_required_then_optional().add_err("Error parsing <TypeGenericParametersRequiredThenOptional> for <TypeGenericParameters>").parse_optional() or []
-            p3 = self._parse_token(TokenType.TkRightAngleBracket).add_err("Error parsing '>' for <TypeGenericParameters>").opt_err().parse_once()
+            p3 = self._parse_token(TokenType.TkRightAngleBracket).add_err("Error parsing '>' for <TypeGenericParameters>").parse_once()
             return p2
         return BoundParser(self, inner)
 
@@ -1294,7 +1294,6 @@ class Parser:
         def inner():
             p3 = self._parse_type_generic_required_parameter().add_err("Error parsing <TypeGenericRequiredParameter> for <TypeGenericRequiredParameters>").parse_once()
             p4 = self._parse_type_generic_rest_of_required_parameters().add_err("Error parsing <TypeGenericRestOfRequiredParameters>? for <TypeGenericRequiredParameters>").parse_optional()
-            __ = self._parse_dummy().opt_err().parse_once()
             return [p3, p4]
         return BoundParser(self, inner)
 
@@ -1309,7 +1308,6 @@ class Parser:
         def inner():
             p3 = self._parse_type_generic_optional_parameter().add_err("Error parsing <TypeGenericOptionalParameter> for <TypeGenericOptionalParameters>").parse_once()
             p4 = self._parse_type_generic_rest_of_optional_parameters().add_err("Error parsing <TypeGenericRestOfOptionalParameters>? for <TypeGenericOptionalParameters>").parse_optional()
-            __ = self._parse_dummy().opt_err().parse_once()
             return [p3, p4]
         return BoundParser(self, inner)
 
@@ -1324,7 +1322,6 @@ class Parser:
         def inner():
             p1 = self._parse_identifier().add_err("Error parsing <Identifier> for <TypeGenericRequiredParameter>").parse_once()
             p2 = self._parse_type_generic_parameter_inline_constraint().add_err("Error parsing <TypeGenericParameterInlineConstraint>? for <TypeGenericRequiredParameter>").parse_optional()
-            __ = self._parse_dummy().opt_err().parse_once()
             return TypeGenericParameterRequiredAst(p1, p2)
         return BoundParser(self, inner)
 
@@ -1340,7 +1337,6 @@ class Parser:
         def inner():
             p1 = self._parse_type_generic_variadic_parameter().add_err("Error parsing <TypeGenericVariadicParameter> for <TypeGenericVariadicParameters>").parse_once()
             p2 = self._parse_type_generic_rest_of_variadic_parameters().add_err("Error parsing <TypeGenericRestOfVariadicParameters>? for <TypeGenericVariadicParameters>").parse_optional()
-            __ = self._parse_dummy().opt_err().parse_once()
             return [p1, p2]
         return BoundParser(self, inner)
 
@@ -1379,7 +1375,6 @@ class Parser:
             p1 = self._parse_statement_if_branch().add_err("Error parsing <StatementIfBranch> for <StatementIf>").parse_once()
             p5 = self._parse_statement_elif_branch().add_err("Error parsing <StatementElifBranch> for <StatementIf>").parse_zero_or_more()
             p6 = self._parse_statement_else_branch().add_err("Error parsing <StatementElseBranch> for <StatementIf>").parse_optional()
-            __ = self._parse_dummy().opt_err().parse_once()
             return IfStatementAst(p1, p5, p6)
         return BoundParser(self, inner)
 
@@ -1387,7 +1382,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.KwIf).add_err("Error parsing 'if' for <StatementIfBranch>").parse_once()
             p2 = self._parse_statement_inline_definitions().add_err("Error parsing <StatementInlineDefinitions>* for <StatementIfBranch>").parse_zero_or_more()
-            p3 = self._parse_expression().add_err("Error parsing <Expression> for <StatementIfBranch>").opt_err().parse_once()
+            p3 = self._parse_expression().add_err("Error parsing <Expression> for <StatementIfBranch>").parse_once()
             p4 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementIfBranch>").parse_once()
             return IfStatementBranchAst(p2, p3, p4)
         return BoundParser(self, inner)
@@ -1396,7 +1391,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.KwElif).add_err("Error parsing 'elif' for <StatementElifBranch>").parse_once()
             p2 = self._parse_statement_inline_definitions().add_err("Error parsing <StatementInlineDefinitions>* for <StatementElifBranch>").parse_zero_or_more()
-            p3 = self._parse_expression().add_err("Error parsing <Expression> for <StatementElifBranch>").opt_err().parse_once()
+            p3 = self._parse_expression().add_err("Error parsing <Expression> for <StatementElifBranch>").parse_once()
             p4 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementElifBranch>").parse_once()
             return ElifStatementBranchAst(p2, p3, p4)
         return BoundParser(self, inner)
@@ -1413,7 +1408,7 @@ class Parser:
             p1 = self._parse_token(TokenType.KwWhile).add_err("Error parsing 'while' for <StatementWhileLoop>").parse_once()
             p2 = self._parse_expression().add_err("Error parsing <Expression> for <StatementWhileLoop>").parse_once()
             p3 = self._parse_statement_loop_tag().add_err("Error parsing <StatementLoopTag>? for <StatementWhile>").parse_optional()
-            p4 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementWhile>").opt_err().parse_once()
+            p4 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementWhile>").parse_once()
             return WhileStatementAst(p2, p3, p4)
         return BoundParser(self, inner)
 
@@ -1424,7 +1419,7 @@ class Parser:
             p3 = self._parse_token(TokenType.KwIn).add_err("Error parsing 'in' for <StatementFor>").parse_once()
             p4 = self._parse_expression().add_err("Error parsing <Expression> for <StatementFor>").parse_once()
             p5 = self._parse_statement_loop_tag().add_err("Error parsing <StatementLoopTag>? for <StatementFor>").parse_optional()
-            p6 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementFor>").opt_err().parse_once()
+            p6 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementFor>").parse_once()
             return ForStatementAst(p2, p4, p5, p6)
         return BoundParser(self, inner)
 
@@ -1435,7 +1430,6 @@ class Parser:
             p3 = self._parse_token(TokenType.KwWhile).add_err("Error parsing 'while' for <StatementDo>").parse_once()
             p4 = self._parse_expression().add_err("Error parsing <Expression> for <StatementDo>").parse_once()
             p5 = self._parse_statement_loop_tag().add_err("Error parsing <StatementLoopTag>? for <StatementDo>").parse_optional()
-            __ = self._parse_dummy().opt_err().parse_once()
             return DoWhileStatementAst(p2, p4, p5)
         return BoundParser(self, inner)
 
@@ -1452,7 +1446,7 @@ class Parser:
             p1 = self._parse_token(TokenType.KwCase).add_err("Error parsing 'case' for <StatementCase>").parse_once()
             p2 = self._parse_expression().add_err("Error parsing <Expression> for <StatementCase>").parse_once()
             p3 = self._parse_value_guard().add_err("Error parsing <ValueGuard>? for <StatementCase>").parse_optional()
-            p4 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementCase>").opt_err().parse_once()
+            p4 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementCase>").parse_once()
             return CaseStatementAst(p2, p3, p4)
         return BoundParser(self, inner)
 
@@ -1461,7 +1455,7 @@ class Parser:
             p1 = self._parse_token(TokenType.KwCase).add_err("Error parsing 'case' for <StatementCaseDefault>").parse_once()
             p2 = self._parse_expression_placeholder().add_err("Error parsing <ExpressionPlaceholder> for <StatementCaseDefault>").parse_once()
             p3 = self._parse_value_guard().add_err("Error parsing <ValueGuard>? for <StatementCaseDefault>").parse_optional()
-            p4 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementCaseDefault>").opt_err().parse_once()
+            p4 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementCaseDefault>").parse_once()
             return CaseStatementAst(p2, p3, p4)
         return BoundParser(self, inner)
 
@@ -1485,7 +1479,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.KwReturn).add_err("Error parsing 'return' for <StatementReturn>").parse_once()
             p2 = self._parse_expression().add_err("Error parsing <Expression> for <StatementReturn>").parse_optional()
-            p3 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <StatmentReturn>").opt_err().parse_once()
+            p3 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <StatmentReturn>").parse_once()
             return ReturnStatementAst(p2)
         return BoundParser(self, inner)
 
@@ -1493,7 +1487,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.KwYield).add_err("Error parsing 'yield' for <StatementYield>").parse_once()
             p2 = self._parse_expression().add_err("Error parsing 'yield' for <StatementYield>").parse_optional()
-            p3 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <StatementYield>").opt_err().parse_once()
+            p3 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <StatementYield>").parse_once()
             return YieldStatementAst(p2)
         return BoundParser(self, inner)
 
@@ -1509,17 +1503,17 @@ class Parser:
 
     def _parse_statement_break(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwBreak).parse_once()
-            p2 = self._parse_statement_loop_tag().parse_optional()
-            p3 = self._parse_token(TokenType.TkSemicolon).parse_once()
+            p1 = self._parse_token(TokenType.KwBreak).add_err("Error parsing 'break' for <StatementBreak>").parse_once()
+            p2 = self._parse_statement_loop_tag().add_err("Error parsing <StatementLoopTag>? for <StatementBreak>").parse_optional()
+            p3 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';'? for <StatementBreak>").parse_once()
             return BreakStatementAst(p2)
         return BoundParser(self, inner)
 
     def _parse_statement_continue(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwContinue).parse_once()
-            p2 = self._parse_statement_loop_tag().parse_optional()
-            p3 = self._parse_token(TokenType.TkSemicolon).parse_once()
+            p1 = self._parse_token(TokenType.KwContinue).add_err("Error parsing 'continue' for <StatementContinue>").parse_once()
+            p2 = self._parse_statement_loop_tag().add_err("Error parsing <StatementLoopTag>? for <StatementContinue>").parse_optional()
+            p3 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <StatementContinue>").parse_once()
             return ContinueStatementAst(p2)
         return BoundParser(self, inner)
 
@@ -1617,7 +1611,7 @@ class Parser:
     def _parse_local_variable_identifier(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwMut).add_err("Error parsing 'mut'? for <LocalVariableIdentifier>").parse_optional()
-            p2 = self._parse_identifier().add_err("Error parsing <Identifier> for <LocalVariableIdentifier>").opt_err().parse_once()
+            p2 = self._parse_identifier().add_err("Error parsing <Identifier> for <LocalVariableIdentifier>").parse_once()
             return LocalVariableAst(p1, p2)
         return BoundParser(self, inner)
 
@@ -1637,28 +1631,28 @@ class Parser:
 
     def _parse_statement_expression(self) -> BoundParser:
         def inner():
-            p1 = self._parse_expression().parse_once()
-            p2 = self._parse_token(TokenType.TkSemicolon).parse_once()
+            p1 = self._parse_expression().add_err("Error parsing <Expression> for <StatementExpression>").parse_once()
+            p2 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <StatementExpression>").parse_once()
             return p1
         return BoundParser(self, inner)
 
     def _parse_statement(self) -> BoundParser:
         def inner():
-            p1 = self._parse_statement_if().delay_parse()
-            p2 = self._parse_statement_while().delay_parse()
-            p3 = self._parse_statement_for().delay_parse()
-            p4 = self._parse_statement_do().delay_parse()
-            p5 = self._parse_statement_match().delay_parse()
-            p6 = self._parse_statement_with().delay_parse()
-            p7 = self._parse_statement_typedef().delay_parse()
-            p8 = self._parse_statement_return().delay_parse()
-            p9 = self._parse_statement_yield().delay_parse()
-            p10 = self._parse_statement_break().delay_parse()
-            p11 = self._parse_statement_continue().delay_parse()
-            p12 = self._parse_statement_let().delay_parse()
-            p13 = self._parse_statement_expression().delay_parse()
+            p1 = self._parse_statement_if().add_err("Error parsing <StatementIf> for <Statement>").delay_parse()
+            p2 = self._parse_statement_while().add_err("Error parsing <StatementWhile> for <Statement>").delay_parse()
+            p3 = self._parse_statement_for().add_err("Error parsing <StatementFor> for <Statement>").delay_parse()
+            p4 = self._parse_statement_do().add_err("Error parsing <StatementDo> for <Statement>").delay_parse()
+            p5 = self._parse_statement_match().add_err("Error parsing <StatementMatch> for <Statement>").delay_parse()
+            p6 = self._parse_statement_with().add_err("Error parsing <StatementWith> for <Statement>").delay_parse()
+            p7 = self._parse_statement_typedef().add_err("Error parsing <StatementTypedef> for <Statement>").delay_parse()
+            p8 = self._parse_statement_return().add_err("Error parsing <StatementReturn> for <Statement>").delay_parse()
+            p9 = self._parse_statement_yield().add_err("Error parsing <StatementYield> for <Statement>").delay_parse()
+            p10 = self._parse_statement_break().add_err("Error parsing <StatementBreak> for <Statement>").delay_parse()
+            p11 = self._parse_statement_continue().add_err("Error parsing <StatementContinue> for <Statement>").delay_parse()
+            p12 = self._parse_statement_let().add_err("Error parsing <StatementLet> for <Statement>").delay_parse()
+            p13 = self._parse_statement_expression().add_err("Error parsing <StatementExpression> for <Statement>").delay_parse()
             # p14 = self._parse_function_prototype().delay_parse()
-            p15 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12 | p13).parse_once()
+            p15 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12 | p13).add_err("Error parsing selection for <Statement>").parse_once()
             return p15
         return BoundParser(self, inner)
 
@@ -1686,8 +1680,8 @@ class Parser:
 
     def _parse_static_scoped_generic_identifier_next(self) -> BoundParser:
         def inner():
-            p3 = self._parse_token(TokenType.TkDoubleColon).parse_once()
-            p4 = self._parse_generic_identifier().parse_once()
+            p3 = self._parse_token(TokenType.TkDoubleColon).add_err("Error parsing '::' for <StaticScopedGenericIdentifierNext>").parse_once()
+            p4 = self._parse_generic_identifier().add_err("Error parsing <GenericIdentifier> for <StaticScopedGenericIdentifierNext>").parse_once()
             return p4
         return BoundParser(self, inner)
 
@@ -1870,21 +1864,21 @@ class Parser:
 
     def _parse_operator_identifier_unary(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkPlus).delay_parse()
-            p2 = self._parse_token(TokenType.TkHyphen).delay_parse()
-            p3 = self._parse_token(TokenType.TkTilde).delay_parse()
-            p4 = self._parse_token(TokenType.TkExclamation).delay_parse()
-            p5 = self._parse_unary_operator_reference().delay_parse()
-            p6 = self._parse_operator_identifier_variadic().delay_parse()
-            p7 = self._parse_token(TokenType.KwAwait).delay_parse()
-            p8 = (p1 | p2 | p3 | p4 | p5 | p6 | p7).parse_once()
+            p1 = self._parse_token(TokenType.TkPlus).add_err("Error parsing ... | '+' | ... for <OperatorIdentifierUnary>").delay_parse()
+            p2 = self._parse_token(TokenType.TkHyphen).add_err("Error parsing ... | '-' | ... for <OperatorIdentifierUnary>").delay_parse()
+            p3 = self._parse_token(TokenType.TkTilde).add_err("Error parsing ... | '~' | ... for <OperatorIdentifierUnary>").delay_parse()
+            p4 = self._parse_token(TokenType.TkExclamation).add_err("Error parsing ... | '!' | ... for <OperatorIdentifierUnary>").delay_parse()
+            p5 = self._parse_unary_operator_reference().add_err("Error parsing ... | <UnaryOperatorReference> | ... for <OperatorIdentifierUnary>").delay_parse()
+            p6 = self._parse_operator_identifier_variadic().add_err("Error parsing ... | <OperatorIdentifierVariadic> | ... for <OperatorIdentifierUnary>").delay_parse()
+            p7 = self._parse_token(TokenType.KwAwait).add_err("Error parsing ... | 'await' | ... for <OperatorIdentifierUnary>").delay_parse()
+            p8 = (p1 | p2 | p3 | p4 | p5 | p6 | p7).add_err("Error parsing selection for <OperatorIdentifierUnary>").parse_once()
             return p8
         return BoundParser(self, inner)
 
     def _parse_unary_operator_reference(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkAmpersand).parse_once()
-            p2 = self._parse_token(TokenType.KwMut).parse_optional() is not None
+            p1 = self._parse_token(TokenType.TkAmpersand).add_err("Error parsing '&' for <UnaryOperatorReference>").parse_once()
+            p2 = self._parse_token(TokenType.KwMut).add_err("Error parsing 'mut'? for <UnaryOperatorReference").parse_optional() is not None
             return TokenAst(p1.primary, p2 is not None)
         return BoundParser(self, inner)
 
@@ -2174,7 +2168,7 @@ class Parser:
 
                 error = ParseSyntaxError(
                     # ErrorFormatter(self._tokens).error(self._current) +
-                    f"! Expected <{token}>, got <{current_token.token_type}> ({current_token.token_metadata})\n")
+                    f"! Expected <{token}>, got: <{current_token.token_type}> => '{current_token.token_metadata}'\n")
                 raise error
 
             self._current += 1
@@ -2229,9 +2223,4 @@ class Parser:
             if p1.identifier != character:
                 raise ParseSyntaxError(f"Expected {character}, got {p1.value}")
             return p1
-        return BoundParser(self, inner)
-
-    def _parse_dummy(self) -> BoundParser:
-        def inner():
-            pass
         return BoundParser(self, inner)
