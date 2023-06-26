@@ -13,8 +13,6 @@ class ParserError(Exception):
 
 Rule = Callable
 
-OPT_ERR = None
-SHOULD_OPT_ERR = False
 FOLD = ""
 
 FAILED_OPTIONAL_PARSE_MESSAGE = "\n########## Failed to Parse Optional ##########\n"
@@ -53,7 +51,7 @@ class ErrorFormatter:
 
 
 class BoundParser:
-    _OR_INDENT = 0
+    _opt_err = ""
 
     _ctor: Callable
     _rule: Rule
@@ -69,92 +67,80 @@ class BoundParser:
         self._ast = None
         self._err = ""
 
-    def __ret_value(self):
-        return self._ast
-
     def add_err(self, error: str) -> BoundParser:
-        # num_tabs = self._err.split("\n")[-1].count("\t")
-        # self._err += "\t" * num_tabs + "- " + error
         self._err += FOLD + "- " + error
         return self
 
-    def opt_err(self) -> BoundParser:
-        global OPT_ERR
-        if OPT_ERR is not None:
-            alternative_err = str(OPT_ERR)
-            self._err += FOLD + FAILED_OPTIONAL_PARSE_MESSAGE
-            self._err += alternative_err
-            OPT_ERR = None
-            # self._err = self._err if self._err.count("\n") > alternative_err.count("\n") else alternative_err
-        return self
-
     def parse_once(self):
+        # Try to parse the rule once. If there is an error whilst parsing the rule, then catch it, append the current
+        # BoundParser's error to the error message, and re-raise the error. This allows for the error message to be
+        # propagated up the call stack.
         try:
             results = self._rule()
-            # remove previous "opt err" from previous parser's error message
+            BoundParser._opt_err = BoundParser._opt_err[:BoundParser._opt_err.rfind(FAILED_OPTIONAL_PARSE_MESSAGE)]
 
-        except ParseSyntaxError as e:
-            self._err += "\n" + str(e)
-            global SHOULD_OPT_ERR
-            if SHOULD_OPT_ERR:
-                self.opt_err()
-                SHOULD_OPT_ERR = False
-
+        except ParseSyntaxError as parse_once_error:
+            self._err += "\n" + str(parse_once_error)
+            self._err += FAILED_OPTIONAL_PARSE_MESSAGE + BoundParser._opt_err if BoundParser._opt_err else ""
             raise ParseSyntaxError(self._err)
 
+        # Remove None from a list of results (where a parse_optional has added a None to the list).
         while isinstance(results, list) and None in results:
             results.remove(None)
 
+        # Save the result to the ast attribute, and return the ast out of the class.
         self._ast = results
-        result = self.__ret_value()
-        return result
+        return self._ast
 
     def parse_optional(self):
+        # Save the current index of the parser -- it will need to be restored if the optional parse fails, so that the
+        # next rule can start from this point.
         restore_index = self._parser._current
 
+        # Try to parse the rule by calling the 'parse_once()' parse function -- this allows for the error message to be
+        # formatted before being returned to the optional parser. If the parse is successful, then return the ast (the
+        # attribute will have already been set from the 'parse_once()' call).
         try:
             self.parse_once()
-            return self.__ret_value()
-        except ParseSyntaxError as e:
-            global OPT_ERR; OPT_ERR = e
-            global SHOULD_OPT_ERR; SHOULD_OPT_ERR = True
+            return self._ast
+
+        # If there is an error in the optional parse, then the token index of the parser is restored, and the ast is set
+        # to None. The None value is also returned, and functions can specify alternatives ie '.parse_optional() or []'
+        except ParseSyntaxError as parse_optional_error:
             self._parser._current = restore_index
             self._ast = None
-            return self.__ret_value()
+            BoundParser._opt_err = str(parse_optional_error)
+            return self._ast
 
     def parse_zero_or_more(self):
         results = []
 
+        # Use a 'while True' sot hat the parsing can continue until an error causes the loop to be returned from. This
+        # allows for 0+ items to be parsed.
         while True:
+
+            # Save the index for restoring when a parse fails.
             restore_index = self._parser._current
+
+            # Call the 'parse_once()' function to parse the rule and handle error message formatting. Append the result
+            # to the results list.
             try:
                 result = self.parse_once()
                 results.append(result)
-            except ParseSyntaxError as e:
-                global OPT_ERR; OPT_ERR = e
-                global SHOULD_OPT_ERR; SHOULD_OPT_ERR = True
-                self._parser._current = restore_index
-                break
 
-        self._ast = results
-        return self.__ret_value()
+            # If an error is caught, then the next parse has failed, so restore the index, and don't append anything to
+            # the results list. Set the ast to the list of results (usually a list of other asts), and return this list.
+            except ParseSyntaxError as parse_zero_or_more_error:
+                self._parser._current = restore_index
+                self._ast = results
+                BoundParser._opt_err = str(parse_zero_or_more_error)
+                return self._ast
 
     def parse_one_or_more(self):
-        results = [self.parse_once()]
-
-        while True:
-            restore_index = self._parser._current
-            try:
-                result = self.parse_once()
-                results.append(result)
-            except ParseSyntaxError as e:
-                global OPT_ERR; OPT_ERR = e
-                global SHOULD_OPT_ERR; SHOULD_OPT_ERR = True
-                self._parser._current = restore_index
-                break
-
-        self._ast = results
-        return self.__ret_value()
+        results = self.parse_zero_or_more()
+        if not results:
+            raise ParseSyntaxError("Expected at least one result")
+        return results
 
     def delay_parse(self) -> BoundParser:
         self._delayed = True
@@ -168,12 +154,9 @@ class BoundParser:
             raise ParserError("Both parsers must be delayed")
 
         if isinstance(self, MultiBoundParser):
-            # that.opt_err()
             self.add_bound_parser(that)
             return self
         else:
-            # self.opt_err()
-            # that.opt_err()
             multi_bound_parser = MultiBoundParser(self._parser)
             multi_bound_parser.delay_parse()
             multi_bound_parser.add_bound_parser(self)
@@ -201,9 +184,9 @@ class MultiBoundParser(BoundParser):
             except ParseSyntaxError as e:
                 self._parser._current = restore_index
                 errors.append(str(e))
-        new_indent = errors[0].split("\n")[-1].count("\t") + 1 # todo : not always correct
+
+        new_indent = errors[0].split("\n")[-1].count("\t") + 1
         errors = [error.replace("\n", "\n" + "\t" * new_indent) for error in errors]
-        # raise ParseSyntaxError(max(errors, key=lambda x: x.count("\t")))
         raise ParseSyntaxError(FOLD + FAILED_TO_PARSE_ONE_OF_MESSAGE + FAILED_OR.join(errors))
 
     def parse_one_or_more(self):
@@ -219,7 +202,7 @@ class MultiBoundParser(BoundParser):
                 break
 
         self._ast = results
-        return self.__ret_value()
+        return self._ast
 
 
 class Parser:
@@ -249,7 +232,7 @@ class Parser:
     def _parse_program(self) -> BoundParser:
         def inner():
             p1 = self._parse_module_prototype().add_err("Error parsing <ModulePrototype> for <Program>").parse_once()
-            p2 = self._parse_eof().add_err("Error parsing <EOF> for <Program>").opt_err().parse_once()
+            p2 = self._parse_eof().add_err("Error parsing <EOF> for <Program>").parse_once()
             return ProgramAst(p1)
         return BoundParser(self, inner)
 
@@ -1113,15 +1096,15 @@ class Parser:
 
     def _parse_parenthesized_expression(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
-            p2 = self._parse_expression().parse_once()
-            p3 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
+            p1 = self._parse_token(TokenType.TkLeftParenthesis).add_err("Error parsing '(' for <ParenthesizedExpression>").parse_once()
+            p2 = self._parse_expression().add_err("Error parsing <Expression> for <ParenthesizedExpression>").parse_once()
+            p3 = self._parse_token(TokenType.TkRightParenthesis).add_err("Error parsing ')' for <ParenthesizedExpression>").parse_once()
             return ParenthesizedExpressionAst(p2)
         return BoundParser(self, inner)
 
     def _parse_expression_placeholder(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkUnderscore).parse_once()
+            p1 = self._parse_token(TokenType.TkUnderscore).add_err("Error parsing '_' for <ExpressionPlaceholder>").parse_once()
             return PlaceholderAst()
         return BoundParser(self, inner)
 
@@ -1907,13 +1890,13 @@ class Parser:
 
     def _parse_operator_identifier_variadic(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkTripleDot).parse_once()
+            p1 = self._parse_token(TokenType.TkTripleDot).add_err("Error parsing '...' for <OperatorIdentiferVariadic>").parse_once()
             return p1
         return BoundParser(self, inner)
 
     def _parse_operator_identifier_member_access(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkDot).parse_once()
+            p1 = self._parse_token(TokenType.TkDot).add_err("Error parsing '.' for <OperatorIdentifierMemberAccess>").parse_once()
             return p1
         return BoundParser(self, inner)
 
@@ -1934,17 +1917,17 @@ class Parser:
 
     def _parse_literal(self) -> BoundParser:
         def inner():
-            p1 = self._parse_literal_number().delay_parse()
-            p2 = self._parse_literal_string().delay_parse()
-            p3 = self._parse_literal_char().delay_parse()
-            p4 = self._parse_literal_boolean().delay_parse()
-            p5 = self._parse_literal_list().delay_parse()
-            p6 = self._parse_literal_map().delay_parse()
-            p7 = self._parse_literal_set().delay_parse()
-            p8 = self._parse_literal_pair().delay_parse()
-            p9 = self._parse_literal_tuple().delay_parse()
-            p10 = self._parse_literal_regex().delay_parse()
-            p11 = self._parse_literal_generator().delay_parse()
+            p1 = self._parse_literal_number().add_err("Error parsing <LiteralNumber> for <Literal>").delay_parse()
+            p2 = self._parse_literal_string().add_err("Error parsing <LiteralString> for <Literal>").delay_parse()
+            p3 = self._parse_literal_char().add_err("Error parsing <LiteralChar> for <Literal>").delay_parse()
+            p4 = self._parse_literal_boolean().add_err("Error parsing <LiteralBoolean> for <Literal>").delay_parse()
+            p5 = self._parse_literal_list().add_err("Error parsing <LiteralList> for <Literal>").delay_parse()
+            p6 = self._parse_literal_map().add_err("Error parsing <LiteralMap> for <Literal>").delay_parse()
+            p7 = self._parse_literal_set().add_err("Error parsing <LiteralSet> for <Literal>").delay_parse()
+            p8 = self._parse_literal_pair().add_err("Error parsing <LiteralPair> for <Literal>").delay_parse()
+            p9 = self._parse_literal_tuple().add_err("Error parsing <LiteralTuple> for <Literal>").delay_parse()
+            p10 = self._parse_literal_regex().add_err("Error parsing <LiteralRegex> for <Literal>").delay_parse()
+            p11 = self._parse_literal_generator().add_err("Error parsing <LiteralGenerator> for <Literal>").delay_parse()
             p12 = (p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11).parse_once()
             return p12
         return BoundParser(self, inner)
@@ -1960,21 +1943,21 @@ class Parser:
 
     def _parse_literal_string(self) -> BoundParser:
         def inner():
-            p1 = self._parse_lexeme(TokenType.LxDoubleQuoteStr).parse_once()
+            p1 = self._parse_lexeme(TokenType.LxDoubleQuoteStr).add_err("Error parsing <Lexeme> for <LiteralString>").parse_once()
             return StringLiteralAst(p1)
         return BoundParser(self, inner)
 
     def _parse_literal_char(self) -> BoundParser:
         def inner():
-            p1 = self._parse_lexeme(TokenType.LxSingleQuoteChr).parse_once()
+            p1 = self._parse_lexeme(TokenType.LxSingleQuoteChr).add_err("Error parsing <Lexeme> for <LiteralChar>").parse_once()
             return CharLiteralAst(p1)
         return BoundParser(self, inner)
 
     def _parse_literal_boolean(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwTrue).delay_parse()
-            p2 = self._parse_token(TokenType.KwFalse).delay_parse()
-            p3 = (p1 | p2).parse_once()
+            p1 = self._parse_token(TokenType.KwTrue).add_err("Error parsing 'true' for <LiteralBoolean>").delay_parse()
+            p2 = self._parse_token(TokenType.KwFalse).add_err("Error parsing 'false' for <LiteralBoolean>").delay_parse()
+            p3 = (p1 | p2).add_err("Error parsing selection for <LiteralBoolean>").parse_once()
             return BoolLiteralAst(p3 == TokenType.KwTrue)
         return BoundParser(self, inner)
 
@@ -2044,7 +2027,7 @@ class Parser:
 
     def _parse_literal_regex(self) -> BoundParser:
         def inner():
-            p1 = self._parse_lexeme(TokenType.LxRegex).parse_once()
+            p1 = self._parse_lexeme(TokenType.LxRegex).add_err("Error parsing <Lexeme> for <LiteralRegex>").parse_once()
             return RegexLiteralAst(p1)
         return BoundParser(self, inner)
 
