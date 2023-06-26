@@ -77,7 +77,7 @@ class BoundParser:
         global OPT_ERR
         if OPT_ERR is not None:
             alternative_err = str(OPT_ERR)
-            self._err += "\n########## Alternative Error ##########\n"
+            self._err += "\n########## Failed to Parse Optional ##########\n"
             self._err += alternative_err
             OPT_ERR = None
             # self._err = self._err if self._err.count("\n") > alternative_err.count("\n") else alternative_err
@@ -86,7 +86,7 @@ class BoundParser:
     def parse_once(self):
         try:
             results = self._rule()
-            # remove previous "opt err" from error message?
+            # remove previous "opt err" from previous parser's error message
 
         except ParseSyntaxError as e:
             self._err += "\n" + str(e)
@@ -196,9 +196,26 @@ class MultiBoundParser(BoundParser):
             except ParseSyntaxError as e:
                 self._parser._current = restore_index
                 errors.append(str(e))
-        new_indent = errors[0].split("\n")[-1].count("\t") + 1
+        new_indent = errors[0].split("\n")[-1].count("\t") + 1 # todo : not always correct
         errors = [error.replace("\n", "\n" + "\t" * new_indent) for error in errors]
-        raise ParseSyntaxError(max(errors, key=lambda x: x.count("\n")))
+        # raise ParseSyntaxError(max(errors, key=lambda x: x.count("\t")))
+        raise ParseSyntaxError("\n<fold>\n" + "\n########## OR ##########\n".join(errors))
+
+    def parse_one_or_more(self):
+        results = [self.parse_once()]
+
+        while True:
+            restore_index = self._parser._current
+            try:
+                result = self.parse_once()
+                results.append(result)
+            except ParseSyntaxError as e:
+                self._parser._current = restore_index
+                break
+
+        self._ast = results
+        return self.__ret_value()
+
 
 class Parser:
     _tokens: list[Token]
@@ -355,7 +372,7 @@ class Parser:
 
     def _parse_class_prototype(self) -> BoundParser:
         def inner():
-            p1 = self._parse_decorators().add_err("error parsing <Decorators>? for <ClassPrototype>").parse_optional()
+            p1 = self._parse_decorators().add_err("Error parsing <Decorators>? for <ClassPrototype>").parse_optional()
             p2 = self._parse_token(TokenType.KwPart).add_err("Error parsing 'part'? for <ClassPrototype>").parse_optional()
             p3 = self._parse_access_modifier().add_err("Error parsing <AccessModifier>? for <ClassPrototype>").parse_optional()
             p4 = self._parse_token(TokenType.KwCls).add_err("Error parsing 'cls' for <ClassPrototype>").parse_once()
@@ -1652,7 +1669,7 @@ class Parser:
             p12 = self._parse_statement_let().add_err("Error parsing <StatementLet> for <Statement>").delay_parse()
             p13 = self._parse_statement_expression().add_err("Error parsing <StatementExpression> for <Statement>").delay_parse()
             # p14 = self._parse_function_prototype().delay_parse()
-            p15 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12 | p13).add_err("Error parsing selection for <Statement>").parse_once()
+            p15 = (p1 | p2 | p13).add_err("Error parsing selection for <Statement>").parse_once()
             return p15
         return BoundParser(self, inner)
 
@@ -2168,8 +2185,8 @@ class Parser:
             if current_token.token_type != token:
 
                 error = ParseSyntaxError(
-                    ErrorFormatter(self._tokens).error(self._current) +
-                    f"Expected <{token}>, got: <{current_token.token_type}> => '{current_token.token_metadata}'\n")
+                    # ErrorFormatter(self._tokens).error(self._current) +
+                    f"- Expected <{token}>, got: <{current_token.token_type}> => '{current_token.token_metadata}'\n")
                 raise error
 
             self._current += 1
