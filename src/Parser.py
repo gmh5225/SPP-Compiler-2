@@ -15,6 +15,7 @@ Rule = Callable
 
 OPT_ERR = None
 SHOULD_OPT_ERR = False
+FOLD = "<fold>"
 
 # todo
 #   - only use .opt-err() following a .parse-optional/one-or-more/zero-or-more => remove otherwise
@@ -70,14 +71,14 @@ class BoundParser:
     def add_err(self, error: str) -> BoundParser:
         # num_tabs = self._err.split("\n")[-1].count("\t")
         # self._err += "\t" * num_tabs + "- " + error
-        self._err += "- " + error
+        self._err += FOLD + "- " + error
         return self
 
     def opt_err(self) -> BoundParser:
         global OPT_ERR
         if OPT_ERR is not None:
             alternative_err = str(OPT_ERR)
-            self._err += "\n########## Failed to Parse Optional ##########\n"
+            self._err += FOLD + "########## Failed to Parse Optional ##########\n"
             self._err += alternative_err
             OPT_ERR = None
             # self._err = self._err if self._err.count("\n") > alternative_err.count("\n") else alternative_err
@@ -199,7 +200,7 @@ class MultiBoundParser(BoundParser):
         new_indent = errors[0].split("\n")[-1].count("\t") + 1 # todo : not always correct
         errors = [error.replace("\n", "\n" + "\t" * new_indent) for error in errors]
         # raise ParseSyntaxError(max(errors, key=lambda x: x.count("\t")))
-        raise ParseSyntaxError("\n<fold>\n" + "\n########## OR ##########\n".join(errors))
+        raise ParseSyntaxError(FOLD + "########## OR ##########\n".join(errors))
 
     def parse_one_or_more(self):
         results = [self.parse_once()]
@@ -2186,7 +2187,7 @@ class Parser:
 
                 error = ParseSyntaxError(
                     # ErrorFormatter(self._tokens).error(self._current) +
-                    f"- Expected <{token}>, got: <{current_token.token_type}> => '{current_token.token_metadata}'\n")
+                    FOLD + f"- Expected <{token}>, got: <{current_token.token_type}> => '{current_token.token_metadata}'\n")
                 raise error
 
             self._current += 1
