@@ -33,7 +33,7 @@ class ErrorFormatter:
         current_line_string = "".join([token.token_metadata for token in tokens])
 
         spaces = 0
-        for token in tokens[:error_position - start_token_index]:
+        for token in tokens[:error_position - start_token_index - 1]:
             spaces += len(token.token_metadata)
 
         error_length = len(self._tokens[error_position].token_metadata)
@@ -1218,97 +1218,97 @@ class Parser:
 
     def _parse_type_generic_parameters(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkLeftAngleBracket).parse_once()
-            p2 = self._parse_type_generic_parameters_required_then_optional().parse_optional() or []
-            p3 = self._parse_token(TokenType.TkRightAngleBracket).parse_once()
+            p1 = self._parse_token(TokenType.TkLeftAngleBracket).add_err("Error parsing '<' for <TypeGenericParameters>").parse_once()
+            p2 = self._parse_type_generic_parameters_required_then_optional().add_err("Error parsing <TypeGenericParametersRequiredThenOptional> for <TypeGenericParameters>").parse_optional() or []
+            p3 = self._parse_token(TokenType.TkRightAngleBracket).add_err("Error parsing '>' for <TypeGenericParameters>").opt_err().parse_once()
             return p2
         return BoundParser(self, inner)
 
     def _parse_type_generic_parameters_required_then_optional(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_generic_required_parameters().delay_parse()
-            p2 = self._parse_type_generic_optional_parameters().delay_parse()
-            p3 = self._parse_type_generic_variadic_parameters().delay_parse()
-            p4 = (p1 | p2 | p3).parse_once()
+            p1 = self._parse_type_generic_required_parameters().add_err("Error parsing ... | <TypeGenericRequiredParameters> | ... for <TypeGenericParametersRequiredThenOptional>").delay_parse()
+            p2 = self._parse_type_generic_optional_parameters().add_err("Error parsing ... | <TypeGenericOptionalParameters> | ... for <TypeGenericParametersRequiredThenOptional>").delay_parse()
+            p3 = self._parse_type_generic_variadic_parameters().add_err("Error parsing ... | <TypeGenericVariadicParameters> | ... for <TypeGenericParametersRequiredThenOptional>").delay_parse()
+            p4 = (p1 | p2 | p3).add_err("Error parsing selection for <TypeGenericParametersRequiredThenOptional>").parse_once()
             return p4
         return BoundParser(self, inner)
 
     def _parse_type_generic_parameters_optional_then_variadic(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_generic_optional_parameters().delay_parse()
-            p2 = self._parse_type_generic_variadic_parameters().delay_parse()
-            p3 = (p1 | p2).parse_once()
+            p1 = self._parse_type_generic_optional_parameters().add_err("Error parsing ... | <TypeGenericOptionalParameters> | ... for <TypeGenericParametersOptionalThenVariadic>").delay_parse()
+            p2 = self._parse_type_generic_variadic_parameters().add_err("Error parsing ... | <TypeGenericVariadicParameters> | ... for <TypeGenericParametersOptionalThenVariadic>").delay_parse()
+            p3 = (p1 | p2).add_err("Error parsing selection for <TypeGenericParametersOptionalThenVariadic>").parse_once()
             return p3
         return BoundParser(self, inner)
 
     def _parse_type_generic_required_parameters(self) -> BoundParser:
         def inner():
-            p3 = self._parse_type_generic_required_parameter().parse_once()
-            p4 = self._parse_type_generic_rest_of_required_parameters().parse_optional()
+            p3 = self._parse_type_generic_required_parameter().add_err("Error parsing <TypeGenericRequiredParameter> for <TypeGenericRequiredParameters>").parse_once()
+            p4 = self._parse_type_generic_rest_of_required_parameters().add_err("Error parsing <TypeGenericRestOfRequiredParameters>? for <TypeGenericRequiredParameters>").opt_err().parse_optional()
             return [p3, p4]
         return BoundParser(self, inner)
 
     def _parse_type_generic_rest_of_required_parameters(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkComma).parse_once()
-            p2 = self._parse_type_generic_parameters_required_then_optional().parse_once()
+            p1 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <TypeGenericRestOfRequiredParameters>").parse_once()
+            p2 = self._parse_type_generic_parameters_required_then_optional().add_err("Error parsing <TypeGenericParametersRequiredThenOptional> for <TypeGenericRestOfRequiredParameters>").parse_once()
             return p2
         return BoundParser(self, inner)
 
     def _parse_type_generic_optional_parameters(self) -> BoundParser:
         def inner():
-            p3 = self._parse_type_generic_optional_parameter().parse_once()
-            p4 = self._parse_type_generic_rest_of_optional_parameters().parse_optional()
+            p3 = self._parse_type_generic_optional_parameter().add_err("Error parsing <TypeGenericOptionalParameter> for <TypeGenericOptionalParameters>").parse_once()
+            p4 = self._parse_type_generic_rest_of_optional_parameters().add_err("Error parsing <TypeGenericRestOfOptionalParameters>? for <TypeGenericOptionalParameters>").parse_optional()
             return [p3, *p4]
         return BoundParser(self, inner)
 
     def _parse_type_generic_rest_of_optional_parameters(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkComma).parse_once()
-            p2 = self._parse_type_generic_parameters_optional_then_variadic().parse_once()
+            p1 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <TypeGenericRestOfOptionalParameters>").parse_once()
+            p2 = self._parse_type_generic_parameters_optional_then_variadic().add_err("Error parsing <TypeGenericParametersOptionalThenVariadic> for <TypeGenericRestOfOptionalParameters>").parse_once()
             return p2
         return BoundParser(self, inner)
 
     def _parse_type_generic_required_parameter(self) -> BoundParser:
         def inner():
-            p1 = self._parse_identifier().parse_once()
-            p2 = self._parse_type_generic_parameter_inline_constraint().parse_optional()
+            p1 = self._parse_identifier().add_err("Error parsing <Identifier> for <TypeGenericRequiredParameter>").parse_once()
+            p2 = self._parse_type_generic_parameter_inline_constraint().add_err("Error parsing <TypeGenericParameterInlineConstraint>? for <TypeGenericRequiredParameter>").parse_optional()
             return TypeGenericParameterRequiredAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_type_generic_optional_parameter(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_generic_required_parameter().parse_once()
-            p2 = self._parse_token(TokenType.TkEqual).parse_once()
-            p3 = self._parse_type_identifier().parse_once()
+            p1 = self._parse_type_generic_required_parameter().add_err("Error parsing <TypeGenericRequiredParameter> for <TypeGenericOptionalParameter>").parse_once()
+            p2 = self._parse_token(TokenType.TkEqual).add_err("Error parsing '=' for <TypeGenericOptionalParameter>").opt_err().parse_once()
+            p3 = self._parse_type_identifier().add_err("Error parsing <TypeIdentifier> for <TypeGenericOptionalParameter>").parse_once()
             return TypeGenericParameterOptionalAst(p1, p3)
         return BoundParser(self, inner)
 
     def _parse_type_generic_variadic_parameters(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_generic_variadic_parameter().parse_once()
-            p2 = self._parse_type_generic_rest_of_variadic_parameters().parse_optional()
+            p1 = self._parse_type_generic_variadic_parameter().add_err("Error parsing <TypeGenericVariadicParameter> for <TypeGenericVariadicParameters>").parse_once()
+            p2 = self._parse_type_generic_rest_of_variadic_parameters().add_err("Error parsing <TypeGenericRestOfVariadicParameters>? for <TypeGenericVariadicParameters>").opt_err().parse_optional()
             return [p1, *p2]
         return BoundParser(self, inner)
 
     def _parse_type_generic_variadic_parameter(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkTripleDot).parse_once()
-            p2 = self._parse_type_generic_required_parameter().parse_once()
+            p1 = self._parse_token(TokenType.TkTripleDot).add_err("Error parsing '...' for <TypeGenericVariadicParameter>").parse_once()
+            p2 = self._parse_type_generic_required_parameter().add_err("Error parsing <TypeGenericRequiredParameter> for <TypeGenericVariadicParameter>").parse_once()
             return TypeGenericParameterVariadicAst(p2)
         return BoundParser(self, inner)
 
     def _parse_type_generic_rest_of_variadic_parameters(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkComma).parse_once()
-            p2 = self._parse_type_generic_variadic_parameter().parse_once()
+            p1 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <TypeGenericRestOfVariadicParameters>").parse_once()
+            p2 = self._parse_type_generic_variadic_parameter().add_err("Error parsing <TypeGenericVariadicParameter> for <TypeGenericRestOfVariadicParameters>").parse_once()
             return p2
         return BoundParser(self, inner)
 
     def _parse_type_generic_parameter_inline_constraint(self) -> BoundParser:
         def inner():
-            p3 = self._parse_token(TokenType.TkColon).parse_once()
-            p4 = self._parse_where_constraint_chain().parse_once()
+            p3 = self._parse_token(TokenType.TkColon).add_err("Error parsing ':' for <TypeGenericParameterInlineConstraint>").parse_once()
+            p4 = self._parse_where_constraint_chain().add_err("Error parsing <WhereConstraintChain> for <TypeGenericParameterInlineConstraint>").parse_once()
             return p4
         return BoundParser(self, inner)
 
