@@ -15,6 +15,10 @@ Rule = Callable
 
 OPT_ERR = None
 
+# todo
+#   - only use .opt-err() following a .parse-optional/one-or-more/zero-or-more => remove otherwise
+#   - if a parse ends with one of the above, add a dummy-parse call after it with .opt-err() to get the error
+
 
 class ErrorFormatter:
     def __init__(self, tokens: list[Token]):
@@ -1342,61 +1346,61 @@ class Parser:
 
     def _parse_statement_inline_definitions(self) -> BoundParser:
         def inner():
-            p5 = self._parse_statement_let().parse_once()
-            p6 = self._parse_token(TokenType.TkComma).parse_once()
+            p5 = self._parse_statement_let().add_err("Error parsing <StatementLet> for <StatementInlineDefinitions>").parse_once()
+            p6 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <StatementInlineDefinitions>").parse_once()
             return p5
         return BoundParser(self, inner)
 
     def _parse_statement_if(self) -> BoundParser:
         def inner():
-            p1 = self._parse_statement_if_branch().parse_once()
-            p5 = self._parse_statement_elif_branch().parse_zero_or_more()
-            p6 = self._parse_statement_else_branch().parse_optional()
+            p1 = self._parse_statement_if_branch().add_err("Error parsing <StatementIfBranch> for <StatementIf>").parse_once()
+            p5 = self._parse_statement_elif_branch().add_err("Error parsing <StatementElifBranch> for <StatementIf>").parse_zero_or_more()
+            p6 = self._parse_statement_else_branch().add_err("Error parsing <StatementElseBranch> for <StatementIf>").parse_optional()
             return IfStatementAst(p1, p5, p6)
         return BoundParser(self, inner)
 
     def _parse_statement_if_branch(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwIf).parse_once()
-            p2 = self._parse_statement_inline_definitions().parse_zero_or_more()
-            p3 = self._parse_expression().parse_once()
-            p4 = self._parse_statement_block().parse_once()
+            p1 = self._parse_token(TokenType.KwIf).add_err("Error parsing 'if' for <StatementIfBranch>").parse_once()
+            p2 = self._parse_statement_inline_definitions().add_err("Error parsing <StatementInlineDefinitions>* for <StatementIfBranch>").parse_zero_or_more()
+            p3 = self._parse_expression().add_err("Error parsing <Expression> for <StatementIfBranch>").opt_err().parse_once()
+            p4 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementIfBranch>").parse_once()
             return IfStatementBranchAst(p2, p3, p4)
         return BoundParser(self, inner)
 
     def _parse_statement_elif_branch(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwElif).parse_once()
-            p2 = self._parse_statement_inline_definitions().parse_zero_or_more()
-            p3 = self._parse_expression().parse_once()
-            p4 = self._parse_statement_block().parse_once()
+            p1 = self._parse_token(TokenType.KwElif).add_err("Error parsing 'elif' for <StatementElifBranch>").parse_once()
+            p2 = self._parse_statement_inline_definitions().add_err("Error parsing <StatementInlineDefinitions>* for <StatementElifBranch>").parse_zero_or_more()
+            p3 = self._parse_expression().add_err("Error parsing <Expression> for <StatementElifBranch>").opt_err().parse_once()
+            p4 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementElifBranch>").parse_once()
             return ElifStatementBranchAst(p2, p3, p4)
         return BoundParser(self, inner)
 
     def _parse_statement_else_branch(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwElse).parse_once()
-            p2 = self._parse_statement_block().parse_once()
+            p1 = self._parse_token(TokenType.KwElse).add_err("Error parsing 'else' for <StatementElseBranch>").parse_once()
+            p2 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementElseBranch>").parse_once()
             return ElseStatementBranchAst(p2)
         return BoundParser(self, inner)
 
     def _parse_statement_while(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwWhile).parse_once()
-            p2 = self._parse_expression().parse_once()
-            p3 = self._parse_statement_loop_tag().parse_optional()
-            p4 = self._parse_statement_block().parse_once()
+            p1 = self._parse_token(TokenType.KwWhile).add_err("Error parsing 'while' for <StatementWhileLoop>").parse_once()
+            p2 = self._parse_expression().add_err("Error parsing <Expression> for <StatementWhileLoop>").parse_once()
+            p3 = self._parse_statement_loop_tag().add_err("Error parsing <StatementLoopTag> for <StatementWhile>").parse_optional()
+            p4 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementWhile>").opt_err().parse_once()
             return WhileStatementAst(p2, p3, p4)
         return BoundParser(self, inner)
 
     def _parse_statement_for(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwFor).parse_once()
-            p2 = self._parse_local_variable_identifiers().parse_once()
-            p3 = self._parse_token(TokenType.KwIn).parse_once()
-            p4 = self._parse_expression().parse_once()
-            p5 = self._parse_statement_loop_tag().parse_optional()
-            p6 = self._parse_statement_block().parse_once()
+            p1 = self._parse_token(TokenType.KwFor).add_err("Error parsing 'for' for <StatementFor>").parse_once()
+            p2 = self._parse_local_variable_identifiers().add_err("Error parsing <LocalVariableIdentifiers> for <StatementFor>").parse_once()
+            p3 = self._parse_token(TokenType.KwIn).add_err("Error parsing 'in' for <StatementFor>").parse_once()
+            p4 = self._parse_expression().add_err("Error parsing <Expression> for <StatementFor>").parse_once()
+            p5 = self._parse_statement_loop_tag().add_err("Error parsing <StatementLoopTag> for <StatementFor>").parse_optional()
+            p6 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementFor>").opt_err().parse_once()
             return ForStatementAst(p2, p4, p5, p6)
         return BoundParser(self, inner)
 
