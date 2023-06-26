@@ -71,7 +71,7 @@ class BoundParser:
             alternative_err = str(OPT_ERR)
             alternative_err += "\n########## Alternative Error ##########\n"
             self._err = alternative_err + self._err
-            # self._err = self._err if len(self._err) > len(alternative_err) else alternative_err
+            # self._err = self._err if self._err.count("\n") > alternative_err.count("\n") else alternative_err
         return self
 
     def parse_once(self):
@@ -148,9 +148,9 @@ class BoundParser:
                 num_tabs = self._err.split("\n")[-1].count("\t") + 1
                 t = "\t" * num_tabs
                 raise ParseSyntaxError(
-                    f"\n{t}" +
+                    # f"\n{t}" +
                     self._err.replace("\n", f"\n{t}").replace(f"{t}{t}", f"{t}") +
-                    f"\n{t}" +
+                    # f"\n{t}" +
                     that._err.replace("\n", f"\n{t}").replace(f"{t}{t}", f"{t}"))
             return f
 
@@ -637,7 +637,7 @@ class Parser:
         def inner():
             p1 = self._parse_function_call_normal_arguments().add_err("Error parsing ... | <FunctionCallNormalArguments> | ... for <FunctionCallArgumentsNormalThenNamed>").delay_parse()
             p2 = self._parse_function_call_named_arguments().add_err("Error parsing ... | <FunctionCallNamedArguments> | ... for <FunctionCallArgumentsNormalThenNamed>").delay_parse()
-            p3 = (p1 | p2).add_err("Error parsing selection for <FunctionCallArgumentsNormalThenNamed>:").parse_once()
+            p3 = (p2 | p1).add_err("Error parsing selection for <FunctionCallArgumentsNormalThenNamed>:").parse_once()
             return p3
         return BoundParser(self, inner)
 
@@ -1836,9 +1836,8 @@ class Parser:
     def _parse_unary_operator_reference(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkAmpersand).parse_once()
-            p2 = self._parse_token(TokenType.KwMut).parse_once()
-            p3 = (p1 | p2).parse_once()
-            return p3
+            p2 = self._parse_token(TokenType.KwMut).parse_optional() is not None
+            return TokenAst(p1.primary, p2 is not None)
         return BoundParser(self, inner)
 
     def _parse_operator_identifier_variadic(self) -> BoundParser:
