@@ -145,7 +145,13 @@ class BoundParser:
             if f is None:
                 f = that.parse_optional()
             if f is None:
-                raise ParseSyntaxError(f"\n\t" + self._err.replace("\n", "\n\t").replace("\t\t", "\t") + "\n\t" + that._err.replace("\n", "\n\t").replace("\t\t", "\t"))
+                num_tabs = self._err.split("\n")[-1].count("\t") + 1
+                t = "\t" * num_tabs
+                raise ParseSyntaxError(
+                    f"\n{t}" +
+                    self._err.replace("\n", f"\n{t}").replace(f"{t}{t}", f"{t}") +
+                    f"\n{t}" +
+                    that._err.replace("\n", f"\n{t}").replace(f"{t}{t}", f"{t}"))
             return f
 
         b = BoundParser(self._parser, parse_one_of_inner)
@@ -586,7 +592,7 @@ class Parser:
         def inner():
             p1 = self._parse_function_or_empty_implementation_empty_prep().add_err("Error parsing <FunctionOrEmptyImplementationEmptyPrep> for <FunctionOrEmptyImplementation>").delay_parse()
             p2 = self._parse_function_or_empty_implementation_non_empty_prep().add_err("Error parsing <FunctionOrEmptyImplementationNonEmptyPrep> for <FunctionOrEmptyImplementation>").delay_parse()
-            p3 = (p1 | p2).add_err("Error parsing selection for <FunctionOrEmptyImplementation>").parse_once()
+            p3 = (p1 | p2).add_err("Error parsing selection for <FunctionOrEmptyImplementation>:").parse_once()
             return p3
         return BoundParser(self, inner)
 
@@ -631,7 +637,7 @@ class Parser:
         def inner():
             p1 = self._parse_function_call_normal_arguments().add_err("Error parsing ... | <FunctionCallNormalArguments> | ... for <FunctionCallArgumentsNormalThenNamed>").delay_parse()
             p2 = self._parse_function_call_named_arguments().add_err("Error parsing ... | <FunctionCallNamedArguments> | ... for <FunctionCallArgumentsNormalThenNamed>").delay_parse()
-            p3 = (p1 | p2).add_err("Error parsing selection for <FunctionCallArgumentsNormalThenNamed>").parse_once()
+            p3 = (p1 | p2).add_err("Error parsing selection for <FunctionCallArgumentsNormalThenNamed>:").parse_once()
             return p3
         return BoundParser(self, inner)
 
@@ -692,7 +698,7 @@ class Parser:
             p1 = self._parse_function_required_parameters().add_err("Error parsing ... | <FunctionRequiredParameters> | ... for <FunctionParametersRequiredThenOptional>").delay_parse()
             p2 = self._parse_function_optional_parameters().add_err("Error parsing ... | <FunctionOptionalParameters> | ... for <FunctionParametersRequiredThenOptional>").delay_parse()
             p3 = self._parse_function_variadic_parameter().add_err("Error parsing ... | <FunctionVariadicParameter> | ... for <FunctionParametersRequiredThenOptional>").delay_parse()
-            p4 = (p3 | p2 | p1).add_err("Error parsing selection for <FunctionParametersRequiredThenOptional>").parse_once()
+            p4 = (p3 | p2 | p1).add_err("Error parsing selection for <FunctionParametersRequiredThenOptional>:").parse_once()
             return p4
         return BoundParser(self, inner)
 
@@ -700,7 +706,7 @@ class Parser:
         def inner():
             p1 = self._parse_function_optional_parameters().add_err("Error parsing ... | <FunctionOptionalParameters> | ... for <FunctionParametersOptionalThenVariadic>").delay_parse()
             p2 = self._parse_function_variadic_parameter().add_err("Error parsing ... | <FunctionVariadicParameter> | ... for <FunctionParametersOptionalThenVariadic>").delay_parse()
-            p3 = (p2 | p1).add_err("Error parsing selection for <FunctionParametersOptionalThenVariadic>").parse_once()
+            p3 = (p2 | p1).add_err("Error parsing selection for <FunctionParametersOptionalThenVariadic>:").parse_once()
             return p3
         return BoundParser(self, inner)
 
@@ -879,7 +885,7 @@ class Parser:
         def inner():
             p1 = self._parse_assignment_single().add_err("Error parsing ... | <AssignmentSingle> | ... for <AssignmentExpression>").delay_parse()
             p2 = self._parse_assignment_multiple().add_err("Error parsing ... | <AssignmentMultiple> | ... for <AssignmentExpression>").delay_parse()
-            p3 = (p1 | p2).add_err("Error parsing selector for <AssignmentExpression>").parse_once()
+            p3 = (p1 | p2).add_err("Error parsing selection for <AssignmentExpression>:").parse_once()
             return p3
         return BoundParser(self, inner)
 
@@ -1230,7 +1236,7 @@ class Parser:
             p1 = self._parse_type_generic_required_parameters().add_err("Error parsing ... | <TypeGenericRequiredParameters> | ... for <TypeGenericParametersRequiredThenOptional>").delay_parse()
             p2 = self._parse_type_generic_optional_parameters().add_err("Error parsing ... | <TypeGenericOptionalParameters> | ... for <TypeGenericParametersRequiredThenOptional>").delay_parse()
             p3 = self._parse_type_generic_variadic_parameters().add_err("Error parsing ... | <TypeGenericVariadicParameters> | ... for <TypeGenericParametersRequiredThenOptional>").delay_parse()
-            p4 = (p3 | p2 | p1).add_err("Error parsing selection for <TypeGenericParametersRequiredThenOptional>").parse_once()
+            p4 = (p3 | p2 | p1).add_err("Error parsing selection for <TypeGenericParametersRequiredThenOptional>:").parse_once()
             return p4
         return BoundParser(self, inner)
 
@@ -1238,7 +1244,7 @@ class Parser:
         def inner():
             p1 = self._parse_type_generic_optional_parameters().add_err("Error parsing ... | <TypeGenericOptionalParameters> | ... for <TypeGenericParametersOptionalThenVariadic>").delay_parse()
             p2 = self._parse_type_generic_variadic_parameters().add_err("Error parsing ... | <TypeGenericVariadicParameters> | ... for <TypeGenericParametersOptionalThenVariadic>").delay_parse()
-            p3 = (p2 | p1).add_err("Error parsing selection for <TypeGenericParametersOptionalThenVariadic>").parse_once()
+            p3 = (p2 | p1).add_err("Error parsing selection for <TypeGenericParametersOptionalThenVariadic>:").parse_once()
             return p3
         return BoundParser(self, inner)
 
@@ -1289,7 +1295,7 @@ class Parser:
         def inner():
             p1 = self._parse_type_generic_variadic_parameter().add_err("Error parsing <TypeGenericVariadicParameter> for <TypeGenericVariadicParameters>").parse_once()
             p2 = self._parse_type_generic_rest_of_variadic_parameters().add_err("Error parsing <TypeGenericRestOfVariadicParameters>? for <TypeGenericVariadicParameters>").opt_err().parse_optional()
-            return [p1, *p2]
+            return [p1, p2]
         return BoundParser(self, inner)
 
     def _parse_type_generic_variadic_parameter(self) -> BoundParser:
