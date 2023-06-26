@@ -43,6 +43,8 @@ class ErrorFormatter:
 
 
 class BoundParser:
+    _OR_INDENT = 0
+
     _ctor: Callable
     _rule: Rule
     _parser: Parser
@@ -140,23 +142,54 @@ class BoundParser:
         if not (self._delayed and that._delayed):
             raise ParserError("Both parsers must be delayed")
 
-        def parse_one_of_inner():
-            f = self.parse_optional()
-            if f is None:
-                f = that.parse_optional()
-            if f is None:
-                num_tabs = self._err.split("\n")[-1].count("\t") + 1
-                t = "\t" * num_tabs
-                raise ParseSyntaxError(
-                    # f"\n{t}" +
-                    self._err.replace("\n", f"\n{t}").replace(f"{t}{t}", f"{t}") +
-                    # f"\n{t}" +
-                    that._err.replace("\n", f"\n{t}").replace(f"{t}{t}", f"{t}"))
-            return f
+        if isinstance(self, MultiBoundParser):
+            self.add_bound_parser(that)
+            return self
+        else:
+            multi_bound_parser = MultiBoundParser(self._parser)
+            multi_bound_parser.delay_parse()
+            multi_bound_parser.add_bound_parser(self)
+            multi_bound_parser.add_bound_parser(that)
+            return multi_bound_parser
 
-        b = BoundParser(self._parser, parse_one_of_inner)
-        b.delay_parse()
-        return b
+        # def parse_one_of_inner():
+        #     f = self.parse_optional()
+        #     if f is None:
+        #         f = that.parse_optional()
+        #     if f is None:
+        #         num_tabs = self._err.split("\n")[-1].count("\t") + 1
+        #         t = "\t" * num_tabs
+        #         raise ParseSyntaxError(
+        #             f"\n{t}" +
+        #             self._err.replace("\n", f"\n{t}").replace(f"{t}{t}", f"{t}") +
+        #             f"\n{t}" +
+        #             that._err.replace("\n", f"\n{t}").replace(f"{t}{t}", f"{t}"))
+        #     return f
+        #
+        # b = BoundParser(self._parser, parse_one_of_inner)
+        # b.delay_parse()
+        # return b
+
+class MultiBoundParser(BoundParser):
+    _bound_parsers: list[BoundParser]
+
+    def __init__(self, parser: Parser):
+        super().__init__(parser, None)
+        self._bound_parsers = []
+
+    def add_bound_parser(self, bound_parser: BoundParser):
+        self._bound_parsers.append(bound_parser)
+
+    def parse_once(self):
+        errors = []
+        for bound_parser in self._bound_parsers:
+            try:
+                return bound_parser.parse_once()
+            except ParseSyntaxError as e:
+                errors.append(str(e))
+        current_indent = errors[0].split("\n")[-1].count("\t") + 1
+        errors = [error.replace("\n", "\n" + "\t" * current_indent) for error in errors]
+        raise ParseSyntaxError("\n" + "\n".join(errors))
 
 class Parser:
     _tokens: list[Token]
