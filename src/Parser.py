@@ -15,7 +15,11 @@ Rule = Callable
 
 OPT_ERR = None
 SHOULD_OPT_ERR = False
-FOLD = "<fold>"
+FOLD = ""
+
+FAILED_OPTIONAL_PARSE_MESSAGE = "\n########## Failed to Parse Optional ##########\n"
+FAILED_TO_PARSE_ONE_OF_MESSAGE = "\n########## Failed to Parse One Of ##########\n"
+FAILED_OR = "\n########## Or ##########\n"
 
 # todo
 #   - only use .opt-err() following a .parse-optional/one-or-more/zero-or-more => remove otherwise
@@ -78,7 +82,7 @@ class BoundParser:
         global OPT_ERR
         if OPT_ERR is not None:
             alternative_err = str(OPT_ERR)
-            self._err += FOLD + "########## Failed to Parse Optional ##########\n"
+            self._err += FOLD + FAILED_OPTIONAL_PARSE_MESSAGE
             self._err += alternative_err
             OPT_ERR = None
             # self._err = self._err if self._err.count("\n") > alternative_err.count("\n") else alternative_err
@@ -200,7 +204,7 @@ class MultiBoundParser(BoundParser):
         new_indent = errors[0].split("\n")[-1].count("\t") + 1 # todo : not always correct
         errors = [error.replace("\n", "\n" + "\t" * new_indent) for error in errors]
         # raise ParseSyntaxError(max(errors, key=lambda x: x.count("\t")))
-        raise ParseSyntaxError(FOLD + "########## OR ##########\n".join(errors))
+        raise ParseSyntaxError(FOLD + FAILED_TO_PARSE_ONE_OF_MESSAGE + FAILED_OR.join(errors))
 
     def parse_one_or_more(self):
         results = [self.parse_once()]
@@ -1083,8 +1087,8 @@ class Parser:
 
     def _parse_primary_expression(self) -> BoundParser:
         def inner():
-            p1 = self._parse_identifier().add_err("Error parsing <Identifier> for <PrimaryExpression>").parse_once()
-            p2 = self._parse_lambda().add_err("Error parsing <Lambda> for <PrimaryExpression>").parse_once()
+            p1 = self._parse_identifier().add_err("Error parsing <Identifier> for <PrimaryExpression>").delay_parse()
+            p2 = self._parse_lambda().add_err("Error parsing <Lambda> for <PrimaryExpression>").delay_parse()
             p3 = self._parse_literal().add_err("Error parsing <Literal> for <PrimaryExpression>").delay_parse()
             p4 = self._parse_static_scoped_generic_identifier().add_err("Error parsing StaticScopedGenericIdentifier for <PrimaryExpression>").delay_parse()
             p5 = self._parse_parenthesized_expression().add_err("Error parsing <ParenthesizedExpression> for <PrimaryExpression>").delay_parse()
