@@ -152,23 +152,6 @@ class BoundParser:
             multi_bound_parser.add_bound_parser(that)
             return multi_bound_parser
 
-        # def parse_one_of_inner():
-        #     f = self.parse_optional()
-        #     if f is None:
-        #         f = that.parse_optional()
-        #     if f is None:
-        #         num_tabs = self._err.split("\n")[-1].count("\t") + 1
-        #         t = "\t" * num_tabs
-        #         raise ParseSyntaxError(
-        #             f"\n{t}" +
-        #             self._err.replace("\n", f"\n{t}").replace(f"{t}{t}", f"{t}") +
-        #             f"\n{t}" +
-        #             that._err.replace("\n", f"\n{t}").replace(f"{t}{t}", f"{t}"))
-        #     return f
-        #
-        # b = BoundParser(self._parser, parse_one_of_inner)
-        # b.delay_parse()
-        # return b
 
 class MultiBoundParser(BoundParser):
     _bound_parsers: list[BoundParser]
@@ -183,9 +166,12 @@ class MultiBoundParser(BoundParser):
     def parse_once(self):
         errors = []
         for bound_parser in self._bound_parsers:
+            restore_index = self._parser._current
             try:
-                return bound_parser.parse_once()
+                result = bound_parser.parse_once()
+                return result
             except ParseSyntaxError as e:
+                self._parser._current = restore_index
                 errors.append(str(e))
         current_indent = errors[0].split("\n")[-1].count("\t") + 1
         errors = [error.replace("\n", "\n" + "\t" * current_indent) for error in errors]
@@ -217,14 +203,14 @@ class Parser:
 
     def _parse_program(self) -> BoundParser:
         def inner():
-            p1 = self._parse_module_prototype().parse_once()
-            p2 = self._parse_eof().opt_err().parse_once()
+            p1 = self._parse_module_prototype().add_err("Error parsing <ModulePrototype> for <Program>").parse_once()
+            p2 = self._parse_eof().add_err("Error parsing <EOF> for <Program>").opt_err().parse_once()
             return ProgramAst(p1)
         return BoundParser(self, inner)
 
     def _parse_eof(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkEOF).parse_once()
+            p1 = self._parse_token(TokenType.TkEOF).add_err("Error parsing 'eof' for <EOF>").parse_once()
             return p1
         return BoundParser(self, inner)
 
