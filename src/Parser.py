@@ -1458,42 +1458,42 @@ class Parser:
 
     def _parse_statement_case_default(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwCase).parse_once()
-            p2 = self._parse_expression_placeholder().parse_once()
-            p3 = self._parse_value_guard().parse_optional()
-            p4 = self._parse_statement_block().parse_once()
+            p1 = self._parse_token(TokenType.KwCase).add_err("Error parsing 'case' for <StatementCaseDefault>").parse_once()
+            p2 = self._parse_expression_placeholder().add_err("Error parsing <ExpressionPlaceholder> for <StatementCaseDefault>").parse_once()
+            p3 = self._parse_value_guard().add_err("Error parsing <ValueGuard>? for <StatementCaseDefault>").parse_optional()
+            p4 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementCaseDefault>").opt_err().parse_once()
             return CaseStatementAst(p2, p3, p4)
         return BoundParser(self, inner)
 
     def _parse_statement_with(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwWith).parse_once()
-            p2 = self._parse_expression().parse_once()
-            p3 = self._parse_with_statement_expression_alias().parse_optional()
-            p4 = self._parse_statement_block().parse_once()
+            p1 = self._parse_token(TokenType.KwWith).add_err("Error parsing 'with' for <StatementWith>").parse_once()
+            p2 = self._parse_expression().add_err("Error parsing <Expression> for <StatementWith>").parse_once()
+            p3 = self._parse_statement_with_expression_alias().add_err("Error parsing <StatementWithExpressionAlias>? for <StatementWith>").parse_optional()
+            p4 = self._parse_statement_block().add_err("Error parsing <StatementBlock> for <StatementWith>").parse_once()
             return WithStatementAst(p2, p3, p4)
         return BoundParser(self, inner)
 
-    def _parse_with_statement_expression_alias(self) -> BoundParser:
+    def _parse_statement_with_expression_alias(self) -> BoundParser:
         def inner():
-            p5 = self._parse_token(TokenType.KwAs).parse_once()
-            p6 = self._parse_local_variable_identifier().parse_once()
+            p5 = self._parse_token(TokenType.KwAs).add_err("Error parsing 'as' for <StatementWithExpressionAlias>").parse_once()
+            p6 = self._parse_local_variable_identifier().add_err("Error parsing <LocalVariableIdentifier> for <StatementWithExpressionAlias>").parse_once()
             return p6
         return BoundParser(self, inner)
 
     def _parse_statement_return(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwReturn).parse_once()
-            p2 = self._parse_expression().parse_optional()
-            p3 = self._parse_token(TokenType.TkSemicolon).parse_once()
+            p1 = self._parse_token(TokenType.KwReturn).add_err("Error parsing 'return' for <StatementReturn>").parse_once()
+            p2 = self._parse_expression().add_err("Error parsing <Expression> for <StatementReturn>").parse_optional()
+            p3 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <StatmentReturn>").opt_err().parse_once()
             return ReturnStatementAst(p2)
         return BoundParser(self, inner)
 
     def _parse_statement_yield(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwYield).parse_once()
-            p2 = self._parse_expression().parse_optional()
-            p3 = self._parse_token(TokenType.TkSemicolon).parse_once()
+            p1 = self._parse_token(TokenType.KwYield).add_err("Error parsing 'yield' for <StatementYield>").parse_once()
+            p2 = self._parse_expression().add_err("Error parsing 'yield' for <StatementYield>").parse_optional()
+            p3 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <StatementYield>").opt_err().parse_once()
             return YieldStatementAst(p2)
         return BoundParser(self, inner)
 
