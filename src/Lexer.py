@@ -12,9 +12,11 @@ class Lexer:
         current = 0
         lexed_tokens = []
 
-        keywords = list(filter(lambda t: t.startswith("Kw"), TokenType.__dict__["_member_names_"])); keywords.sort(key=lambda t: len(t), reverse=True)
-        tokens   = list(filter(lambda t: t.startswith("Tk"), TokenType.__dict__["_member_names_"])); tokens.sort(key=lambda t: len(t), reverse=True)
+        keywords = list(filter(lambda t: t.startswith("Kw"), TokenType.__dict__["_member_names_"])); keywords.sort(key=lambda t: len(TokenType[t].value), reverse=True)
+        tokens   = list(filter(lambda t: t.startswith("Tk"), TokenType.__dict__["_member_names_"])); tokens.sort(key=lambda t: len(TokenType[t].value), reverse=True)
         lexemes  = list(filter(lambda t: t.startswith("Lx"), TokenType.__dict__["_member_names_"]))
+
+        print(tokens)
 
         while current < len(self._code):
             f = False
