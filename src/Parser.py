@@ -765,94 +765,95 @@ class Parser:
 
     def _parse_where_block(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwWhere).parse_once()
-            p2 = self._parse_token(TokenType.TkLeftBracket).parse_once()
-            p3 = self._parse_where_constraints().parse_optional()
-            p4 = self._parse_token(TokenType.TkRightBracket).parse_once()
+            p1 = self._parse_token(TokenType.KwWhere).add_err("Error parsing 'where' for <WhereBlock>").parse_once()
+            p2 = self._parse_token(TokenType.TkLeftBracket).add_err("Error parsing '[' for <WhereBlock>").parse_once()
+            p3 = self._parse_where_constraints().add_err("Error parsing <WhereConstraints> for <WhereBlock>").parse_once()
+            p4 = self._parse_token(TokenType.TkRightBracket).add_err("Error parsing ']' for <WhereBlock>").opt_err().parse_once()
             return WhereBlockAst(p3)
         return BoundParser(self, inner)
 
     def _parse_where_constraints(self) -> BoundParser:
         def inner():
-            p1 = self._parse_where_constraint().parse_once()
-            p2 = self._parse_where_constraint_next().parse_zero_or_more()
+            p1 = self._parse_where_constraint().add_err("Error parsing <WhereConstraint> for <WhereConstraints>").parse_once()
+            p2 = self._parse_where_constraint_next().add_err("Error parsing <WhereConstraintNext>* for <WhereConstraints>").parse_zero_or_more()
             return [p1, *p2]
         return BoundParser(self, inner)
 
     def _parse_where_constraint_next(self) -> BoundParser:
         def inner():
-            p3 = self._parse_token(TokenType.TkComma).parse_once()
-            p4 = self._parse_where_constraint().parse_once()
+            p3 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <WhereConstraintNext>").parse_once()
+            p4 = self._parse_where_constraint().add_err("Error parsing <WhereConstraint> for <WhereConstraintNext>").parse_once()
             return p4
         return BoundParser(self, inner)
 
     def _parse_where_constraint(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_identifiers().parse_once()
-            p2 = self._parse_token(TokenType.TkColon).parse_once()
-            p3 = self._parse_where_constraint_chain().parse_once()
+            p1 = self._parse_type_identifiers().add_err("Error parsing <TypeIdentifiers> for <WhereConstraint>").parse_once()
+            p2 = self._parse_token(TokenType.TkColon).add_err("Error parsing ':' for <WhereConstraint>").parse_once()
+            p3 = self._parse_where_constraint_chain().add_err("Error parsing <WhereConstraintChain> for <WhereConstraint>").parse_once()
             return WhereConstraintAst(p1, p3)
         return BoundParser(self, inner)
 
     def _parse_where_constraint_chain(self) -> BoundParser:
         def inner():
-            p3 = self._parse_where_constraint_chain_element().parse_once()
-            p4 = self._parse_where_constraint_chain_element_next().parse_zero_or_more()
+            p3 = self._parse_where_constraint_chain_element().add_err("Error parsing <WhereConstraintChainElement> for <WhereConstraintChain>").parse_once()
+            p4 = self._parse_where_constraint_chain_element_next().add_err("Error parsing <WhereConstraintChainElementNext>* for <WhereConstraintChain>").parse_zero_or_more()
             return [p3, *p4]
         return BoundParser(self, inner)
 
     def _parse_where_constraint_chain_element_next(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkPlus).parse_once()
-            p2 = self._parse_where_constraint_chain_element().parse_once()
+            p1 = self._parse_token(TokenType.TkPlus).add_err("Error parsing '+' for <WhereConstraintChainElementNext>").parse_once()
+            p2 = self._parse_where_constraint_chain_element().add_err("Error parsing <WhereConstraintChainElement> for <WhereConstraintChainElementNext>").parse_once()
             return p2
         return BoundParser(self, inner)
 
     def _parse_where_constraint_chain_element(self) -> BoundParser:
         def inner():
-            p1 = self._parse_static_scoped_generic_identifier().parse_once()
+            p1 = self._parse_static_scoped_generic_identifier().add_err("Error parsing <StaticScopedGenericIdentifier> for <WhereConstraintChainElement>").parse_once()
             return p1
         return BoundParser(self, inner)
 
     def _parse_value_guard(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwIf).parse_once()
-            p2 = self._parse_expression().parse_once()
+            p1 = self._parse_token(TokenType.KwIf).add_err("Error parsing 'if' for <ValueGuard>").parse_once()
+            p2 = self._parse_expression().add_err("Error parsing <Expression> for <ValueGuard>").parse_once()
             return ValueGuardAst(p2)
         return BoundParser(self, inner)
 
-    """[DECORATORS]"""
+    # Decorators
 
     def _parse_decorator(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkAt).parse_once()
-            p2 = self._parse_decorator_identifier().parse_once()
-            p3 = self._parse_type_generic_arguments().parse_optional()
-            p4 = self._parse_function_call_arguments().parse_optional()
+            p1 = self._parse_token(TokenType.TkAt).add_err("Error parsing '@' for <Decorator>").parse_once()
+            p2 = self._parse_decorator_identifier().add_err("Error parsing <DecoratorIdentifier> for <Decorator>").parse_once()
+            p3 = self._parse_type_generic_arguments().add_err("Error parsing <TypeGenericArguments>? for <Decorator>").parse_optional()
+            p4 = self._parse_function_call_arguments().add_err("Error parsing <FunctionCallArguments>? for <Decorator>").parse_optional()
             return DecoratorAst(p2, p3, p4)
         return BoundParser(self, inner)
 
     def _parse_decorators(self) -> BoundParser:
         def inner():
-            p1 = self._parse_decorator().parse_once()
-            p2 = self._parse_decorator_next().parse_zero_or_more()
+            p1 = self._parse_decorator().add_err("Error parsing <Decorator> for <Decorators>").parse_once()
+            p2 = self._parse_decorator_next().add_err("Error parsing <DecoratorNext>* for <Decorators>").opt_err().parse_zero_or_more()
             return [p1, *p2]
         return BoundParser(self, inner)
 
     def _parse_decorator_next(self):
         def inner():
-            p3 = self._parse_token(TokenType.TkComma).parse_once()
-            p4 = self._parse_decorator().parse_once()
+            p3 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <DecoratorNext>").parse_once()
+            p4 = self._parse_decorator().add_err("Error parsing <Decorator> for <DecoratorNext>").parse_once()
             return p4
         return BoundParser(self, inner)
 
     def _parse_decorator_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_static_scoped_generic_identifier().parse_once()
+            p1 = self._parse_static_scoped_generic_identifier().add_err("Error parsing <StaticScopedGenericIdentifier> for <DecoratorIdentifier>").parse_once()
             return p1
         return BoundParser(self, inner)
 
-    """[EXPRESSIONS]"""
+    # Expressions
+
     def _parse_expressions(self) -> BoundParser:
         def inner():
             p1 = self._parse_expression().parse_once()
