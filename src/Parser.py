@@ -856,53 +856,53 @@ class Parser:
 
     def _parse_expressions(self) -> BoundParser:
         def inner():
-            p1 = self._parse_expression().parse_once()
-            p2 = self._parse_expression_next().parse_zero_or_more()
+            p1 = self._parse_expression().add_err("Error parsing <Expression> for <Expressions>").parse_once()
+            p2 = self._parse_expression_next().add_err("Error parsing <ExpressionNext>* for <Expressions>").parse_zero_or_more()
             return [p1, *p2]
         return BoundParser(self, inner)
 
     def _parse_expression_next(self):
         def inner():
-            p3 = self._parse_token(TokenType.TkComma).parse_once()
-            p4 = self._parse_expression().parse_once()
+            p3 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <ExpressionNext>").parse_once()
+            p4 = self._parse_expression().add_err("Error parsing <Expression> for <ExpressionNext>").parse_once()
             return p4
         return BoundParser(self, inner)
 
     def _parse_expression(self) -> BoundParser:
         def inner():
-            p1 = self._parse_assignment_expression().parse_once()
+            p1 = self._parse_assignment_expression().add_err("Error parsing <AssignmentExpression> for <Expression>").parse_once()
             return p1
         return BoundParser(self, inner)
 
     def _parse_assignment_expression(self) -> BoundParser:
         def inner():
-            p1 = self._parse_assignment_single().delay_parse()
-            p2 = self._parse_assignment_multiple().delay_parse()
-            p3 = (p1 | p2).parse_once()
+            p1 = self._parse_assignment_single().add_err("Error parsing ... | <AssignmentSingle> | ... for <AssignmentExpression>").delay_parse()
+            p2 = self._parse_assignment_multiple().add_err("Error parsing ... | <AssignmentMultiple> | ... for <AssignmentExpression>").delay_parse()
+            p3 = (p1 | p2).add_err("Error parsing selector for <AssignmentExpression>").parse_once()
             return p3
         return BoundParser(self, inner)
 
     def _parse_assignment_multiple(self) -> BoundParser:
         def inner():
-            p4 = self._parse_null_coalescing_expression().parse_once()
-            p5 = self._parse_assignment_multiple_lhs().parse_zero_or_more()
-            p6 = self._parse_token(TokenType.TkEqual).parse_once()
-            p7 = self._parse_assignment_expression().parse_once()
-            p8 = self._parse_assignment_multiple_rhs().parse_zero_or_more()
+            p4 = self._parse_null_coalescing_expression().add_err("Error parsing <NullCoalescingExpression> for <AssignmentMultiple>").parse_once()
+            p5 = self._parse_assignment_multiple_lhs().add_err("Error parsing <AssignmentMultipleLhs>* for <AssignmentMultiple>").parse_zero_or_more()
+            p6 = self._parse_token(TokenType.TkEqual).add_err("Error parsing '=' for <AssignmentMultiple>").opt_err().parse_once()
+            p7 = self._parse_assignment_expression().add_err("Error parsing <AssignmentExpression> for <AssignmentMultiple>").parse_once()
+            p8 = self._parse_assignment_multiple_rhs().add_err("Error parsing <AssignmentMultipleRhs>* for <AssignmentMultiple>").parse_zero_or_more()
             return MultiAssignmentExpressionAst([p4, *p5], [p7, *p8])
         return BoundParser(self, inner)
 
     def _parse_assignment_multiple_lhs(self) -> BoundParser:
         def inner():
-            p9 = self._parse_token(TokenType.TkComma).parse_once()
-            p10 = self._parse_null_coalescing_expression().parse_once()
+            p9 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <AssignmentMultipleLhs>").parse_once()
+            p10 = self._parse_null_coalescing_expression().add_err("Error parsing <NullCoalescingExpression> for <AssignmentMultipleLhs>").parse_once()
             return p10
         return BoundParser(self, inner)
 
     def _parse_assignment_multiple_rhs(self) -> BoundParser:
         def inner():
-            p9 = self._parse_token(TokenType.TkComma).parse_once()
-            p10 = self._parse_assignment_expression().parse_once()
+            p9 = self._parse_token(TokenType.TkComma).add_err("Error parsing ',' for <AssignmentMultipleRhs>").parse_once()
+            p10 = self._parse_assignment_expression().add_err("Error parsing <AssignmentExpression> for <AssignmentMultipleRhs>").parse_once()
             return p10
         return BoundParser(self, inner)
 
