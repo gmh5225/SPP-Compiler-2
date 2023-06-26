@@ -208,7 +208,7 @@ class Parser:
     def _parse_program(self) -> BoundParser:
         def inner():
             p1 = self._parse_module_prototype().add_err("Error parsing <ModulePrototype> for <Program>").parse_once()
-            p2 = self._parse_eof().add_err("Error parsing <EOF> for <Program>").parse_once()
+            p2 = self._parse_eof().add_err("Error parsing <EOF> for <Program>").opt_err().parse_once()
             return ProgramAst(p1)
         return BoundParser(self, inner)
 
@@ -1592,12 +1592,12 @@ class Parser:
 
     def _parse_statement_let(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwLet).parse_once()
-            p2 = self._parse_local_variable_identifier().parse_once()
-            p3 = self._parse_statement_let_type_annotation()
-            p4 = self._parse_statement_let_value()
-            p5 = (p3 | p4).parse_once()
-            return LetStatementAst(p2, p5)
+            p1 = self._parse_token(TokenType.KwLet).add_err("Error parsing 'let' for <StatementLet>").parse_once()
+            p2 = self._parse_local_variable_identifier().add_err("Error parsing <LocalVariableIdentifiers> for <StatementLet>").parse_once()
+            p3 = self._parse_statement_let_type_annotation().add_err("Error parsing <StatementLetTypeAnnotation> for <StatementLet>").delay_parse()
+            p4 = self._parse_statement_let_value().add_err("Error parsing <StatementLetValue> for <StatementLet>").delay_parse()
+            p5 = (p3 | p4).add_err("Error parsing selection for <StatementLet>").parse_once()
+            return LetStatementAst(p2, [], p5) if isinstance(p5, TypeAst) else LetStatementAst(p2, p5, None)
         return BoundParser(self, inner)
 
     def _parse_statement_let_value(self) -> BoundParser:
@@ -1616,8 +1616,8 @@ class Parser:
 
     def _parse_local_variable_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwMut).parse_once()
-            p2 = self._parse_identifier().parse_once()
+            p1 = self._parse_token(TokenType.KwMut).add_err("Error parsing 'mut'? for <LocalVariableIdentifier>").parse_optional()
+            p2 = self._parse_identifier().add_err("Error parsing <Identifier> for <LocalVariableIdentifier>").opt_err().parse_once()
             return LocalVariableAst(p1, p2)
         return BoundParser(self, inner)
 
