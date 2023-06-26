@@ -1651,7 +1651,7 @@ class Parser:
 
     def _parse_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_lexeme(TokenType.LxIdentifier).parse_once()
+            p1 = self._parse_lexeme(TokenType.LxIdentifier).add_err("Error parsing <Lexeme> for <Identifier>").parse_once()
             return IdentifierAst(p1)
         return BoundParser(self, inner)
 
@@ -2154,12 +2154,12 @@ class Parser:
             if self._current >= len(self._tokens):
                 raise ParseSyntaxError(f"Expected <{token}>, got <EOF>")
 
-            current_token = self._tokens[self._current].token_type
-            if current_token != token:
+            current_token = self._tokens[self._current]
+            if current_token.token_type != token:
 
                 error = ParseSyntaxError(
                     # ErrorFormatter(self._tokens).error(self._current) +
-                    f"! Expected <{token}>, got <{current_token}>\n")
+                    f"! Expected <{token}>, got <{current_token.token_type}> ({current_token.token_metadata})\n")
                 raise error
 
             self._current += 1
@@ -2169,7 +2169,7 @@ class Parser:
 
     def _parse_lexeme(self, lexeme: TokenType) -> BoundParser:
         def inner():
-            p1 = self._parse_token(lexeme).parse_once()
+            p1 = self._parse_token(lexeme).add_err("Error parsing <Token> for <Lexeme>").parse_once()
             return p1.primary.token_metadata
         return BoundParser(self, inner)
 
@@ -2204,7 +2204,7 @@ class Parser:
 
     def _parse_empty_implementation(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkSemicolon).parse_once()
+            p1 = self._parse_token(TokenType.TkSemicolon).add_err("Error parsing ';' for <EmptyImplementation>").parse_once()
             return p1
         return BoundParser(self, inner)
 
