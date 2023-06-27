@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import functools
-import inspect
-from typing import Optional, Generic, TypeVar, Callable, Any
+from typing import Callable, Any
 from src.Ast import *
 from src.Tokens import TokenType, Token
+
 
 class ParseSyntaxError(Exception):
     ...
@@ -14,6 +14,7 @@ class ParseSyntaxMultiError(Exception):
 
 class ParserError(Exception):
     ...
+
 
 Rule = Callable
 
@@ -36,7 +37,7 @@ class ErrorFormatter:
         if self._tokens[error_position].token_type == TokenType.TkEOF:
             error_position -= 1
         if self._tokens[error_position].token_type == TokenType.TkEOF and self._tokens[error_position - 1] == TokenType.TkNewLine:
-            start_token_index -= 1
+            start_token_index -= 1 # todo : not -1, need to minus off the number of newlines before the EOF
 
         # If the start index is on a newline token, then move it back until it is not on a newline, so that the correct
         # line can be tracked over in reverse to fin the start of it. Once a non-newline has been found, move the
@@ -84,7 +85,6 @@ class BoundParser:
         self._parser = parser
         self._delayed = False
         self._ast = None
-        self._caller = inspect.stack()[1].function
 
     def parse_once(self):
         # Try to parse the rule once. If there is an error whilst parsing the rule, then catch it, append the current
