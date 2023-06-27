@@ -111,7 +111,7 @@ class BoundParser:
         except ParseSyntaxError as parse_optional_error:
             self._parser._current = restore_index
             self._ast = None
-            BoundParser._opt_err = str(parse_optional_error).split("¦")[0]
+            BoundParser._opt_err = str(parse_optional_error).rsplit("¦")[0]
             return self._ast
 
     def parse_zero_or_more(self):
@@ -135,7 +135,7 @@ class BoundParser:
             except ParseSyntaxError as parse_zero_or_more_error:
                 self._parser._current = restore_index
                 self._ast = results
-                BoundParser._opt_err = str(parse_zero_or_more_error).split("¦")[0]
+                BoundParser._opt_err = str(parse_zero_or_more_error).rsplit("¦")[0]
                 return self._ast
 
     def parse_one_or_more(self):
