@@ -1919,7 +1919,7 @@ class Parser:
             p9 = self._parse_literal_tuple().delay_parse()
             p10 = self._parse_literal_regex().delay_parse()
             p11 = self._parse_literal_generator().delay_parse()
-            p12 = (p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11).parse_once()
+            p12 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11).parse_once()
             return p12
         return BoundParser(self, inner)
 
@@ -2163,13 +2163,16 @@ class Parser:
             global EXPECTED_TOKENS
             current_token = self._tokens[self._current]
             if current_token.token_type != token:
+                got_token = current_token.token_type.value if not current_token.token_type.name.startswith("Lx") else current_token.token_type.name[2:]
+                exp_token = token.value if not token.name.startswith("Lx") else token.name[2:]
+
                 error = ParseSyntaxError(
                     ErrorFormatter(self._tokens).error(self._current) +
-                    f"Expected one of ¬, got: '{current_token.token_type.value}'")
+                    f"Expected one of ¬, got: '{got_token}'")
 
                 global CUR_ERR_IND
                 if CUR_ERR_IND == self._current:
-                    EXPECTED_TOKENS.append(str("'" + token.value + "'"))
+                    EXPECTED_TOKENS.append(str("'" + exp_token + "'"))
                     if ERRS:
                         ERRS[-1] = str(error).replace("¬", ", ".join(EXPECTED_TOKENS))
                     else:
@@ -2177,7 +2180,7 @@ class Parser:
                     raise error
                 else:
                     CUR_ERR_IND = self._current
-                    EXPECTED_TOKENS = [str("'" + token.value + "'")]
+                    EXPECTED_TOKENS = [str("'" + exp_token + "'")]
                     ERRS.append(str(error).replace("¬", ", ".join(EXPECTED_TOKENS)))
                     raise ParseSyntaxError("\n".join(ERRS))
 
