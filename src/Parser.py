@@ -1633,7 +1633,7 @@ class Parser:
 
     def _parse_local_variable_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwMut).parse_optional()
+            p1 = self._parse_token(TokenType.KwMut).parse_optional() is not None
             p2 = self._parse_identifier().parse_once()
             return LocalVariableAst(p1, p2)
         return BoundParser(self, inner)

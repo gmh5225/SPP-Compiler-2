@@ -355,8 +355,8 @@ class LetStatementAst:
 
 @dataclass
 class LocalVariableAst:
-    identifier: IdentifierAst
     is_mutable: bool
+    identifier: IdentifierAst
 
 
 @dataclass
