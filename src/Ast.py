@@ -449,15 +449,12 @@ class BoolLiteralAst:
 
 @dataclass
 class ListLiteralAst:
-    iterable_build: IterableRangeAst | IterableFixedAst | IterableComprehensionAst
+    values: list[ExpressionAst]
 
 @dataclass
 class SetLiteralAst:
-    iterable_build: IterableRangeAst | IterableFixedAst | IterableComprehensionAst
+    values: list[ExpressionAst]
 
-@dataclass
-class GeneratorLiteralAst:
-    iterable_build: IterableRangeAst | IterableComprehensionAst
 
 @dataclass
 class MapLiteralAst:
@@ -477,26 +474,14 @@ class TupleLiteralAst:
     values: list[ExpressionAst]
 
 @dataclass
-class IterableRangeAst:
-    start: ExpressionAst
+class RangeLiteralAst:
+    start: Optional[ExpressionAst]
     end: Optional[ExpressionAst]
-    step: Optional[ExpressionAst]
-
-@dataclass
-class IterableFixedAst:
-    values: list[ExpressionAst]
-
-@dataclass
-class IterableComprehensionAst:
-    expression: ExpressionAst
-    variables: list[LocalVariableAst]
-    iterating: ExpressionAst
-    guard: Optional[ValueGuardAst]
 
 
 PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixIndexAccessAst | PostfixSliceAccessAst | PostfixStructInitializerAst | PostfixTypeCastAst | TokenAst
 NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiteralBase02Ast
-LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | ListLiteralAst | GeneratorLiteralAst | MapLiteralAst | SetLiteralAst | PairLiteralAst | RegexLiteralAst | TupleLiteralAst
+LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | ListLiteralAst | MapLiteralAst | SetLiteralAst | PairLiteralAst | RegexLiteralAst | TupleLiteralAst
 PrimaryExpressionAst = LiteralAst | IdentifierAst | ParenthesizedExpressionAst | LambdaAst | PlaceholderAst
 ExpressionAst = UnaryExpressionAst | BinaryExpressionAst | PostfixExpressionAst | MultiAssignmentExpressionAst | PrimaryExpressionAst
 StatementAst = IfStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst | MatchStatementAst | WithStatementAst | ReturnStatementAst | YieldStatementAst | TypedefStatementAst | LetStatementAst | ExpressionAst

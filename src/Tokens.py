@@ -120,7 +120,7 @@ class TokenType(Enum):
     LxDoubleQuoteStr = r"\".*\""
     LxSingleQuoteChr = r"'.?'"
     LxRegex = r"r\".*\""
-    LxTag = r"\$[a-zA-Z0-9_]+"
+    LxTag = r"\'[a-zA-Z0-9_]+"
 
 
 @dataclass
