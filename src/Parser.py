@@ -191,9 +191,9 @@ class MultiBoundParser(BoundParser):
                 return result
             except ParseSyntaxError as e:
                 self._parser._current = restore_index
-                errors.append(str(e).replace("£", "€"))
+                errors.append(str(e))
 
-        raise ParseSyntaxMultiError("£".join(errors))
+        raise ParseSyntaxMultiError("".join(errors))
 
 
 class Parser:
@@ -1066,8 +1066,10 @@ class Parser:
             p3 = self._parse_static_scoped_generic_identifier().delay_parse()
             p4 = self._parse_parenthesized_expression().delay_parse()
             p5 = self._parse_expression_placeholder().delay_parse()
-            p6 = (p1 | p2 | p3 | p4 | p5).parse_once()
-            return p6
+            p6 = self._parse_statement_if().delay_parse()
+            p7 = self._parse_statement_match().delay_parse()
+            p8 = (p6 | p7 | p1 | p2 | p3 | p4 | p5).parse_once()
+            return p8
         return BoundParser(self, inner)
 
     def _parse_binary_expression(self, __lhs, __op, __rhs) -> BoundParser:
@@ -1360,9 +1362,12 @@ class Parser:
 
     def _parse_statement_inline_definitions(self) -> BoundParser:
         def inner():
-            p5 = self._parse_statement_let().parse_once()
+            p1 = self._parse_token(TokenType.KwLet).parse_once()
+            p2 = self._parse_local_variable_identifier().parse_once()
+            p3 = self._parse_token(TokenType.TkEqual).parse_once()
+            p4 = self._parse_expression().parse_once()
             p6 = self._parse_token(TokenType.TkComma).parse_once()
-            return p5
+            return LetStatementAst([p2], [p4], None)
         return BoundParser(self, inner)
 
     def _parse_statement_if(self) -> BoundParser:
@@ -1627,10 +1632,11 @@ class Parser:
     def _parse_statement_let(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwLet).parse_once()
-            p2 = self._parse_local_variable_identifier().parse_once()
+            p2 = self._parse_local_variable_identifiers().parse_once()
             p3 = self._parse_statement_let_type_annotation().delay_parse()
             p4 = self._parse_statement_let_value().delay_parse()
             p5 = (p3 | p4).parse_once()
+            p6 = self._parse_token(TokenType.TkSemicolon).parse_once()
             return LetStatementAst(p2, [], p5) if isinstance(p5, TypeAst) else LetStatementAst(p2, p5, None)
         return BoundParser(self, inner)
 
@@ -1676,13 +1682,6 @@ class Parser:
             return p1
         return BoundParser(self, inner)
 
-    def _parse_statement_let_for_statement(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_statement_let().parse_once()
-            p2 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return p1
-        return BoundParser(self, inner)
-
     def _parse_statement(self) -> BoundParser:
         def inner():
             p1 = self._parse_statement_if().delay_parse()
@@ -1694,7 +1693,7 @@ class Parser:
             p7 = self._parse_statement_typedef().delay_parse()
             p8 = self._parse_statement_return().delay_parse()
             p9 = self._parse_statement_yield().delay_parse()
-            p10 = self._parse_statement_let_for_statement().delay_parse()
+            p10 = self._parse_statement_let().delay_parse()
             p11 = self._parse_statement_expression().delay_parse()
             # p12 = self._parse_function_prototype().delay_parse()
             p13 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11).parse_once()
