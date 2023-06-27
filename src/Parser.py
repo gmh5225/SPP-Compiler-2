@@ -15,7 +15,7 @@ Rule = Callable
 
 FOLD = ""
 
-FAILED_OPTIONAL_PARSE_MESSAGE = "\n########## Failed to Parse Optional ##########\n"
+FAILED_OPTIONAL_PARSE_MESSAGE = "\n########## Failed to Parse Alternative ##########\n"
 FAILED_TO_PARSE_ONE_OF_MESSAGE = "\n########## Failed to Parse One Of ##########\n"
 FAILED_OR = "\n########## Or ##########\n"
 
@@ -77,11 +77,13 @@ class BoundParser:
         # propagated up the call stack.
         try:
             results = self._rule()
-            BoundParser._opt_err = BoundParser._opt_err[:BoundParser._opt_err.rfind(FAILED_OPTIONAL_PARSE_MESSAGE)]
+            # current_index = max(0, next(reversed(BoundParser._opt_err.split("\n"))).count("\t") - 1)
+            # BoundParser._opt_err = BoundParser._opt_err[:BoundParser._opt_err.rfind("\t" * current_index + "-")]
+            print(len(BoundParser._opt_err.split("\n")))
 
         except ParseSyntaxError as parse_once_error:
             self._err += "\n" + str(parse_once_error)
-            self._err += FAILED_OPTIONAL_PARSE_MESSAGE + BoundParser._opt_err if BoundParser._opt_err else ""
+            self._err += ("¦" + FAILED_OPTIONAL_PARSE_MESSAGE + BoundParser._opt_err) if BoundParser._opt_err else ""
             raise ParseSyntaxError(self._err)
 
         # Remove None from a list of results (where a parse_optional has added a None to the list).
@@ -109,7 +111,7 @@ class BoundParser:
         except ParseSyntaxError as parse_optional_error:
             self._parser._current = restore_index
             self._ast = None
-            BoundParser._opt_err = str(parse_optional_error)
+            BoundParser._opt_err = str(parse_optional_error).split("¦")[0]
             return self._ast
 
     def parse_zero_or_more(self):
@@ -123,17 +125,17 @@ class BoundParser:
             restore_index = self._parser._current
 
             # Call the 'parse_once()' function to parse the rule and handle error message formatting. Append the result
-            # to the results list.
+            # to the result list.
             try:
                 result = self.parse_once()
                 results.append(result)
 
             # If an error is caught, then the next parse has failed, so restore the index, and don't append anything to
-            # the results list. Set the ast to the list of results (usually a list of other asts), and return this list.
+            # the result list. Set the ast to the list of results (usually a list of other asts), and return this list.
             except ParseSyntaxError as parse_zero_or_more_error:
                 self._parser._current = restore_index
                 self._ast = results
-                BoundParser._opt_err = str(parse_zero_or_more_error)
+                BoundParser._opt_err = str(parse_zero_or_more_error).split("¦")[0]
                 return self._ast
 
     def parse_one_or_more(self):
@@ -156,6 +158,7 @@ class BoundParser:
         if isinstance(self, MultiBoundParser):
             self.add_bound_parser(that)
             return self
+
         else:
             multi_bound_parser = MultiBoundParser(self._parser)
             multi_bound_parser.delay_parse()
@@ -187,7 +190,13 @@ class MultiBoundParser(BoundParser):
 
         new_indent = errors[0].split("\n")[-1].count("\t") + 1
         errors = [error.replace("\n", "\n" + "\t" * new_indent) for error in errors]
-        raise ParseSyntaxError(FOLD + FAILED_TO_PARSE_ONE_OF_MESSAGE + FAILED_OR.join(errors))
+
+        # Guess the correct branch being used (most successful parses)
+        # errors.sort(key=lambda error: error.count("\n"))
+        # correct_branch = errors[0] #.split("\n")[0]
+
+        # print(len(errors))
+        raise ParseSyntaxError(FAILED_TO_PARSE_ONE_OF_MESSAGE + FAILED_OR.join(errors) + "\n")
 
     def parse_one_or_more(self):
         results = [self.parse_once()]
@@ -1657,7 +1666,7 @@ class Parser:
             p12 = self._parse_statement_let().add_err("Error parsing <StatementLet> for <Statement>").delay_parse()
             p13 = self._parse_statement_expression().add_err("Error parsing <StatementExpression> for <Statement>").delay_parse()
             # p14 = self._parse_function_prototype().delay_parse()
-            p15 = (p1 | p2 | p13).add_err("Error parsing selection for <Statement>").parse_once()
+            p15 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12 | p13).add_err("Error parsing selection for <Statement>").parse_once()
             return p15
         return BoundParser(self, inner)
 
@@ -2199,7 +2208,7 @@ class Parser:
 
         def inner():
             self._indent += 4
-            p1 = self._parse_indented_whitespace().parse_once()
+            p1 = self._parse_indented_whitespace().add_err("Error parsing '    '*n for <Indent>").parse_once()
             if self._tokens[self._current].token_type == TokenType.TkWhitespace:
                 raise ParseSyntaxError("Unexpected whitespace")
 
@@ -2208,7 +2217,7 @@ class Parser:
     def _parse_indented_whitespace(self) -> BoundParser:
         def inner():
             for i in range(self._indent):
-                self._parse_token(TokenType.TkWhitespace).parse_once()
+                self._parse_token(TokenType.TkWhitespace).add_err("Error parsing ' ' for '    '*n").parse_once()
         return BoundParser(self, inner)
 
     def _parse_dedent(self) -> BoundParser:
