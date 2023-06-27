@@ -25,16 +25,27 @@ CUR_ERR_IND = None
 
 class ErrorFormatter:
     def __init__(self, tokens: list[Token]):
+        print(list(enumerate(tokens)))
         self._tokens = tokens
 
     def error(self, start_token_index: int) -> str:
         error_position = start_token_index
+        print(error_position)
+        if self._tokens[error_position].token_type == TokenType.TkEOF:
+            start_token_index -= 1
+            error_position -= 1
+
+        if start_token_index > 0 and self._tokens[start_token_index].token_type == TokenType.TkNewLine:
+            start_token_index -= 1
         while start_token_index > 0 and self._tokens[start_token_index].token_type != TokenType.TkNewLine:
             start_token_index -= 1
 
         end_token_index = start_token_index + 1
+        if end_token_index < len(self._tokens) and self._tokens[end_token_index].token_type == TokenType.TkNewLine:
+            end_token_index += 1
         while end_token_index < len(self._tokens) and self._tokens[end_token_index].token_type != TokenType.TkNewLine:
             end_token_index += 1
+        print(start_token_index, end_token_index)
 
         tokens = self._tokens[start_token_index:end_token_index]
         current_line_string = "".join([token.token_metadata for token in tokens])
@@ -42,10 +53,12 @@ class ErrorFormatter:
         spaces = 0
         for token in tokens[:error_position - start_token_index - 1]:
             spaces += len(token.token_metadata)
+        print(spaces)
 
-        error_length = len(self._tokens[error_position].token_metadata)
+        error_length = max(1, len(self._tokens[error_position].token_metadata))
         error_line_string = "".join([" " * spaces, "^" * error_length]) + " <- "
         final_string = "\n".join(["", current_line_string, error_line_string])
+        print("-" * 50)
         return final_string
 
 
@@ -90,7 +103,7 @@ class BoundParser:
 
         # If there is an error in the optional parse, then the token index of the parser is restored, and the ast is set
         # to None. The None value is also returned, and functions can specify alternatives ie '.parse_optional() or []'
-        except Exception:
+        except (ParseSyntaxError, ParseSyntaxMultiError):
             self._parser._current = restore_index
             self._ast = None
             return self._ast
@@ -114,7 +127,7 @@ class BoundParser:
 
             # If an error is caught, then the next parse has failed, so restore the index, and don't append anything to
             # the result list. Set the ast to the list of results (usually a list of other asts), and return this list.
-            except Exception as e:
+            except (ParseSyntaxError, ParseSyntaxMultiError) as e:
                 self._parser._current = restore_index
                 self._ast = results
                 return self._ast
@@ -2146,7 +2159,10 @@ class Parser:
                 global CUR_ERR_IND
                 if CUR_ERR_IND == self._current:
                     EXPECTED_TOKENS.append(str("'" + token.value + "'"))
-                    ERRS[-1] = str(error).replace("¬", ", ".join(EXPECTED_TOKENS))
+                    if ERRS:
+                        ERRS[-1] = str(error).replace("¬", ", ".join(EXPECTED_TOKENS))
+                    else:
+                        ERRS.append(str(error).replace("¬", ", ".join(EXPECTED_TOKENS)))
                     raise error
                 else:
                     CUR_ERR_IND = self._current
@@ -2155,6 +2171,7 @@ class Parser:
                     raise ParseSyntaxError("\n".join(ERRS))
 
             EXPECTED_TOKENS.clear()
+            ERRS.clear()
             self._current += 1
 
             return TokenAst(self._tokens[self._current - 1], None)
