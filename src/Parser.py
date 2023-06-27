@@ -25,40 +25,51 @@ CUR_ERR_IND = None
 
 class ErrorFormatter:
     def __init__(self, tokens: list[Token]):
-        print(list(enumerate(tokens)))
         self._tokens = tokens
 
     def error(self, start_token_index: int) -> str:
+        # The error position for the ("^") will be from the provisional start token index. If the error position is end
+        # of the file, then the error position have to be decremented by one, so that the error position is not pointing
+        # to the EOF token. The start token index has to be moved back to that the newline behind the EOF is skipped (if
+        # there is one).
         error_position = start_token_index
-        print(error_position)
         if self._tokens[error_position].token_type == TokenType.TkEOF:
-            start_token_index -= 1
             error_position -= 1
+        if self._tokens[error_position].token_type == TokenType.TkEOF and self._tokens[error_position - 1] == TokenType.TkNewLine:
+            start_token_index -= 1
 
-        if start_token_index > 0 and self._tokens[start_token_index].token_type == TokenType.TkNewLine:
+        # If the start index is on a newline token, then move it back until it is not on a newline, so that the correct
+        # line can be tracked over in reverse to fin the start of it. Once a non-newline has been found, move the
+        # counter back until another newline is found - this will be the start of the line.
+        while start_token_index > 0 and self._tokens[start_token_index].token_type == TokenType.TkNewLine:
             start_token_index -= 1
         while start_token_index > 0 and self._tokens[start_token_index].token_type != TokenType.TkNewLine:
             start_token_index -= 1
 
+        # The end of the line is the first newline after the start of the line. If The re-scan forward is required
+        # because there could have been multiple newlines after the current line, so only go to the first one.
         end_token_index = start_token_index + 1
         if end_token_index < len(self._tokens) and self._tokens[end_token_index].token_type == TokenType.TkNewLine:
             end_token_index += 1
         while end_token_index < len(self._tokens) and self._tokens[end_token_index].token_type != TokenType.TkNewLine:
             end_token_index += 1
-        print(start_token_index, end_token_index)
 
+        # Get the tokens on the current line by slicing the tokens between the start and end indexes just found from
+        # backwards and forward newline-scanning
         tokens = self._tokens[start_token_index:end_token_index]
         current_line_string = "".join([token.token_metadata for token in tokens])
 
+        # The number of spaces before the "^" characters is the error message position variable from the start - this
+        # hasn't been altered
         spaces = 0
         for token in tokens[:error_position - start_token_index - 1]:
             spaces += len(token.token_metadata)
-        print(spaces)
 
+        # The number of "^" characters is the length of the current tokens metadata (ie the symbol or length of keyword
+        # / lexeme). Append the repeated "^" characters to the spaces, and then add the error message to the string.
         error_length = max(1, len(self._tokens[error_position].token_metadata))
         error_line_string = "".join([" " * spaces, "^" * error_length]) + " <- "
         final_string = "\n".join(["", current_line_string, error_line_string])
-        print("-" * 50)
         return final_string
 
 
