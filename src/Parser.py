@@ -15,7 +15,7 @@ Rule = Callable
 
 FOLD = ""
 
-FAILED_OPTIONAL_PARSE_MESSAGE = "\n########## Failed to Parse Alternative ##########\n"
+FAILED_ALTERNATIVE_PARSE_MESSAGE = "\n########## Failed to Parse Alternative ##########\n"
 FAILED_TO_PARSE_ONE_OF_MESSAGE = "\n########## Failed to Parse One Of ##########\n"
 FAILED_OR = "\n########## Or ##########\n"
 
@@ -79,11 +79,10 @@ class BoundParser:
             results = self._rule()
             # current_index = max(0, next(reversed(BoundParser._opt_err.split("\n"))).count("\t") - 1)
             # BoundParser._opt_err = BoundParser._opt_err[:BoundParser._opt_err.rfind("\t" * current_index + "-")]
-            print(len(BoundParser._opt_err.split("\n")))
 
         except ParseSyntaxError as parse_once_error:
             self._err += "\n" + str(parse_once_error)
-            self._err += ("¦" + FAILED_OPTIONAL_PARSE_MESSAGE + BoundParser._opt_err) if BoundParser._opt_err else ""
+            self._err += ("¦" + FAILED_ALTERNATIVE_PARSE_MESSAGE + BoundParser._opt_err) if BoundParser._opt_err else ""
             raise ParseSyntaxError(self._err)
 
         # Remove None from a list of results (where a parse_optional has added a None to the list).
@@ -189,14 +188,16 @@ class MultiBoundParser(BoundParser):
                 errors.append(str(e))
 
         new_indent = errors[0].split("\n")[-1].count("\t") + 1
-        errors = [error.replace("\n", "\n" + "\t" * new_indent) for error in errors]
+        old_tabs = "\t" * (new_indent - 1)
+        new_tabs = "\t" * new_indent
+        errors = [error.replace("\n", "\n" + new_tabs) for error in errors]
 
         # Guess the correct branch being used (most successful parses)
         # errors.sort(key=lambda error: error.count("\n"))
         # correct_branch = errors[0] #.split("\n")[0]
 
         # print(len(errors))
-        raise ParseSyntaxError(FAILED_TO_PARSE_ONE_OF_MESSAGE + FAILED_OR.join(errors).replace("¦", "£") + "\n")
+        raise ParseSyntaxError(FAILED_TO_PARSE_ONE_OF_MESSAGE + FAILED_OR.join(errors).replace(old_tabs + "¦", old_tabs + "£") + "\n")
 
     def parse_one_or_more(self):
         results = [self.parse_once()]
@@ -227,8 +228,12 @@ class Parser:
         self._dedents_expected = 0
 
     def parse(self) -> ProgramAst:
-        program = self._parse_root().parse_once()
-        return program
+        try:
+            program = self._parse_root().parse_once()
+            return program
+        except ParseSyntaxError as e:
+            message = str(e).replace("¦", "").replace("£", "")
+            raise ParseSyntaxError(message)
 
     # Modules
 
