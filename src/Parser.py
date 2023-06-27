@@ -209,8 +209,11 @@ class Parser:
         self._dedents_expected = 0
 
     def parse(self) -> ProgramAst:
-        program = self._parse_program().parse_once()
-        return program
+        try:
+            program = self._parse_program().parse_once()
+            return program
+        except ParseSyntaxError as e:
+            raise ParseSyntaxError("\n".join(ERRS))
 
     def _parse_program(self) -> BoundParser:
         def inner():
@@ -271,10 +274,9 @@ class Parser:
     def _parse_import_block(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwUse).parse_once()
-            p2 = self._parse_token(TokenType.TkColon).parse_once()
-            p3 = self._parse_indent().parse_once()
+            p3 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p4 = self._parse_import_definition().parse_one_or_more()
-            p5 = self._parse_dedent().parse_once()
+            p5 = self._parse_token(TokenType.TkRightBrace).parse_once()
             return ImportBlockAst(p4)
         return BoundParser(self, inner)
 
@@ -350,36 +352,15 @@ class Parser:
             p5 = self._parse_class_identifier().parse_once()
             p6 = self._parse_type_generic_parameters().parse_optional()
             p7 = self._parse_where_block().parse_optional()
-            p8 = self._parse_class_or_empty_implementation().parse_once()
-            return ClassPrototypeAst(p1, p3, p5, p6, p6, p7, p8)
-        return BoundParser(self, inner)
-
-    def _parse_class_or_empty_implementation(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_class_or_empty_implementation_empty_prep().delay_parse()
-            p2 = self._parse_class_or_empty_implementation_non_empty_prep().delay_parse()
-            p3 = (p1 | p2).parse_once()
-            return p3
-        return BoundParser(self, inner)
-
-    def _parse_class_or_empty_implementation_empty_prep(self):
-        def inner():
-            p1 = self._parse_empty_implementation().parse_once()
-            return p1
-        return BoundParser(self, inner)
-
-    def _parse_class_or_empty_implementation_non_empty_prep(self):
-        def inner():
-            p1 = self._parse_token(TokenType.TkColon).parse_once()
-            p2 = self._parse_indent().parse_once()
-            p3 = self._parse_class_implementation().parse_once()
-            p4 = self._parse_dedent().parse_once()
-            return p3
+            p8 = self._parse_token(TokenType.TkLeftBrace).parse_once()
+            p9 = self._parse_class_implementation().parse_once()
+            p10 = self._parse_token(TokenType.TkRightBrace).parse_once()
+            return ClassPrototypeAst(p1, p3, p5, p6, p6, p7, p9)
         return BoundParser(self, inner)
 
     def _parse_class_implementation(self) -> BoundParser:
         def inner():
-            p1 = self._parse_class_member().parse_one_or_more()
+            p1 = self._parse_class_member().parse_zero_or_more()
             return ClassImplementationAst(p1)
         return BoundParser(self, inner)
 
@@ -447,8 +428,10 @@ class Parser:
             p5 = self._parse_type_generic_parameters().parse_optional() or []
             p6 = self._parse_sup_identifier().parse_once()
             p7 = self._parse_where_block().parse_optional()
-            p8 = self._parse_sup_or_empty_implementation().parse_once()
-            return SupPrototypeNormalAst(p5, p6, p7, p8)
+            p8 = self._parse_token(TokenType.TkLeftBrace).parse_once()
+            p9 = self._parse_sup_implementation().parse_once()
+            p10 = self._parse_token(TokenType.TkRightBrace).parse_once()
+            return SupPrototypeNormalAst(p5, p6, p7, p9)
         return BoundParser(self, inner)
 
     def _parse_sup_prototype_with_inherit(self):
@@ -458,31 +441,10 @@ class Parser:
             p7 = self._parse_token(TokenType.KwFor).parse_once()
             p8 = self._parse_sup_identifier().parse_once()
             p9 = self._parse_where_block().parse_optional()
-            p10 = self._parse_sup_or_empty_implementation().parse_once()
-            return SupPrototypeInheritanceAst(p5, p8, p9, p10, p6)
-        return BoundParser(self, inner)
-
-    def _parse_sup_or_empty_implementation(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_sup_or_empty_implementation_empty_prep().delay_parse()
-            p2 = self._parse_sup_or_empty_implementation_non_empty_prep().delay_parse()
-            p3 = (p1 | p2).parse_once()
-            return p3
-        return BoundParser(self, inner)
-
-    def _parse_sup_or_empty_implementation_empty_prep(self):
-        def inner():
-            p1 = self._parse_empty_implementation().parse_once()
-            return p1
-        return BoundParser(self, inner)
-
-    def _parse_sup_or_empty_implementation_non_empty_prep(self):
-        def inner():
-            p1 = self._parse_token(TokenType.TkColon).parse_once()
-            p2 = self._parse_indent().parse_once()
-            p3 = self._parse_sup_implementation().parse_once()
-            p4 = self._parse_dedent().parse_once()
-            return p3
+            p10 = self._parse_token(TokenType.TkLeftBrace).parse_once()
+            p11 = self._parse_sup_implementation().parse_once()
+            p12 = self._parse_token(TokenType.TkRightBrace).parse_once()
+            return SupPrototypeInheritanceAst(p5, p8, p9, p11, p6)
         return BoundParser(self, inner)
 
     def _parse_sup_implementation(self) -> BoundParser:
@@ -525,31 +487,10 @@ class Parser:
             p1 = self._parse_access_modifier().parse_optional()
             p2 = self._parse_token(TokenType.KwEnum).parse_once()
             p3 = self._parse_enum_identifier().parse_once()
-            p4 = self._parse_enum_or_empty_implementation().parse_once()
-            return EnumPrototypeAst(p1, p3, p4)
-        return BoundParser(self, inner)
-
-    def _parse_enum_or_empty_implementation(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_enum_or_empty_implementation_empty_prep().delay_parse()
-            p2 = self._parse_enum_or_empty_implementation_non_empty_prep().delay_parse()
-            p3 = (p1 | p2).parse_once()
-            return p3
-        return BoundParser(self, inner)
-
-    def _parse_enum_or_empty_implementation_empty_prep(self):
-        def inner():
-            p1 = self._parse_empty_implementation().parse_once()
-            return p1
-        return BoundParser(self, inner)
-
-    def _parse_enum_or_empty_implementation_non_empty_prep(self):
-        def inner():
-            p1 = self._parse_token(TokenType.TkColon).parse_once()
-            p2 = self._parse_indent().parse_once()
-            p3 = self._parse_enum_implementation().parse_once()
-            p4 = self._parse_dedent().parse_once()
-            return p3
+            p4 = self._parse_token(TokenType.TkLeftBrace).parse_once()
+            p5 = self._parse_enum_implementation().parse_once()
+            p6 = self._parse_token(TokenType.TkRightBrace).parse_once()
+            return EnumPrototypeAst(p1, p3, p5)
         return BoundParser(self, inner)
 
     def _parse_enum_implementation(self) -> BoundParser:
@@ -614,36 +555,15 @@ class Parser:
             p9 = self._parse_type_identifiers().parse_once()
             p10 = self._parse_where_block().parse_optional()
             p11 = self._parse_value_guard().parse_optional()
-            p12 = self._parse_function_or_empty_implementation().parse_once()
-            return FunctionPrototypeAst(p1, p2, p3, p5, p6, p7, p9, p10, p11, p12)
-        return BoundParser(self, inner)
-
-    def _parse_function_or_empty_implementation(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_function_or_empty_implementation_empty_prep().delay_parse()
-            p2 = self._parse_function_or_empty_implementation_non_empty_prep().delay_parse()
-            p3 = (p1 | p2).parse_once()
-            return p3
-        return BoundParser(self, inner)
-
-    def _parse_function_or_empty_implementation_empty_prep(self):
-        def inner():
-            p4 = self._parse_empty_implementation().parse_once()
-            return p4
-        return BoundParser(self, inner)
-
-    def _parse_function_or_empty_implementation_non_empty_prep(self):
-        def inner():
-            p4 = self._parse_token(TokenType.TkColon).parse_once()
-            p5 = self._parse_indent().parse_once()
-            p6 = self._parse_function_implementation().parse_once()
-            p7 = self._parse_dedent().parse_once()
-            return p6
+            p12 = self._parse_token(TokenType.TkLeftBrace).parse_once()
+            p13 = self._parse_function_implementation().parse_once()
+            p14 = self._parse_token(TokenType.TkRightBrace).parse_once()
+            return FunctionPrototypeAst(p1, p2, p3, p5, p6, p7, p9, p10, p11, p13)
         return BoundParser(self, inner)
 
     def _parse_function_implementation(self) -> BoundParser:
         def inner():
-            p1 = self._parse_statement().parse_one_or_more()
+            p1 = self._parse_statement().parse_zero_or_more()
             return FunctionImplementationAst(p1)
         return BoundParser(self, inner)
 
@@ -1173,7 +1093,7 @@ class Parser:
 
     def _parse_lambda_implementation(self) -> BoundParser:
         def inner():
-            p1 = self._parse_expression().parse_once()
+            p1 = self._parse_statement_block().parse_once()
             return p1
         return BoundParser(self, inner)
 
@@ -1552,51 +1472,17 @@ class Parser:
 
     def _parse_statement_block(self) -> BoundParser:
         def inner():
-            p1 = self._parse_statement_block_multiple_lines().delay_parse()
-            p2 = self._parse_statement_block_single_line().delay_parse()
-            p3 = self._parse_empty_implementation().delay_parse()
-            p4 = (p1 | p2 | p3).parse_once()
-            return p4
-        return BoundParser(self, inner)
-
-    def _parse_statement_block_multiple_lines(self) -> BoundParser:
-        def inner():
-            p5 = self._parse_token(TokenType.TkColon).parse_once()
-            p6 = self._parse_indent().parse_once()
-            p7 = self._parse_statement().parse_one_or_more()
-            p8 = self._parse_dedent().parse_once()
-            return p7
-        return BoundParser(self, inner)
-
-    def _parse_statement_block_single_line(self) -> BoundParser:
-        def inner():
-            p5 = self._parse_token(TokenType.TkColon).parse_once()
-            p6 = self._parse_statement().parse_once()
-            return p6
+            p1 = self._parse_token(TokenType.TkLeftBrace).parse_once()
+            p2 = self._parse_statement().parse_zero_or_more()
+            p3 = self._parse_token(TokenType.TkRightBrace).parse_once()
+            return p2
         return BoundParser(self, inner)
 
     def _parse_statement_block_for_looping(self) -> BoundParser:
         def inner():
-            p1 = self._parse_statement_block_multiple_lines_for_looping().delay_parse()
-            p2 = self._parse_statement_block_single_line_for_looping().delay_parse()
-            p3 = self._parse_empty_implementation().delay_parse()
-            p4 = (p1 | p2 | p3).parse_once()
-            return p4
-        return BoundParser(self, inner)
-
-    def _parse_statement_block_multiple_lines_for_looping(self):
-        def inner():
-            p1 = self._parse_token(TokenType.TkColon).parse_once()
-            p2 = self._parse_indent().parse_once()
-            p3 = self._parse_statement_for_looping().parse_one_or_more()
-            p4 = self._parse_dedent().parse_once()
-            return p3
-        return BoundParser(self, inner)
-
-    def _parse_statement_block_single_line_for_looping(self):
-        def inner():
-            p1 = self._parse_token(TokenType.TkColon).parse_once()
-            p2 = self._parse_statement_for_looping().parse_once()
+            p1 = self._parse_token(TokenType.TkLeftBrace).parse_once()
+            p2 = self._parse_statement_for_looping().parse_zero_or_more()
+            p3 = self._parse_token(TokenType.TkRightBrace).parse_once()
             return p2
         return BoundParser(self, inner)
 
@@ -1604,28 +1490,25 @@ class Parser:
         def inner():
             p1 = self._parse_statement_cases_force_default()
             p2 = self._parse_statement_cases_force_exhaustion()
-            p3 = self._parse_empty_implementation()
-            p4 = (p1 | p2 | p3).parse_once()
+            p4 = (p1 | p2).parse_once()
             return p4
         return BoundParser(self, inner)
 
     def _parse_statement_cases_force_default(self) -> BoundParser:
         def inner():
-            p5 = self._parse_token(TokenType.TkColon).parse_once()
-            p6 = self._parse_indent().parse_once()
+            p5 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p7 = self._parse_statement_case().parse_zero_or_more()
             p8 = self._parse_statement_case_default().parse_one_or_more()
-            p9 = self._parse_dedent().parse_once()
+            p5 = self._parse_token(TokenType.TkRightBrace).parse_once()
             return [p7, *p8]
         return BoundParser(self, inner)
 
     def _parse_statement_cases_force_exhaustion(self) -> BoundParser:
         def inner():
-            p5 = self._parse_token(TokenType.TkColon).parse_once()
-            p6 = self._parse_indent().parse_once()
+            p5 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p7 = self._parse_statement_case().parse_one_or_more()
             p8 = self._parse_statement_case_default().parse_zero_or_more()
-            p9 = self._parse_dedent().parse_once()
+            p5 = self._parse_token(TokenType.TkRightBrace).parse_once()
             return [p7, *p8]
         return BoundParser(self, inner)
 
@@ -2174,7 +2057,7 @@ class Parser:
             return NumberExponentAst(p2, p3)
         return BoundParser(self, inner)
 
-    """[MISC]"""
+    # Misc
 
     def _parse_token(self, token: TokenType) -> BoundParser:
         def inner():
@@ -2236,41 +2119,6 @@ class Parser:
             return p1.primary.token_metadata
         return BoundParser(self, inner)
 
-
-    def _skip(self, token: TokenType):
-        while self._current < len(self._tokens) and self._tokens[self._current].token_type == token:
-            self._current += 1
-
-    def _parse_indent(self) -> BoundParser:
-        def increment_dedents_expected(x): # todo
-            self._dedents_expected += x is None
-
-        def inner():
-            self._indent += 4
-            p1 = self._parse_indented_whitespace().parse_once()
-            if self._tokens[self._current].token_type == TokenType.TkWhitespace:
-                raise ParseSyntaxError("Unexpected whitespace")
-
-        return BoundParser(self, inner)
-
-    def _parse_indented_whitespace(self) -> BoundParser:
-        def inner():
-            for i in range(self._indent):
-                self._parse_token(TokenType.TkWhitespace).parse_once()
-        return BoundParser(self, inner)
-
-    def _parse_dedent(self) -> BoundParser:
-        def inner():
-            self._indent -= 4
-            self._dedents_expected = max(self._dedents_expected - 1, 0)
-        return BoundParser(self, inner)
-
-    def _parse_empty_implementation(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return p1
-        return BoundParser(self, inner)
-
     def _parse_character(self, character: str) -> BoundParser:
         def inner():
             p1 = self._parse_identifier().parse_once()
@@ -2278,3 +2126,7 @@ class Parser:
                 raise ParseSyntaxError(f"Expected {character}, got {p1.value}")
             return p1
         return BoundParser(self, inner)
+
+    def _skip(self, token: TokenType):
+        while self._current < len(self._tokens) and self._tokens[self._current].token_type == token:
+            self._current += 1
