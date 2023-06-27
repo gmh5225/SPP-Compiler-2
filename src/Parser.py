@@ -1586,8 +1586,8 @@ class Parser:
             p9 = self._parse_statement_yield().delay_parse()
             p10 = self._parse_statement_let().delay_parse()
             p11 = self._parse_statement_expression().delay_parse()
-            # p12 = self._parse_function_prototype().delay_parse()
-            p13 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11).parse_once()
+            p12 = self._parse_function_prototype().delay_parse()
+            p13 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12).parse_once()
             return p13
         return BoundParser(self, inner)
 
