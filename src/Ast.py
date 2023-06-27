@@ -365,8 +365,8 @@ class SupImplementationAst:
 
 @dataclass
 class SupPrototypeNormalAst:
-    identifier: IdentifierAst
     generic_parameters: list[TypeGenericParameterAst]
+    identifier: IdentifierAst
     where_block: Optional[WhereBlockAst]
     body: SupImplementationAst
 

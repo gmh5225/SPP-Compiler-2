@@ -444,15 +444,15 @@ class Parser:
     def _parse_sup_prototype(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwSup).parse_once()
-            p2 = self._parse_sup_prototype_normal().delay_parse()
-            p3 = self._parse_sup_prototype_with_inherit().delay_parse()
+            p2 = self._parse_sup_prototype_with_inherit().delay_parse()
+            p3 = self._parse_sup_prototype_normal().delay_parse()
             p4 = (p2 | p3).parse_once()
             return p4
         return BoundParser(self, inner)
 
     def _parse_sup_prototype_normal(self):
         def inner():
-            p5 = self._parse_type_generic_parameters().parse_optional()
+            p5 = self._parse_type_generic_parameters().parse_optional() or []
             p6 = self._parse_sup_identifier().parse_once()
             p7 = self._parse_where_block().parse_optional()
             p8 = self._parse_sup_or_empty_implementation().parse_once()
@@ -523,7 +523,7 @@ class Parser:
     def _parse_sup_method_prototype(self) -> BoundParser:
         def inner():
             p1 = self._parse_function_prototype().parse_once()
-            return SupMethodPrototypeAst(p1) # todo
+            return SupMethodPrototypeAst(p1.decorators, p1.modifier, p1.is_async, p1.identifier, p1.generic_parameters, p1.parameters, p1.return_type, p1.where_block, p1.value_guard, p1.body)
         return BoundParser(self, inner)
 
     """ENUMS"""
@@ -1411,7 +1411,7 @@ class Parser:
             p1 = self._parse_token(TokenType.KwWhile).parse_once()
             p2 = self._parse_expression().parse_once()
             p3 = self._parse_statement_loop_tag().parse_optional()
-            p4 = self._parse_statement_block().parse_once()
+            p4 = self._parse_statement_block_for_looping().parse_once()
             return WhileStatementAst(p2, p3, p4)
         return BoundParser(self, inner)
 
@@ -1422,14 +1422,14 @@ class Parser:
             p3 = self._parse_token(TokenType.KwIn).parse_once()
             p4 = self._parse_expression().parse_once()
             p5 = self._parse_statement_loop_tag().parse_optional()
-            p6 = self._parse_statement_block().parse_once()
+            p6 = self._parse_statement_block_for_looping().parse_once()
             return ForStatementAst(p2, p4, p5, p6)
         return BoundParser(self, inner)
 
     def _parse_statement_do(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwDo).parse_once()
-            p2 = self._parse_statement_block().parse_once()
+            p2 = self._parse_statement_block_for_looping().parse_once()
             p3 = self._parse_token(TokenType.KwWhile).parse_once()
             p4 = self._parse_expression().parse_once()
             p5 = self._parse_statement_loop_tag().parse_optional()
@@ -1578,6 +1578,31 @@ class Parser:
             return p6
         return BoundParser(self, inner)
 
+    def _parse_statement_block_for_looping(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_statement_block_multiple_lines_for_looping().delay_parse()
+            p2 = self._parse_statement_block_single_line_for_looping().delay_parse()
+            p3 = self._parse_empty_implementation().delay_parse()
+            p4 = (p1 | p2 | p3).parse_once()
+            return p4
+        return BoundParser(self, inner)
+
+    def _parse_statement_block_multiple_lines_for_looping(self):
+        def inner():
+            p1 = self._parse_token(TokenType.TkColon).parse_once()
+            p2 = self._parse_indent().parse_once()
+            p3 = self._parse_statement_for_looping().parse_one_or_more()
+            p4 = self._parse_dedent().parse_once()
+            return p3
+        return BoundParser(self, inner)
+
+    def _parse_statement_block_single_line_for_looping(self):
+        def inner():
+            p1 = self._parse_token(TokenType.TkColon).parse_once()
+            p2 = self._parse_statement_for_looping().parse_once()
+            return p2
+        return BoundParser(self, inner)
+
     def _parse_statement_cases(self) -> BoundParser:
         def inner():
             p1 = self._parse_statement_cases_force_default()
@@ -1659,6 +1684,13 @@ class Parser:
             return p1
         return BoundParser(self, inner)
 
+    def _parse_statement_let_for_statement(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_statement_let().parse_once()
+            p2 = self._parse_token(TokenType.TkSemicolon).parse_once()
+            return p1
+        return BoundParser(self, inner)
+
     def _parse_statement(self) -> BoundParser:
         def inner():
             p1 = self._parse_statement_if().delay_parse()
@@ -1670,13 +1702,20 @@ class Parser:
             p7 = self._parse_statement_typedef().delay_parse()
             p8 = self._parse_statement_return().delay_parse()
             p9 = self._parse_statement_yield().delay_parse()
-            p10 = self._parse_statement_break().delay_parse()
-            p11 = self._parse_statement_continue().delay_parse()
-            p12 = self._parse_statement_let().delay_parse()
-            p13 = self._parse_statement_expression().delay_parse()
-            # p14 = self._parse_function_prototype().delay_parse()
-            p15 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12 | p13).parse_once()
-            return p15
+            p10 = self._parse_statement_let_for_statement().delay_parse()
+            p11 = self._parse_statement_expression().delay_parse()
+            # p12 = self._parse_function_prototype().delay_parse()
+            p13 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11).parse_once()
+            return p13
+        return BoundParser(self, inner)
+
+    def _parse_statement_for_looping(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_statement().delay_parse()
+            p2 = self._parse_statement_break().delay_parse()
+            p3 = self._parse_statement_continue().delay_parse()
+            p4 = (p1 | p2 | p3).parse_once()
+            return p4
         return BoundParser(self, inner)
 
     # Identifiers
