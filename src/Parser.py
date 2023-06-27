@@ -2172,7 +2172,8 @@ class Parser:
 
                 global CUR_ERR_IND
                 if CUR_ERR_IND == self._current:
-                    EXPECTED_TOKENS.append(str("'" + exp_token + "'"))
+                    if "'" + exp_token + "'" not in EXPECTED_TOKENS:
+                        EXPECTED_TOKENS.append(str("'" + exp_token + "'"))
                     if ERRS:
                         ERRS[-1] = str(error).replace("¬", ", ".join(EXPECTED_TOKENS))
                     else:
