@@ -461,13 +461,13 @@ class Parser:
 
     def _parse_sup_prototype_with_inherit(self):
         def inner():
-            p5 = self._parse_type_generic_parameters().parse_optional()
+            p5 = self._parse_type_generic_parameters().parse_optional() or []
             p6 = self._parse_sup_identifier().parse_once()
             p7 = self._parse_token(TokenType.KwFor).parse_once()
             p8 = self._parse_sup_identifier().parse_once()
             p9 = self._parse_where_block().parse_optional()
             p10 = self._parse_sup_or_empty_implementation().parse_once()
-            return SupPrototypeInheritanceAst(p5, p6, p8, p9, p10)
+            return SupPrototypeInheritanceAst(p5, p8, p9, p10, p6)
         return BoundParser(self, inner)
 
     def _parse_sup_or_empty_implementation(self) -> BoundParser:
@@ -611,12 +611,12 @@ class Parser:
 
     def _parse_function_prototype(self) -> BoundParser:
         def inner():
-            p1 = self._parse_decorators().parse_optional()
+            p1 = self._parse_decorators().parse_optional() or []
             p2 = self._parse_access_modifier().parse_optional()
-            p3 = self._parse_token(TokenType.KwAsync).parse_optional()
+            p3 = self._parse_token(TokenType.KwAsync).parse_optional() is not None
             p4 = self._parse_token(TokenType.KwFun).parse_once()
             p5 = self._parse_function_identifier().parse_once()
-            p6 = self._parse_type_generic_parameters().parse_optional()
+            p6 = self._parse_type_generic_parameters().parse_optional() or []
             p7 = self._parse_function_parameters().parse_once()
             p8 = self._parse_token(TokenType.TkRightArrow).parse_once()
             p9 = self._parse_type_identifiers().parse_once()
@@ -1729,7 +1729,7 @@ class Parser:
     def _parse_generic_identifier(self) -> BoundParser:
         def inner():
             p1 = self._parse_lexeme(TokenType.LxIdentifier).parse_once()
-            p2 = self._parse_type_generic_arguments().parse_optional()
+            p2 = self._parse_type_generic_arguments().parse_optional() or []
             return GenericIdentifierAst(p1, p2)
         return BoundParser(self, inner)
 
