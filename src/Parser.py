@@ -143,7 +143,7 @@ class BoundParser:
 
             # If an error is caught, then the next parse has failed, so restore the index, and don't append anything to
             # the result list. Set the ast to the list of results (usually a list of other asts), and return this list.
-            except (ParseSyntaxError, ParseSyntaxMultiError) as e:
+            except (ParseSyntaxError, ParseSyntaxMultiError):
                 self._parser._current = restore_index
                 self._ast = results
                 return self._ast
@@ -194,11 +194,10 @@ class MultiBoundParser(BoundParser):
             try:
                 result = bound_parser.parse_once()
                 return result
-            except ParseSyntaxError as e:
+            except ParseSyntaxError:
                 self._parser._current = restore_index
-                errors.append(str(e))
 
-        raise ParseSyntaxMultiError("".join(errors))
+        raise ParseSyntaxError("Error parsing from selection")
 
 
 class Parser:
@@ -338,7 +337,7 @@ class Parser:
             return p4
         return BoundParser(self, inner)
 
-    """CLASSES"""
+    # Classes
 
     def _parse_access_modifier(self) -> BoundParser:
         def inner():
@@ -486,7 +485,7 @@ class Parser:
             return SupMethodPrototypeAst(p1.decorators, p1.modifier, p1.is_async, p1.identifier, p1.generic_parameters, p1.parameters, p1.return_type, p1.where_block, p1.value_guard, p1.body)
         return BoundParser(self, inner)
 
-    """ENUMS"""
+    # Enums
 
     def _parse_enum_prototype(self) -> BoundParser:
         def inner():
@@ -841,7 +840,7 @@ class Parser:
         def inner():
             p1 = self._parse_assignment_single().delay_parse()
             p2 = self._parse_assignment_multiple().delay_parse()
-            p3 = (p1 | p2).parse_once()
+            p3 = (p2 | p1).parse_once()
             return p3
         return BoundParser(self, inner)
 
@@ -987,9 +986,9 @@ class Parser:
 
     def _parse_primary_expression(self) -> BoundParser:
         def inner():
+            p3 = self._parse_static_scoped_generic_identifier().delay_parse()
             p1 = self._parse_rvalue().delay_parse()
             p2 = self._parse_lambda().delay_parse()
-            p3 = self._parse_static_scoped_generic_identifier().delay_parse()
             p4 = self._parse_parenthesized_expression().delay_parse()
             p5 = self._parse_expression_placeholder().delay_parse()
             p6 = self._parse_statement_if().delay_parse()
@@ -1101,7 +1100,7 @@ class Parser:
 
     def _parse_lambda_implementation(self) -> BoundParser:
         def inner():
-            p1 = self._parse_statement_block().parse_once()
+            p1 = self._parse_expression().parse_once()
             return p1
         return BoundParser(self, inner)
 
@@ -2073,16 +2072,6 @@ class Parser:
             if self._dedents_expected > 0:
                 raise ParseSyntaxError("Expected a dedent")
 
-            if self._current < len(self._tokens) and \
-                    self._tokens[self._current].token_type == TokenType.TkSemicolon \
-                    and self._tokens[self._current + 1].token_type == TokenType.TkNewLine \
-                    and token == TokenType.TkSemicolon:
-                self._current += 2
-                for _ in range(self._indent):
-                    self._parse_token(TokenType.TkWhitespace)
-                return TokenAst(Token(";", TokenType.TkSemicolon), None)
-
-
             if token != TokenType.TkNewLine: self._skip(TokenType.TkNewLine)
             if token != TokenType.TkWhitespace: self._skip(TokenType.TkWhitespace)
 
@@ -2115,7 +2104,7 @@ class Parser:
                     raise ParseSyntaxError("\n".join(ERRS))
 
             EXPECTED_TOKENS.clear()
-            ERRS.clear()
+            # ERRS.clear()
             self._current += 1
 
             return TokenAst(self._tokens[self._current - 1], None)
@@ -2131,7 +2120,7 @@ class Parser:
         def inner():
             p1 = self._parse_identifier().parse_once()
             if p1.identifier != character:
-                raise ParseSyntaxError(f"Expected {character}, got {p1.value}")
+                raise ParseSyntaxError(f"Expected {character}, got {p1.identifier}")
             return p1
         return BoundParser(self, inner)
 
