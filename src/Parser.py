@@ -1875,8 +1875,8 @@ class Parser:
             p8 = self._parse_literal_pair().delay_parse()
             p9 = self._parse_literal_tuple().delay_parse()
             p10 = self._parse_literal_regex().delay_parse()
-            p11 = self._parse_literal_range().delay_parse()
-            p12 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11).parse_once()
+            # p11 = self._parse_literal_range().delay_parse()
+            p12 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10).parse_once()
             return p12
         return BoundParser(self, inner)
 
@@ -2049,14 +2049,14 @@ class Parser:
 
     def _parse_numeric_integer(self) -> BoundParser:
         def inner():
-            p1 = self._parse_lexeme(TokenType.LxDecDigits)
+            p1 = self._parse_lexeme(TokenType.LxDecDigits).parse_once()
             return p1
         return BoundParser(self, inner)
 
     def _parse_numeric_decimal(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkDot).parse_once()
-            p2 = self._parse_lexeme(TokenType.LxDecDigits)
+            p2 = self._parse_lexeme(TokenType.LxDecDigits).parse_once()
             return p2
         return BoundParser(self, inner)
 
