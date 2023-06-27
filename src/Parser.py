@@ -209,16 +209,8 @@ class Parser:
         self._dedents_expected = 0
 
     def parse(self) -> ProgramAst:
-        program = self._parse_root().parse_once()
+        program = self._parse_program().parse_once()
         return program
-
-    # Modules
-
-    def _parse_root(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_program().parse_once()
-            return p1
-        return BoundParser(self, inner)
 
     def _parse_program(self) -> BoundParser:
         def inner():
