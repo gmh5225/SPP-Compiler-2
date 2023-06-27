@@ -1287,7 +1287,7 @@ class Parser:
 
     # Statements
 
-    def _parse_statement_inline_definitions(self) -> BoundParser:
+    def _parse_statement_inline_definition(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwLet).parse_once()
             p2 = self._parse_local_variable_identifier().parse_once()
@@ -1308,7 +1308,7 @@ class Parser:
     def _parse_statement_if_branch(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwIf).parse_once()
-            p2 = self._parse_statement_inline_definitions().parse_zero_or_more()
+            p2 = self._parse_statement_inline_definition().parse_zero_or_more()
             p3 = self._parse_expression().parse_once()
             p4 = self._parse_statement_block().parse_once()
             return IfStatementBranchAst(p2, p3, p4)
@@ -1317,7 +1317,7 @@ class Parser:
     def _parse_statement_elif_branch(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwElif).parse_once()
-            p2 = self._parse_statement_inline_definitions().parse_zero_or_more()
+            p2 = self._parse_statement_inline_definition().parse_zero_or_more()
             p3 = self._parse_expression().parse_once()
             p4 = self._parse_statement_block().parse_once()
             return ElifStatementBranchAst(p2, p3, p4)
@@ -1573,6 +1573,14 @@ class Parser:
             return p1
         return BoundParser(self, inner)
 
+    def _parse_statement_new_scope(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_token(TokenType.TkLeftBrace).parse_once()
+            p2 = self._parse_statement().parse_zero_or_more()
+            p3 = self._parse_token(TokenType.TkRightBrace).parse_once()
+            return InnerScopeAst(p2)
+        return BoundParser(self, inner)
+
     def _parse_statement(self) -> BoundParser:
         def inner():
             p1 = self._parse_statement_if().delay_parse()
@@ -1587,7 +1595,8 @@ class Parser:
             p10 = self._parse_statement_let().delay_parse()
             p11 = self._parse_statement_expression().delay_parse()
             p12 = self._parse_function_prototype().delay_parse()
-            p13 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12).parse_once()
+            p13 = self._parse_statement_new_scope().delay_parse()
+            p13 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12 | p13).parse_once()
             return p13
         return BoundParser(self, inner)
 

@@ -355,10 +355,13 @@ class LetStatementAst:
     type_annotation: Optional[TypeAst]
 
 @dataclass
+class InnerScopeAst:
+    statements: list[StatementAst]
+
+@dataclass
 class LocalVariableAst:
     is_mutable: bool
     identifier: IdentifierAst
-
 
 @dataclass
 class SupImplementationAst:
