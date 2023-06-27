@@ -196,7 +196,7 @@ class MultiBoundParser(BoundParser):
         # correct_branch = errors[0] #.split("\n")[0]
 
         # print(len(errors))
-        raise ParseSyntaxError(FAILED_TO_PARSE_ONE_OF_MESSAGE + FAILED_OR.join(errors) + "\n")
+        raise ParseSyntaxError(FAILED_TO_PARSE_ONE_OF_MESSAGE + FAILED_OR.join(errors).replace("¦", "£") + "\n")
 
     def parse_one_or_more(self):
         results = [self.parse_once()]
