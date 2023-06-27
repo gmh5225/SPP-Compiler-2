@@ -342,6 +342,7 @@ class TypedefStatementAst:
 @dataclass
 class BreakStatementAst:
     loop_tag: Optional[TagIdentifierAst]
+    returning_expressions: list[ExpressionAst]
 
 @dataclass
 class ContinueStatementAst:

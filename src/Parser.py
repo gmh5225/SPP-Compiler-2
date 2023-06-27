@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import itertools
 from typing import Callable, Any
 from src.Ast import *
 from src.Tokens import TokenType, Token
@@ -66,10 +67,14 @@ class ErrorFormatter:
         for token in tokens[:error_position - start_token_index - 1]:
             spaces += len(token.token_metadata)
 
+        # Format the line number into the error message string
+        line_number = str([t.token_type for t in tokens[:end_token_index]].count(TokenType.TkNewLine)) + " | "
+        current_line_string = line_number + current_line_string.lstrip("\n")
+
         # The number of "^" characters is the length of the current tokens metadata (ie the symbol or length of keyword
         # / lexeme). Append the repeated "^" characters to the spaces, and then add the error message to the string.
         error_length = max(1, len(self._tokens[error_position].token_metadata))
-        error_line_string = "".join([" " * spaces, "^" * error_length]) + " <- "
+        error_line_string = " " * (len(line_number) - 2) + "| " + "".join([" " * spaces, "^" * error_length]) + " <- "
         final_string = "\n".join(["", current_line_string, error_line_string])
         return final_string
 
@@ -214,6 +219,7 @@ class Parser:
             return program
         except ParseSyntaxError as e:
             raise ParseSyntaxError("\n".join(ERRS))
+
 
     def _parse_program(self) -> BoundParser:
         def inner():
@@ -988,7 +994,9 @@ class Parser:
             p5 = self._parse_expression_placeholder().delay_parse()
             p6 = self._parse_statement_if().delay_parse()
             p7 = self._parse_statement_match().delay_parse()
-            p8 = (p6 | p7 | p1 | p2 | p3 | p4 | p5).parse_once()
+            p8 = self._parse_statement_while().delay_parse()
+            p9 = self._parse_statement_for().delay_parse()
+            p8 = (p6 | p7 | p8 | p9 | p1 | p2 | p3 | p4 | p5).parse_once()
             return p8
         return BoundParser(self, inner)
 
@@ -1444,15 +1452,16 @@ class Parser:
     def _parse_statement_break(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwBreak).parse_once()
-            p2 = self._parse_statement_loop_tag().parse_optional()
-            p3 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return BreakStatementAst(p2)
+            p2 = self._parse_tag_identifier().parse_optional()
+            p3 = self._parse_expressions().parse_optional() or []
+            p4 = self._parse_token(TokenType.TkSemicolon).parse_once()
+            return BreakStatementAst(p2, p3)
         return BoundParser(self, inner)
 
     def _parse_statement_continue(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwContinue).parse_once()
-            p2 = self._parse_statement_loop_tag().parse_optional()
+            p2 = self._parse_tag_identifier().parse_optional()
             p3 = self._parse_token(TokenType.TkSemicolon).parse_once()
             return ContinueStatementAst(p2)
         return BoundParser(self, inner)
@@ -1588,7 +1597,7 @@ class Parser:
             p1 = self._parse_statement().delay_parse()
             p2 = self._parse_statement_break().delay_parse()
             p3 = self._parse_statement_continue().delay_parse()
-            p4 = (p1 | p2 | p3).parse_once()
+            p4 = (p2 | p3 | p1).parse_once()
             return p4
         return BoundParser(self, inner)
 
@@ -2061,7 +2070,6 @@ class Parser:
 
     def _parse_token(self, token: TokenType) -> BoundParser:
         def inner():
-            # print(f"parse_token: {token}")
             if self._dedents_expected > 0:
                 raise ParseSyntaxError("Expected a dedent")
 
