@@ -61,13 +61,17 @@ def ImportTypesIndividualAst(individual_types: list[ImportTypeAst]):
     return ImportTypesAst(individual_types, False)
 
 @dataclass
-class ImportDefinitionsAst:
-    module: ModuleIdentifierAst
+class ImportStatementAst:
+    module: ImportIdentifierAst
     what_to_import: ImportTypesAst
 
 @dataclass
+class ImportIdentifierAst:
+    parts: list[IdentifierAst]
+
+@dataclass
 class ImportBlockAst:
-    imports: list[ImportDefinitionsAst]
+    imports: list[ImportStatementAst]
 
 @dataclass
 class ModuleImplementationAst:

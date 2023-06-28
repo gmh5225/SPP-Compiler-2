@@ -282,62 +282,87 @@ class Parser:
 
     def _parse_import_block(self) -> BoundParser:
         def inner():
+            p1 = self._parse_import_statement().parse_zero_or_more()
+            return ImportBlockAst(p1)
+        return BoundParser(self, inner)
+
+    def _parse_import_statement(self) -> BoundParser:
+        def inner():
             p1 = self._parse_token(TokenType.KwUse).parse_once()
-            p3 = self._parse_token(TokenType.TkLeftBrace).parse_once()
-            p4 = self._parse_import_definition().parse_zero_or_more()
-            p5 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return ImportBlockAst(p4)
+            p2 = self._parse_import_identifier().parse_once()
+            p3 = self._parse_import_what().parse_once()
+            p4 = self._parse_token(TokenType.TkSemicolon).parse_once()
+            return ImportStatementAst(p2, p3)
         return BoundParser(self, inner)
 
-    def _parse_import_definition(self) -> BoundParser:
+    def _parse_import_identifier(self) -> BoundParser:
         def inner():
-            p2 = self._parse_module_identifier().parse_once()
-            p3 = self._parse_token(TokenType.TkRightFatArrow).parse_once()
-            p4 = self._parse_import_identifiers().parse_once()
-            p5 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return ImportDefinitionsAst(p2, p4)
+            p1 = self._parse_import_identifier_part().parse_one_or_more()
+            return ImportIdentifierAst(p1)
         return BoundParser(self, inner)
 
-    def _parse_import_identifiers(self) -> BoundParser:
+    def _parse_import_identifier_part(self) -> BoundParser:
         def inner():
-            p1 = self._parse_import_all_types().delay_parse()
-            p2 = self._parse_import_individual_types().delay_parse()
-            p3 = (p1 | p2).parse_once()
-            return p3
+            p1 = self._parse_identifier().parse_once()
+            p2 = self._parse_token(TokenType.TkDoubleColon).parse_once()
+            return p1
         return BoundParser(self, inner)
 
-    def _parse_import_all_types(self) -> BoundParser:
+    def _parse_import_what(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_import_all().delay_parse()
+            p2 = self._parse_import_single().delay_parse()
+            p3 = self._parse_import_multiple().delay_parse()
+            p4 = (p1 | p2 | p3).parse_once()
+            return p4
+        return BoundParser(self, inner)
+
+    def _parse_import_all(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkAsterisk).parse_once()
             return ImportTypesAllAst()
         return BoundParser(self, inner)
 
-    def _parse_import_individual_types(self) -> BoundParser:
+    def _parse_import_single(self) -> BoundParser:
         def inner():
-            p1 = self._parse_import_individual_type().parse_once()
-            p2 = self._parse_import_individual_type_next().parse_zero_or_more()
-            return ImportTypesIndividualAst([p1, *p2])
+            p1 = self._parse_import_type().parse_once()
+            return ImportTypesIndividualAst([p1])
         return BoundParser(self, inner)
 
-    def _parse_import_individual_type_next(self):
+    def _parse_import_multiple(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_token(TokenType.TkLeftBrace).parse_once()
+            p2 = self._parse_import_types().parse_once()
+            p3 = self._parse_token(TokenType.TkRightBrace).parse_once()
+            return ImportTypesIndividualAst(p2)
+        return BoundParser(self, inner)
+
+    def _parse_import_types(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_import_type().parse_once()
+            p2 = self._parse_import_types_next().parse_zero_or_more()
+            return [p1, *p2]
+        return BoundParser(self, inner)
+
+    def _parse_import_types_next(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkComma).parse_once()
-            p2 = self._parse_import_individual_type().parse_once()
+            p2 = self._parse_import_type().parse_once()
             return p2
         return BoundParser(self, inner)
 
-    def _parse_import_individual_type(self) -> BoundParser:
+    def _parse_import_type(self) -> BoundParser:
         def inner():
             p1 = self._parse_identifier().parse_once()
-            p2 = self._parse_import_individual_type_alias().parse_optional()
+            p2 = self._parse_import_type_alias().parse_optional()
             return ImportTypeAst(p1, p2)
         return BoundParser(self, inner)
 
-    def _parse_import_individual_type_alias(self) -> BoundParser:
+    def _parse_import_type_alias(self):
         def inner():
-            p3 = self._parse_token(TokenType.KwAs).parse_once()
-            p4 = self._parse_identifier().parse_once()
-            return p4
+            p1 = self._parse_token(TokenType.KwAs).parse_once()
+            p2 = self._parse_identifier().parse_once()
+            return p2
         return BoundParser(self, inner)
 
     # Classes
@@ -1761,6 +1786,15 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_operator_identifier_unary(self) -> BoundParser:
+        """
+        "+" => Mathematical absolute of an expression
+        "-" => Mathematical negation of an expression
+        "~" => Bitwise complement of an expression
+        "!" => Logical negation of an expression
+        "&" => Reference of an expression
+        "..." => Variadic unpacking of an expression
+        "await" => Await an expression
+        """
         def inner():
             p1 = self._parse_token(TokenType.TkPlus).delay_parse()
             p2 = self._parse_token(TokenType.TkHyphen).delay_parse()
@@ -1774,6 +1808,10 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_unary_operator_reference(self) -> BoundParser:
+        """
+        "&" => Reference of an expression
+        "mut" => Mutable reference of an expression
+        """
         def inner():
             p1 = self._parse_token(TokenType.TkAmpersand).parse_once()
             p2 = self._parse_token(TokenType.KwMut).parse_optional() is not None
