@@ -16,6 +16,9 @@ class Lexer:
         tokens   = list(filter(lambda t: t.startswith("Tk"), TokenType.__dict__["_member_names_"])); tokens.sort(key=lambda t: len(TokenType[t].value), reverse=True)
         lexemes  = list(filter(lambda t: t.startswith("Lx"), TokenType.__dict__["_member_names_"]))
 
+        import pprint
+        pprint.pprint(tokens)
+
         while current < len(self._code):
             f = False
 

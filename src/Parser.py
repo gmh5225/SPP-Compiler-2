@@ -289,7 +289,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.TkDot).parse_zero_or_more()
             p2 = self._parse_module_identifier().parse_once()
-            p3 = self._parse_token(TokenType.TkRightArrow).parse_once()
+            p3 = self._parse_token(TokenType.TkRightFatArrow).parse_once()
             p4 = self._parse_import_identifiers().parse_once()
             p5 = self._parse_token(TokenType.TkSemicolon).parse_once()
             return ImportDefinitionsAst(p1, p2, p4)
@@ -1034,7 +1034,7 @@ class Parser:
             p1 = self._parse_token(TokenType.KwAsync).parse_optional()
             p2 = self._parse_lambda_capture_list().parse_optional()
             p3 = self._parse_lambda_parameters().parse_once()
-            p4 = self._parse_token(TokenType.TkRightArrow).parse_once()
+            p4 = self._parse_token(TokenType.TKRightFatArrow).parse_once()
             p5 = self._parse_lambda_implementation().parse_once()
             return LambdaAst(p1, p2, p3, p5)
         return BoundParser(self, inner)
@@ -1335,7 +1335,7 @@ class Parser:
             p1 = self._parse_token(TokenType.KwWhile).parse_once()
             p2 = self._parse_expression().parse_once()
             p3 = self._parse_statement_loop_tag().parse_optional()
-            p4 = self._parse_statement_block_for_looping().parse_once()
+            p4 = self._parse_statement_block().parse_once()
             return WhileStatementAst(p2, p3, p4)
         return BoundParser(self, inner)
 
@@ -1346,14 +1346,14 @@ class Parser:
             p3 = self._parse_token(TokenType.KwIn).parse_once()
             p4 = self._parse_expression().parse_once()
             p5 = self._parse_statement_loop_tag().parse_optional()
-            p6 = self._parse_statement_block_for_looping().parse_once()
+            p6 = self._parse_statement_block().parse_once()
             return ForStatementAst(p2, p4, p5, p6)
         return BoundParser(self, inner)
 
     def _parse_statement_do(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwDo).parse_once()
-            p2 = self._parse_statement_block_for_looping().parse_once()
+            p2 = self._parse_statement_block().parse_once()
             p3 = self._parse_token(TokenType.KwWhile).parse_once()
             p4 = self._parse_expression().parse_once()
             p5 = self._parse_statement_loop_tag().parse_optional()
@@ -1393,8 +1393,9 @@ class Parser:
             p1 = self._parse_token(TokenType.KwCase).parse_once()
             p2 = self._parse_statement_case_expressions().parse_once()
             p3 = self._parse_value_guard().parse_optional()
-            p4 = self._parse_statement_block().parse_once()
-            return CaseStatementAst(p2, p3, p4)
+            p4 = self._parse_token(TokenType.TkRightFatArrow).parse_once()
+            p5 = self._parse_statement_block().parse_once()
+            return CaseStatementAst(p2, p3, p5)
         return BoundParser(self, inner)
 
     def _parse_statement_case_default(self) -> BoundParser:
@@ -1402,8 +1403,9 @@ class Parser:
             p1 = self._parse_token(TokenType.KwCase).parse_once()
             p2 = self._parse_expression_placeholder().parse_once()
             p3 = self._parse_value_guard().parse_optional()
-            p4 = self._parse_statement_block().parse_once()
-            return CaseStatementAst(p2, p3, p4)
+            p4 = self._parse_token(TokenType.TkRightFatArrow).parse_once()
+            p5 = self._parse_statement_block().parse_once()
+            return CaseStatementAst(p2, p3, p5)
         return BoundParser(self, inner)
 
     def _parse_statement_with(self) -> BoundParser:
@@ -1486,37 +1488,27 @@ class Parser:
             return p2
         return BoundParser(self, inner)
 
-    def _parse_statement_block_for_looping(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.TkLeftBrace).parse_once()
-            p2 = self._parse_statement_for_looping().parse_zero_or_more()
-            p3 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return p2
-        return BoundParser(self, inner)
-
     def _parse_statement_cases(self) -> BoundParser:
         def inner():
-            p1 = self._parse_statement_cases_force_default()
-            p2 = self._parse_statement_cases_force_exhaustion()
-            p4 = (p1 | p2).parse_once()
+            p1 = self._parse_token(TokenType.TkLeftBrace).parse_once()
+            p2 = self._parse_statement_cases_force_default().delay_parse()
+            p3 = self._parse_statement_cases_force_exhaustion().delay_parse()
+            p4 = (p2 | p3).parse_once()
+            p5 = self._parse_token(TokenType.TkRightBrace).parse_once()
             return p4
         return BoundParser(self, inner)
 
     def _parse_statement_cases_force_default(self) -> BoundParser:
         def inner():
-            p5 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p7 = self._parse_statement_case().parse_zero_or_more()
             p8 = self._parse_statement_case_default().parse_one_or_more()
-            p5 = self._parse_token(TokenType.TkRightBrace).parse_once()
             return [p7, *p8]
         return BoundParser(self, inner)
 
     def _parse_statement_cases_force_exhaustion(self) -> BoundParser:
         def inner():
-            p5 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p7 = self._parse_statement_case().parse_one_or_more()
             p8 = self._parse_statement_case_default().parse_zero_or_more()
-            p5 = self._parse_token(TokenType.TkRightBrace).parse_once()
             return [p7, *p8]
         return BoundParser(self, inner)
 
@@ -1593,20 +1585,13 @@ class Parser:
             p8 = self._parse_statement_return().delay_parse()
             p9 = self._parse_statement_yield().delay_parse()
             p10 = self._parse_statement_let().delay_parse()
-            p11 = self._parse_statement_expression().delay_parse()
-            p12 = self._parse_function_prototype().delay_parse()
-            p13 = self._parse_statement_new_scope().delay_parse()
-            p13 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12 | p13).parse_once()
-            return p13
-        return BoundParser(self, inner)
-
-    def _parse_statement_for_looping(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_statement().delay_parse()
-            p2 = self._parse_statement_break().delay_parse()
-            p3 = self._parse_statement_continue().delay_parse()
-            p4 = (p2 | p3 | p1).parse_once()
-            return p4
+            p11 = self._parse_statement_break().delay_parse()
+            p12 = self._parse_statement_continue().delay_parse()
+            p13 = self._parse_statement_expression().delay_parse()
+            p14 = self._parse_function_prototype().delay_parse()
+            p15 = self._parse_statement_new_scope().delay_parse()
+            p16 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12 | p13 | p14 | p15).parse_once()
+            return p16
         return BoundParser(self, inner)
 
     # Identifiers
