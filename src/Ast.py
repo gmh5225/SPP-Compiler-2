@@ -62,7 +62,6 @@ def ImportTypesIndividualAst(individual_types: list[ImportTypeAst]):
 
 @dataclass
 class ImportDefinitionsAst:
-    parent_directories: int
     module: ModuleIdentifierAst
     what_to_import: ImportTypesAst
 
