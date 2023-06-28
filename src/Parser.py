@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import functools
-import itertools
 from typing import Callable, Any
 from src.Ast import *
 from src.Tokens import TokenType, Token
@@ -996,16 +995,16 @@ class Parser:
 
     def _parse_primary_expression(self) -> BoundParser:
         def inner():
-            p3 = self._parse_static_scoped_generic_identifier().delay_parse()
             p1 = self._parse_rvalue().delay_parse()
             p2 = self._parse_lambda().delay_parse()
+            p3 = self._parse_static_scoped_generic_identifier().delay_parse()
             p4 = self._parse_parenthesized_expression().delay_parse()
             p5 = self._parse_expression_placeholder().delay_parse()
             p6 = self._parse_statement_if().delay_parse()
             p7 = self._parse_statement_match().delay_parse()
             p8 = self._parse_statement_while().delay_parse()
             p9 = self._parse_statement_for().delay_parse()
-            p8 = (p6 | p7 | p8 | p9 | p1 | p2 | p3 | p4 | p5).parse_once()
+            p8 = (p6 | p7 | p8 | p9 | p3 | p2 | p1 | p4 | p5).parse_once()
             return p8
         return BoundParser(self, inner)
 
@@ -1041,10 +1040,10 @@ class Parser:
 
     def _parse_lambda(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwAsync).parse_optional()
+            p1 = self._parse_token(TokenType.KwAsync).parse_optional() is not None
             p2 = self._parse_lambda_capture_list().parse_optional()
             p3 = self._parse_lambda_parameters().parse_once()
-            p4 = self._parse_token(TokenType.TKRightFatArrow).parse_once()
+            p4 = self._parse_token(TokenType.TkRightFatArrow).parse_once()
             p5 = self._parse_lambda_implementation().parse_once()
             return LambdaAst(p1, p2, p3, p5)
         return BoundParser(self, inner)
