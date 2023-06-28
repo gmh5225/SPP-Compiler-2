@@ -626,14 +626,14 @@ class Parser:
 
     def _parse_function_call_normal_argument(self) -> BoundParser:
         def inner():
-            p1 = self._parse_expression().parse_once()
+            p1 = self._parse_non_assignment_expression().parse_once()
             return p1
         return BoundParser(self, inner)
 
     def _parse_function_call_named_argument(self) -> BoundParser:
         def inner():
             p1 = self._parse_identifier().parse_once()
-            p2 = self._parse_token(TokenType.TkColon).parse_once()
+            p2 = self._parse_token(TokenType.TkEqual).parse_once()
             p3 = self._parse_expression().parse_once()
             return FunctionArgumentNamedAst(p1, p3)
         return BoundParser(self, inner)
@@ -842,6 +842,12 @@ class Parser:
             p2 = self._parse_assignment_multiple().delay_parse()
             p3 = (p2 | p1).parse_once()
             return p3
+        return BoundParser(self, inner)
+
+    def _parse_non_assignment_expression(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_null_coalescing_expression().parse_once()
+            return p1
         return BoundParser(self, inner)
 
     def _parse_assignment_multiple(self) -> BoundParser:
