@@ -263,7 +263,7 @@ class Parser:
 
     def _parse_module_identifier_next_part(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkDot).parse_once()
+            p1 = self._parse_token(TokenType.TkDoubleColon).parse_once()
             p2 = self._parse_identifier().parse_once()
             return p2
         return BoundParser(self, inner)
