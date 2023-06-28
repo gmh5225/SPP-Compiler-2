@@ -18,7 +18,6 @@ class ParserError(Exception):
 
 Rule = Callable
 
-FOLD = ""
 EXPECTED_TOKENS = []
 ERRS = []
 CUR_ERR_IND = None
