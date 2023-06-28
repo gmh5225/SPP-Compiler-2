@@ -1397,15 +1397,6 @@ class Parser:
             return CaseStatementAst(p2, p3, p5)
         return BoundParser(self, inner)
 
-    def _parse_statement_case_default(self) -> BoundParser:
-        def inner():
-            p2 = self._parse_expression_placeholder().parse_once()
-            p3 = self._parse_value_guard().parse_optional()
-            p4 = self._parse_token(TokenType.TkRightFatArrow).parse_once()
-            p5 = self._parse_statement_block().parse_once()
-            return CaseStatementAst(p2, p3, p5)
-        return BoundParser(self, inner)
-
     def _parse_statement_with(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwWith).parse_once()
@@ -1489,25 +1480,9 @@ class Parser:
     def _parse_statement_cases(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkLeftBrace).parse_once()
-            p2 = self._parse_statement_cases_force_default().delay_parse()
-            p3 = self._parse_statement_cases_force_exhaustion().delay_parse()
-            p4 = (p2 | p3).parse_once()
-            p5 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return p4
-        return BoundParser(self, inner)
-
-    def _parse_statement_cases_force_default(self) -> BoundParser:
-        def inner():
-            p7 = self._parse_statement_case().parse_zero_or_more()
-            p8 = self._parse_statement_case_default().parse_one_or_more()
-            return [p7, *p8]
-        return BoundParser(self, inner)
-
-    def _parse_statement_cases_force_exhaustion(self) -> BoundParser:
-        def inner():
-            p7 = self._parse_statement_case().parse_one_or_more()
-            p8 = self._parse_statement_case_default().parse_zero_or_more()
-            return [p7, *p8]
+            p2 = self._parse_statement_case().parse_one_or_more()
+            p3 = self._parse_token(TokenType.TkRightBrace).parse_once()
+            return p2
         return BoundParser(self, inner)
 
     def _parse_statement_let(self) -> BoundParser:
@@ -1889,7 +1864,7 @@ class Parser:
             p1 = self._parse_token(TokenType.KwTrue).delay_parse()
             p2 = self._parse_token(TokenType.KwFalse).delay_parse()
             p3 = (p1 | p2).parse_once()
-            return BoolLiteralAst(p3 == TokenType.KwTrue)
+            return BoolLiteralAst(p3.primary.token_type == TokenType.KwTrue)
         return BoundParser(self, inner)
 
     def _parse_literal_list(self) -> BoundParser:
