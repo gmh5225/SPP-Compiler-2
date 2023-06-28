@@ -188,7 +188,6 @@ class MultiBoundParser(BoundParser):
         self._bound_parsers.append(bound_parser)
 
     def parse_once(self):
-        errors = []
         for bound_parser in self._bound_parsers:
             restore_index = self._parser._current
             try:
@@ -217,6 +216,11 @@ class Parser:
             program = self._parse_program().parse_once()
             return program
         except ParseSyntaxError as e:
+            # error = ""
+            # for err in ERRS:
+            #     if err.find("^ <-") > error.find("^ <-"):
+            #         error = err
+            # raise ParseSyntaxError(error)
             raise ParseSyntaxError("\n".join(ERRS))
 
 
@@ -2077,7 +2081,8 @@ class Parser:
                     raise ParseSyntaxError("\n".join(ERRS))
 
             EXPECTED_TOKENS.clear()
-            # ERRS.clear()
+            if ERRS: ERRS.pop(-1)
+
             self._current += 1
 
             return TokenAst(self._tokens[self._current - 1], None)
