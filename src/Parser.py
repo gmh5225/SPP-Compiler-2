@@ -23,6 +23,8 @@ EXPECTED_TOKENS = []
 ERRS = []
 CUR_ERR_IND = None
 
+# todo:
+#  - remove ">>" and ">>>" tokens and convert them to rules (generics ending in multiple ">" don't match the ">>" tok)
 
 class ErrorFormatter:
     def __init__(self, tokens: list[Token]):
