@@ -1373,7 +1373,7 @@ class Parser:
 
     def _parse_statement_case_expression(self) -> BoundParser:
         def inner():
-            p1 = self._parse_rvalue().parse_once()
+            p1 = self._parse_expression().parse_once()
             return p1
         return BoundParser(self, inner)
 
@@ -1669,9 +1669,10 @@ class Parser:
     def _parse_postfix_operator_struct_initializer_field_identifier(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwSup).delay_parse()
-            p2 = self._parse_identifier().delay_parse()
-            p3 = (p1 | p2).parse_once()
-            return p3
+            p2 = self._parse_token(TokenType.KwElse).delay_parse()
+            p3 = self._parse_identifier().delay_parse()
+            p4 = (p1 | p2 | p3).parse_once()
+            return p4
         return BoundParser(self, inner)
 
     # Operator identifiers
@@ -1817,7 +1818,7 @@ class Parser:
             p9 = self._parse_literal_tuple().delay_parse()
             p10 = self._parse_literal_regex().delay_parse()
             p11 = self._parse_literal_range().delay_parse()
-            p12 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11).parse_once()
+            p12 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10).parse_once()
             return p12
         return BoundParser(self, inner)
 
