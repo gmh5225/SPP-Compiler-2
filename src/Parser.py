@@ -1141,7 +1141,7 @@ class Parser:
         def inner():
             p1 = self._parse_type_generic_normal_arguments().delay_parse()
             p2 = self._parse_type_generic_named_arguments().delay_parse()
-            p3 = (p1 | p2).parse_once()
+            p3 = (p2 | p1).parse_once()
             return p3
         return BoundParser(self, inner)
 
