@@ -1390,7 +1390,6 @@ class Parser:
 
     def _parse_statement_case(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwCase).parse_once()
             p2 = self._parse_statement_case_expressions().parse_once()
             p3 = self._parse_value_guard().parse_optional()
             p4 = self._parse_token(TokenType.TkRightFatArrow).parse_once()
@@ -1400,7 +1399,6 @@ class Parser:
 
     def _parse_statement_case_default(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwCase).parse_once()
             p2 = self._parse_expression_placeholder().parse_once()
             p3 = self._parse_value_guard().parse_optional()
             p4 = self._parse_token(TokenType.TkRightFatArrow).parse_once()

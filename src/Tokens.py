@@ -98,7 +98,6 @@ class TokenType(Enum):
     KwFor = "for"
     KwDo = "do"
     KwMatch = "match"
-    KwCase = "case"
     KwReturn = "return"
     KwYield = "yield"
     KwCls = "cls"
