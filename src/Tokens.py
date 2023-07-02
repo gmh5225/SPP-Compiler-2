@@ -98,7 +98,7 @@ class TokenType(Enum):
     KwFor = "for"
     KwDo = "do"
     KwMatch = "match"
-    KwReturn = "return"
+    KwReturn = "ret"
     KwYield = "yield"
     KwCls = "cls"
     KwAwait = "await"
@@ -109,7 +109,7 @@ class TokenType(Enum):
     KwSup = "sup"
     KwWith = "with"
     KwBreak = "break"
-    KwContinue = "continue"
+    KwContinue = "cont"
 
     # Don't change order of these (regex are matched in this order)
     # 0x12 must be HexDigits not DecDigits(0) then Identifier(x12)
