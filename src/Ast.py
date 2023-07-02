@@ -140,12 +140,13 @@ def FunctionArgumentNormalAst(value: ExpressionAst):
 class FunctionParameterAst:
     is_mutable: bool
     identifier: IdentifierAst
+    calling_convention: Optional[TokenAst]
     type_annotation: TypeAst
     default_value: Optional[ExpressionAst]
     is_variadic: bool
 
-def FunctionParameterRequiredAst(is_mutable: bool, identifier: IdentifierAst, type_annotation: TypeAst):
-    return FunctionParameterAst(is_mutable, identifier, type_annotation, None, False)
+def FunctionParameterRequiredAst(is_mutable: bool, identifier: IdentifierAst, calling_convention: Optional[TokenAst], type_annotation: TypeAst):
+    return FunctionParameterAst(is_mutable, identifier, calling_convention, type_annotation, None, False)
 
 def FunctionParameterOptionalAst(parameter: FunctionParameterAst, default_value: ExpressionAst):
     parameter.default_value = default_value
@@ -270,7 +271,7 @@ def TypeGenericArgumentNormalAst(value: TypeAst):
 
 @dataclass
 class TypeAst:
-    reference_type: TokenAst
+    # reference_type: TokenAst
     identifier: GenericIdentifierAst
     # postfixes: list[TokenAst]
     # next_variant: Optional[TypeAst]

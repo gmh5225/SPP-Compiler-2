@@ -720,8 +720,9 @@ class Parser:
             p1 = self._parse_token(TokenType.KwMut).parse_optional()
             p2 = self._parse_function_parameter_identifier().parse_once()
             p3 = self._parse_token(TokenType.TkColon).parse_once()
-            p4 = self._parse_type_identifier().parse_once()
-            return FunctionParameterRequiredAst(p1 is not None, p2, p4)
+            p4 = self._parse_unary_operator_reference().parse_optional()
+            p5 = self._parse_type_identifier().parse_once()
+            return FunctionParameterRequiredAst(p1 is not None, p2, p4, p5)
         return BoundParser(self, inner)
 
     def _parse_function_optional_parameter(self) -> BoundParser:
@@ -1136,9 +1137,9 @@ class Parser:
 
     def _parse_type_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_unary_operator_reference().parse_optional()
+            # p1 = self._parse_unary_operator_reference().parse_optional()
             p2 = self._parse_static_scoped_generic_identifier().parse_once()
-            return TypeAst(p1, p2)
+            return TypeAst(p2)
         return BoundParser(self, inner)
 
     def _parse_type_identifiers(self) -> BoundParser:
