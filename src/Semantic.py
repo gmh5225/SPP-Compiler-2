@@ -24,8 +24,27 @@ Semantic analysis module
 - Memory analysis
 """
 
+from __future__ import annotations
 from multimethod import multimethod
 from src import Ast
+
+
+class UninitializedSymbol:
+    pass
+
+class SymbolTable:
+    _symbols: dict[Ast.LocalVariableAst, (Ast.ExpressionAst, Ast.TypeAst)]
+    _child_tables: list[SymbolTable]
+    _parent: SymbolTable
+
+    def __init__(self, parent: SymbolTable):
+        self._symbols = {}
+        self._child_tables = []
+        self._parent = parent
+        self._parent._child_tables.append(self)
+
+    def add_symbol(self, symbol: Ast.LocalVariableAst, value: Ast.ExpressionAst, type: Ast.TypeAst):
+        self._symbols[symbol] = (value, type)
 
 
 class SemanticAnalyser:
@@ -34,32 +53,28 @@ class SemanticAnalyser:
     def __init__(self, ast: Ast.ProgramAst):
         self._ast = ast
 
-    def _analyse_program(self, ast: Ast.ProgramAst):
-        self._analyse_module_prototype(ast.module)
+    @multimethod
+    def analyse(self, stmt: Ast.LetStatementAst, scope: SymbolTable):
+        if stmt.type_annotation is None:
+            for variable, value in stmt.variables, stmt.values:
+                scope.add_symbol(variable, value, self._infer_type(value))
+        else:
+            for variable in stmt.variables:
+                scope.add_symbol(variable, UninitializedSymbol(), stmt.type_annotation)
 
-    def _analyse_module_prototype(self, ast: Ast.ModulePrototypeAst):
-        self._register_module_name(ast.identifier, ast.modifier)
-        self._analyse_module_implementation(ast.body, ast)
+    def _infer_type(self, expr: Ast.ExpressionAst):
+        # move left to right
+        match expr:
+            case Ast.BinaryExpressionAst(left, op, right):
+                function_type = self._lookup_operator_function(op)
+                matched_functions = self._scan_symbol_table(function_type)
+                matched_signature_functions = filter(lambda fn: self._mach_signature(fn, left, right), matched_functions)
+                matched_signature_function = next(matched_signature_functions)
+                return_type = matched_signature_function.return_type
 
-    def _analyse_module_implementation(self, ast: Ast.ModuleImplementationAst, module_prototype: Ast.ModulePrototypeAst):
-        self._analyse_import_block(ast.imports)
-        self._analyse_module_members(ast.members, module_prototype)
 
-    def _analyse_import_block(self, ast: Ast.ImportBlockAst):
-        for import_statement in ast.imports:
-            self._load_module(import_statement.module, import_statement.parent_directories)
-            self._load_module_members(import_statement.module, import_statement.what_to_import)
+    def _lookup_operator_function(self, op: Ast.TokenAst) -> Ast.FunctionPrototypeAst:
+        pass
 
-    def _analyse_module_member(self, ast: Ast.ModuleMemberAst, module_prototype: Ast.ModulePrototypeAst):
-        match ast:
-            case Ast.FunctionPrototypeAst(): self._analyse_function_prototype(ast)
-            case Ast.ClassPrototypeAst(): self._analyse_class_prototype(ast)
-            case Ast.EnumPrototypeAst(): self._analyse_enum_prototype(ast)
-            case Ast.SupPrototypeNormalAst(): self._analyse_sup_prototype_normal(ast)
-            case Ast.SupPrototypeInheritanceAst(): self._analyse_sup_prototype_inheritance(ast)
-
-    def _analyse_function_prototype(self, ast: Ast.FunctionPrototypeAst, module: Ast.ModulePrototypeAst):
-        self._register_function_name(ast.identifier, ast.modifier)
-        self._analyse_function_parameters(ast.parameters)
-        self._analyse_function_return_type(ast.return_type)
+    def _scan_symbol_table(self): ...
 
