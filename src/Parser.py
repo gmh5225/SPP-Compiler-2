@@ -1135,10 +1135,18 @@ class Parser:
 
     # Type Identifiers
 
+    def _parse_type_self_prefix(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_token(TokenType.KwSelf).parse_once()
+            p2 = self._parse_token(TokenType.TkDoubleColon).parse_once()
+            return SelfTypeAst()
+        return BoundParser(self, inner)
+
     def _parse_type_identifier(self) -> BoundParser:
         def inner():
-            # p1 = self._parse_unary_operator_reference().parse_optional()
+            p1 = self._parse_type_self_prefix().parse_optional()
             p2 = self._parse_static_scoped_generic_identifier().parse_once()
+            p2.parts.insert(0, p1) if p1 else None
             return TypeAst(p2)
         return BoundParser(self, inner)
 

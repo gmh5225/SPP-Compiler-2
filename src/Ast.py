@@ -36,8 +36,12 @@ class GenericIdentifierAst:
     generic: list[TypeGenericArgumentAst]
 
 @dataclass
+class SelfTypeAst:
+    pass
+
+@dataclass
 class ScopedGenericIdentifierAst:
-    parts: list[GenericIdentifierAst]
+    parts: list[SelfTypeAst | GenericIdentifierAst]
 
 @dataclass
 class MemberAccessAst:

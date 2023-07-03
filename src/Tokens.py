@@ -88,7 +88,7 @@ class TokenType(Enum):
     KwPriv = "priv"
     KwPart = "part"
     KwAsync = "async"
-    KwFun = "fun"
+    KwFun = "fn"
     KwMut = "mut"
     KwLet = "let"
     KwIf = "if"
@@ -110,6 +110,7 @@ class TokenType(Enum):
     KwWith = "with"
     KwBreak = "break"
     KwContinue = "cont"
+    KwSelf = "Self"
 
     # Don't change order of these (regex are matched in this order)
     # 0x12 must be HexDigits not DecDigits(0) then Identifier(x12)
