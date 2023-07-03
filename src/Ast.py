@@ -276,7 +276,7 @@ def TypeGenericArgumentNormalAst(value: TypeAst):
 @dataclass
 class TypeAst:
     # reference_type: TokenAst
-    identifier: GenericIdentifierAst
+    identifier: ScopedGenericIdentifierAst
     # postfixes: list[TokenAst]
     # next_variant: Optional[TypeAst]
 
@@ -393,6 +393,17 @@ class SupMethodPrototypeAst(FunctionPrototypeAst):
 @dataclass
 class SupTypedefAst(TypedefStatementAst):
     modifier: Optional[AccessModifierAst]
+
+@dataclass
+class MetaImplementationAst(ClassImplementationAst):
+    pass
+
+@dataclass
+class MetaPrototypeAst:
+    identifier: IdentifierAst
+    generic_parameters: list[TypeGenericParameterAst]
+    where_block: Optional[WhereBlockAst]
+    body: MetaImplementationAst
 
 @dataclass
 class PostfixFunctionCallAst:

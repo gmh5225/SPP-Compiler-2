@@ -110,6 +110,7 @@ class TokenType(Enum):
     KwWith = "with"
     KwBreak = "break"
     KwContinue = "cont"
+    KwMeta = "meta"
     KwSelf = "Self"
 
     # Don't change order of these (regex are matched in this order)
@@ -122,6 +123,8 @@ class TokenType(Enum):
     LxSingleQuoteChr = r"'.?'"
     LxRegex = r"r\".*\""
     LxTag = r"\'[a-zA-Z0-9_]+"
+    LxSingleLineComment = r"#.*"
+    LxMultiLineComment = r"/\*.*\*/"
 
 
 @dataclass
