@@ -74,6 +74,7 @@ fn foo<T, U>(a: T, b: U) -> std::Num where [T: std::Num, U: std::Num] {}
 - A value guard allows for runtime selection based on the value of parameters
 - A value guard is specified as a simplified if-statement
 - If a value guard is used, there must be an unguarded equivalent function
+- All functions with the same signature and different value guards must return the same type
 
 #### Example:
 ```s++

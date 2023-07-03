@@ -19,11 +19,15 @@
 - Parameter and return types for functions must be annotated
 - Class attributes are the same as variables: if they are initialized, they are type-inferred, otherwise they must be annotated
 
+## Supertypes as function parameters
+- A class will automatically cast to a super-type if the super-type is used as a parameter type
+- Within the function, `std::down_cast<T>` can be used to downcast the parameter to the original type
+
 ## Type casting and conversion
 - Implement methods specific to each type
 - The class `std::ToString` is used to convert any type to a string
 
-### Hierarchy casts
+## Hierarchy casts
 #### Upcasting
 - Compile time check to make sure that the target class is a base class of the variable type.
 - Always yields a valid object => return type is `T`.
