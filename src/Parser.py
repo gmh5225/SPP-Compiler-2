@@ -683,8 +683,9 @@ class Parser:
 
     def _parse_function_call_normal_argument(self) -> BoundParser:
         def inner():
-            p1 = self._parse_non_assignment_expression().parse_once()
-            return p1
+            p1 = self._parse_operator_identifier_variadic().parse_optional() is not None
+            p2 = self._parse_non_assignment_expression().parse_once()
+            return FunctionArgumentNormalAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_function_call_named_argument(self) -> BoundParser:
@@ -1872,9 +1873,8 @@ class Parser:
             p3 = self._parse_token(TokenType.TkTilde).delay_parse()
             p4 = self._parse_token(TokenType.TkExclamation).delay_parse()
             p5 = self._parse_unary_operator_reference().delay_parse()
-            p6 = self._parse_operator_identifier_variadic().delay_parse()
-            p7 = self._parse_token(TokenType.KwAwait).delay_parse()
-            p8 = (p1 | p2 | p3 | p4 | p5 | p6 | p7).parse_once()
+            p6 = self._parse_token(TokenType.KwAwait).delay_parse()
+            p8 = (p1 | p2 | p3 | p4 | p5 | p6).parse_once()
             return p8
         return BoundParser(self, inner)
 
