@@ -109,7 +109,6 @@ class ClassImplementationAst:
 @dataclass
 class ClassPrototypeAst:
     decorators: list[DecoratorAst]
-    partial: bool
     modifier: Optional[AccessModifierAst]
     identifier: IdentifierAst
     generic_parameters: list[TypeGenericParameterAst]

@@ -386,16 +386,15 @@ class Parser:
     def _parse_class_prototype(self) -> BoundParser:
         def inner():
             p1 = self._parse_decorators().parse_optional()
-            p3 = self._parse_access_modifier().parse_optional()
-            p2 = self._parse_token(TokenType.KwPart).parse_optional()
-            p4 = self._parse_token(TokenType.KwCls).parse_once()
-            p5 = self._parse_class_identifier().parse_once()
-            p6 = self._parse_type_generic_parameters().parse_optional()
-            p7 = self._parse_where_block().parse_optional()
-            p8 = self._parse_token(TokenType.TkLeftBrace).parse_once()
-            p9 = self._parse_class_implementation().parse_once()
-            p10 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return ClassPrototypeAst(p1, p3, p5, p6, p6, p7, p9)
+            p2 = self._parse_access_modifier().parse_optional()
+            p3 = self._parse_token(TokenType.KwCls).parse_once()
+            p4 = self._parse_class_identifier().parse_once()
+            p5 = self._parse_type_generic_parameters().parse_optional()
+            p6 = self._parse_where_block().parse_optional()
+            p7 = self._parse_token(TokenType.TkLeftBrace).parse_once()
+            p8 = self._parse_class_implementation().parse_once()
+            p9 = self._parse_token(TokenType.TkRightBrace).parse_once()
+            return ClassPrototypeAst(p1, p2, p4, p5, p6, p8)
         return BoundParser(self, inner)
 
     def _parse_class_implementation(self) -> BoundParser:
@@ -1924,12 +1923,11 @@ class Parser:
             p5 = self._parse_literal_list().delay_parse()
             p6 = self._parse_literal_map().delay_parse()
             p7 = self._parse_literal_set().delay_parse()
-            p8 = self._parse_literal_pair().delay_parse()
-            p9 = self._parse_literal_tuple().delay_parse()
-            p10 = self._parse_literal_regex().delay_parse()
-            p11 = self._parse_literal_range().delay_parse()
-            p12 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10).parse_once()
-            return p12
+            p8 = self._parse_literal_tuple().delay_parse()
+            p9 = self._parse_literal_regex().delay_parse()
+            p10 = self._parse_literal_range().delay_parse()
+            p11 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9).parse_once()
+            return p11
         return BoundParser(self, inner)
 
     def _parse_literal_number(self) -> BoundParser:
@@ -1980,33 +1978,31 @@ class Parser:
     def _parse_literal_map(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkLeftBrace).parse_once()
-            p2 = self._parse_literal_pair_internal().parse_once()
-            p3 = self._parse_literal_map_next_pair().parse_zero_or_more()
-            p4 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return MapLiteralAst([p2, *p3])
+            p2 = self._parse_internal_pairs().parse_once() # {} is a set
+            p3 = self._parse_token(TokenType.TkRightBrace).parse_once()
+            return MapLiteralAst(p2)
         return BoundParser(self, inner)
 
-    def _parse_literal_map_next_pair(self) -> BoundParser:
-        def inner():
-            p5 = self._parse_token(TokenType.TkComma).parse_once()
-            p6 = self._parse_literal_pair_internal().parse_once()
-            return p6
-        return BoundParser(self, inner)
-
-    def _parse_literal_pair(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
-            p2 = self._parse_literal_pair_internal().parse_once()
-            p3 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
-            return p2
-        return BoundParser(self, inner)
-
-    def _parse_literal_pair_internal(self) -> BoundParser:
+    def _parse_internal_pair(self) -> BoundParser:
         def inner():
             p1 = self._parse_expression().parse_once()
             p2 = self._parse_token(TokenType.TkColon).parse_once()
             p3 = self._parse_expression().parse_once()
             return PairLiteralAst(p1, p3)
+        return BoundParser(self, inner)
+
+    def _parse_internal_pair_next(self) -> BoundParser:
+        def inner():
+            p5 = self._parse_token(TokenType.TkComma).parse_once()
+            p6 = self._parse_internal_pair().parse_once()
+            return p6
+        return BoundParser(self, inner)
+
+    def _parse_internal_pairs(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_internal_pair().parse_once()
+            p2 = self._parse_internal_pair_next().parse_zero_or_more()
+            return [p1, *p2]
         return BoundParser(self, inner)
 
     def _parse_literal_regex(self) -> BoundParser:
