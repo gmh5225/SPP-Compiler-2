@@ -132,13 +132,14 @@ class FunctionPrototypeAst:
 class FunctionArgumentAst:
     identifier: Optional[IdentifierAst]
     value: ExpressionAst
+    convention: Optional[TokenAst]
     unpack: bool
 
-def FunctionArgumentNamedAst(identifier: IdentifierAst, value: ExpressionAst):
-    return FunctionArgumentAst(identifier, value, False)
+def FunctionArgumentNamedAst(identifier: IdentifierAst, convention: Optional[TokenAst], value: ExpressionAst):
+    return FunctionArgumentAst(identifier, value, convention, False)
 
-def FunctionArgumentNormalAst(value: ExpressionAst, unpack: bool):
-    return FunctionArgumentAst(None, value, unpack)
+def FunctionArgumentNormalAst(convention: Optional[TokenAst], value: ExpressionAst, unpack: bool):
+    return FunctionArgumentAst(None, value, convention, unpack)
 
 @dataclass
 class FunctionParameterAst:

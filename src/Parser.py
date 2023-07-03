@@ -683,17 +683,19 @@ class Parser:
 
     def _parse_function_call_normal_argument(self) -> BoundParser:
         def inner():
-            p1 = self._parse_operator_identifier_variadic().parse_optional() is not None
-            p2 = self._parse_non_assignment_expression().parse_once()
-            return FunctionArgumentNormalAst(p1, p2)
+            p1 = self._parse_unary_operator_reference().parse_optional()
+            p2 = self._parse_operator_identifier_variadic().parse_optional() is not None
+            p3 = self._parse_non_assignment_expression().parse_once()
+            return FunctionArgumentNormalAst(p1, p3, p2)
         return BoundParser(self, inner)
 
     def _parse_function_call_named_argument(self) -> BoundParser:
         def inner():
             p1 = self._parse_identifier().parse_once()
             p2 = self._parse_token(TokenType.TkEqual).parse_once()
-            p3 = self._parse_expression().parse_once()
-            return FunctionArgumentNamedAst(p1, p3)
+            p3 = self._parse_unary_operator_reference().parse_optional()
+            p4 = self._parse_expression().parse_once()
+            return FunctionArgumentNamedAst(p1, p3, p4)
         return BoundParser(self, inner)
 
     # Function Parameters
@@ -1863,8 +1865,6 @@ class Parser:
         "-" => Mathematical negation of an expression
         "~" => Bitwise complement of an expression
         "!" => Logical negation of an expression
-        "&" => Reference of an expression
-        "..." => Variadic unpacking of an expression
         "await" => Await an expression
         """
         def inner():
@@ -1872,10 +1872,9 @@ class Parser:
             p2 = self._parse_token(TokenType.TkHyphen).delay_parse()
             p3 = self._parse_token(TokenType.TkTilde).delay_parse()
             p4 = self._parse_token(TokenType.TkExclamation).delay_parse()
-            p5 = self._parse_unary_operator_reference().delay_parse()
-            p6 = self._parse_token(TokenType.KwAwait).delay_parse()
-            p8 = (p1 | p2 | p3 | p4 | p5 | p6).parse_once()
-            return p8
+            p5 = self._parse_token(TokenType.KwAwait).delay_parse()
+            p6 = (p1 | p2 | p3 | p4 | p5).parse_once()
+            return p6
         return BoundParser(self, inner)
 
     def _parse_unary_operator_reference(self) -> BoundParser:
