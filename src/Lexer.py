@@ -22,6 +22,10 @@ class Lexer:
             for token in tokens:
                 value = TokenType[token].value
                 if self._code[current:current + len(value)] == value:
+                    # Special case for TkUnderscore: make sure that the next character is not matchable by LxIdentifier
+                    if token == TokenType.TkUnderscore.name and re.match(TokenType.LxIdentifier.value, self._code[current + 1]):
+                        break
+
                     lexed_tokens.append(Token(value, TokenType[token]))
                     current += len(value)
                     f = True
