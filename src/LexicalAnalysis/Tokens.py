@@ -5,15 +5,15 @@ class TokenType(Enum):
     # Used for logical operations (AND, OR, NOT)
     TkDoubleAmpersand = "&&"
     TkDoubleAmpersandEquals = "&&="
-    TkDoubleVerticalBar = "||"
-    TkDoubleVerticalBarEquals = "||="
+    TkDoublePipe = "||"
+    TkDoublePipeEquals = "||="
     TkExclamation = "!"
 
     # Used for bitwise operations (AND, OR, XOR, NOT, SHL, SHR, ROL, ROR)
     TkAmpersand = "&"# Also used for references
     TkAmpersandEquals = "&="
-    TkVerticalBar = "|"
-    TkVerticalBarEquals = "|="
+    TkPipeBar = "|"
+    TkPipeEquals = "|="
     TkCaret = "^"
     TkCaretEquals = "^="
     TkTilde = "~"
@@ -26,8 +26,8 @@ class TokenType(Enum):
     TkTripleRightAngleBracket = ">>>"
     TkTripleRightAngleBracketEquals = ">>>="
 
-    TkDoubleEqual = "=="
-    TkExclamationEqual = "!="
+    TkDoubleEquals = "=="
+    TkExclamationEquals = "!="
     TkLeftAngleBracketEquals = "<="
     TkRightAngleBracketEquals = ">="
     TkLeftAngleBracket = "<" # Also used for generics
@@ -46,8 +46,8 @@ class TokenType(Enum):
     TkDoubleForwardSlashEquals = "//="
     TkPercent = "%"
     TkPercentEquals = "%="
-    TkDoubleAstrix = "**"
-    TkDoubleAstrixEquals = "**="
+    TkDoubleAsterisk = "**"
+    TkDoubleAsteriskEquals = "**="
 
     TkLeftParenthesis = "("
     TkRightParenthesis = ")"
@@ -58,7 +58,7 @@ class TokenType(Enum):
 
     TkQuestionMark = "?"
     TkDoubleQuestionMark = "??"
-    TkQuestionMarkColon = "?:"
+    TkDoubleQuestionMarkEquals = "??="
 
     TkPipe = "|>"
     TkDoubleDot = ".."

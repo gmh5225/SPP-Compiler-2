@@ -116,9 +116,8 @@
 | `std::ops::Le`           | `__le__`                            | Binary `<=`                      |
 | `std::ops::Gt`           | `__gt__`                            | Binary `>`                       |
 | `std::ops::Ge`           | `__ge__`                            | Binary `>=`                      |
-| `std::ops::PartOrd`      | `__partial_ord__`                   | Binary `<=>`                     |
+| `std::ops::Cmp`          | `__cmp__`                           | Binary `<=>`                     |
 | `std::ops::NullCoalesce` | `__nlc__`, `__nlc_assign__`         | Binary `??`                      |
-| `std::ops::Elvis`        | `__elv__`, `__elv_assign__`         | Binary `?:`                      |
 | `std::ops::Pipe`         | `__pip__`                           | Binary `\|>`                     |
 | `std::ops::Neg`          | `__neg__`                           | Unary `-`                        |
 | `std::ops::Abs`          | `__abs__`                           | Unary `+`                        |

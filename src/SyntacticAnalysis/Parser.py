@@ -982,13 +982,13 @@ class Parser:
     def _parse_null_coalescing_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_logical_or_expression(),
-            self._parse_operator_identifier_null_coalescing(),
+            self._parse_token(TokenType.TkDoubleQuestionMark),
             self._parse_null_coalescing_expression)
 
     def _parse_logical_or_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_logical_and_expression(),
-            self._parse_token(TokenType.TkDoubleVerticalBar),
+            self._parse_token(TokenType.TkDoublePipe),
             self._parse_logical_or_expression)
 
     def _parse_logical_and_expression(self) -> BoundParser:
@@ -1000,7 +1000,7 @@ class Parser:
     def _parse_bitwise_or_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_bitwise_xor_expression(),
-            self._parse_token(TokenType.TkVerticalBar),
+            self._parse_token(TokenType.TkPipeBar),
             self._parse_bitwise_or_expression)
 
     def _parse_bitwise_xor_expression(self) -> BoundParser:
@@ -1054,7 +1054,7 @@ class Parser:
     def _parse_power_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_pipe_expression(),
-            self._parse_token(TokenType.TkDoubleAstrix),
+            self._parse_token(TokenType.TkDoubleAsterisk),
             self._parse_power_expression)
 
     def _parse_pipe_expression(self) -> BoundParser:
@@ -1803,10 +1803,10 @@ class Parser:
 
     def _parse_operator_identifier_assignment(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkDoubleVerticalBarEquals).delay_parse()
+            p1 = self._parse_token(TokenType.TkDoublePipeEquals).delay_parse()
             p2 = self._parse_token(TokenType.TkDoubleAmpersandEquals).delay_parse()
             p3 = self._parse_token(TokenType.TkAmpersandEquals).delay_parse()
-            p4 = self._parse_token(TokenType.TkVerticalBarEquals).delay_parse()
+            p4 = self._parse_token(TokenType.TkPipeEquals).delay_parse()
             p5 = self._parse_token(TokenType.TkCaretEquals).delay_parse()
             p6 = self._parse_token(TokenType.TkDoubleLeftAngleBracketEquals).delay_parse()
             p7 = self._parse_token(TokenType.TkDoubleRightAngleBracketEquals).delay_parse()
@@ -1818,23 +1818,16 @@ class Parser:
             p13 = self._parse_token(TokenType.TkForwardSlashEquals).delay_parse()
             p14 = self._parse_token(TokenType.TkDoubleForwardSlashEquals).delay_parse()
             p15 = self._parse_token(TokenType.TkPercentEquals).delay_parse()
-            p16 = self._parse_token(TokenType.TkDoubleAstrixEquals).delay_parse()
-            p17 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12 | p13 | p14 | p15 | p16).parse_once()
-            return p17
-        return BoundParser(self, inner)
-
-    def _parse_operator_identifier_null_coalescing(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.TkDoubleQuestionMark).delay_parse()
-            p2 = self._parse_token(TokenType.TkQuestionMarkColon).delay_parse()
-            p3 = (p1 | p2).parse_once()
-            return p3
+            p16 = self._parse_token(TokenType.TkDoubleAsteriskEquals).delay_parse()
+            p17 = self._parse_token(TokenType.TkDoubleQuestionMarkEquals).delay_parse()
+            p18 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12 | p13 | p14 | p15 | p16 | p17).parse_once()
+            return p18
         return BoundParser(self, inner)
 
     def _parse_operator_identifier_equality(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkDoubleEqual).delay_parse()
-            p2 = self._parse_token(TokenType.TkExclamationEqual).delay_parse()
+            p1 = self._parse_token(TokenType.TkDoubleEquals).delay_parse()
+            p2 = self._parse_token(TokenType.TkExclamationEquals).delay_parse()
             p3 = (p1 | p2).parse_once()
             return p3
         return BoundParser(self, inner)
