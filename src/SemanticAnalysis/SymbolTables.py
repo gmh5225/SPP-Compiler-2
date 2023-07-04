@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import pprint
 from dataclasses import dataclass
 from typing import Any, Optional
 from multimethod import multimethod
@@ -41,7 +43,7 @@ class SymbolTable:
         return self._symbols
 
     def __repr__(self):
-        return f"SymbolTable({self._symbols})"
+        return f"SymbolTable({', '.join([key for key in self._symbols.keys()])})"
 
 
 class Scope:
@@ -49,11 +51,13 @@ class Scope:
     A scope is a virtual representation of a scope in the program. The scope is a region of the program where a symbol
     is declared. A scope can be nested inside another scope, and the scope can be exited to return to the parent scope.
     """
+    _scope_name: str
     _symbol_table: SymbolTable
     _parent_scope: Optional[Scope]
     _child_scopes: list[Scope]
 
-    def __init__(self, parent=None):
+    def __init__(self, scope_name: str, parent=None):
+        self._scope_name = scope_name
         self._symbol_table = SymbolTable()
         self._parent_scope = parent
         self._child_scopes = []
@@ -74,7 +78,8 @@ class Scope:
         return self._child_scopes
 
     def __repr__(self):
-        return f"Scope({self._symbol_table})"
+        string = f"Scope {self._scope_name}({self._symbol_table})"
+        return string
 
 
 class SymbolTableManager:
@@ -86,11 +91,11 @@ class SymbolTableManager:
     _current_scope: Scope
 
     def __init__(self):
-        self._global_scope = Scope()
+        self._global_scope = Scope("Global")
         self._current_scope = self._global_scope
 
-    def enter_scope(self):
-        next_scope = Scope(self._current_scope)
+    def enter_scope(self, scope_name: str):
+        next_scope = Scope(scope_name, self._current_scope)
         self._current_scope = next_scope
 
     def exit_scope(self):
@@ -111,20 +116,18 @@ class SymbolTableManager:
 
     def __repr__(self):
         # Print all scopes, their child scopes, and all the symbols in every scope
-        def print_scope(scope: Scope, indent: int, out: str):
-            out += ' ' * indent + f'Scope: {scope}'
-            for symbol in scope.symbol_table.symbols.values():
-                out += ' ' * indent + f'    {symbol}'
+        def inner_print(scope: Scope, indent: int):
+            string = f"{' ' * indent}{scope}\n"
             for child_scope in scope.child_scopes:
-                print_scope(child_scope, indent + 4, out)
-            return out
-        return print_scope(self._global_scope, 0, '')
+                string += inner_print(child_scope, indent + 2)
+            return string
+        return inner_print(self._global_scope, 0)
 
 
 
 def nest_next_scope(func: callable):
     def inner(ast, manager):
-        manager.enter_scope()
+        manager.enter_scope("".join(list(map(lambda x: x.title(), func.__name__.split("_")[2:]))))
         func(ast, manager)
         manager.exit_scope()
     return inner
