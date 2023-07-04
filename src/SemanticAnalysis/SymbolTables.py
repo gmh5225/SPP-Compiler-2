@@ -8,6 +8,18 @@ from multimethod import multimethod
 from src.SyntacticAnalysis import Ast
 
 
+def type_string(type: Optional[Ast.TypeAst]) -> str:
+    string = ""
+    if type is None:
+        return ""
+    for part in type.parts:
+        string += "::" + part.identifier
+        if len(part.generic):
+            string += "<"
+            string += ", ".join([generic.identifier.identifier for generic in part.generic])
+            string += ">"
+    return string[2:]
+
 @dataclass
 class SymbolTableEntry:
     """
@@ -43,7 +55,7 @@ class SymbolTable:
         return self._symbols
 
     def __repr__(self):
-        return f"SymbolTable({', '.join([key for key in self._symbols.keys()])})"
+        return f"SymbolTable({', '.join([name + ': ' + type.type for name, type in self._symbols.items()])})"
 
 
 class Scope:
@@ -101,8 +113,8 @@ class SymbolTableManager:
     def exit_scope(self):
         self._current_scope = self._current_scope.parent_scope or self._current_scope
 
-    def add_symbol(self, name: str, type: str):
-        self._current_scope.symbol_table.add_symbol(name, type)
+    def add_symbol(self, name: str, type: Ast.TypeAst):
+        self._current_scope.symbol_table.add_symbol(name, type_string(type))
 
     def lookup_symbol(self, name: str) -> Optional[SymbolTableEntry]:
         # look in this and parent scopes for the symbol
