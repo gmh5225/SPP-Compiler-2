@@ -308,9 +308,9 @@ class ForStatementAst:
 
 @dataclass
 class DoWhileStatementAst:
+    tag: Optional[TagIdentifierAst]
     body: list[StatementAst]
     condition: ExpressionAst
-    tag: Optional[TagIdentifierAst]
 
 @dataclass
 class MatchStatementAst:

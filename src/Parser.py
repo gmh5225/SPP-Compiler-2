@@ -1070,8 +1070,9 @@ class Parser:
             p7 = self._parse_statement_match().delay_parse()
             p8 = self._parse_statement_while().delay_parse()
             p9 = self._parse_statement_for().delay_parse()
-            p8 = (p6 | p7 | p8 | p9 | p3 | p2 | p1 | p4 | p5).parse_once()
-            return p8
+            p10 = self._parse_statement_do().delay_parse()
+            p11 = (p6 | p7 | p8 | p9 | p10 | p3 | p2 | p1 | p4 | p5).parse_once()
+            return p11
         return BoundParser(self, inner)
 
     def _parse_binary_expression(self, __lhs, __op, __rhs) -> BoundParser:
@@ -1463,11 +1464,11 @@ class Parser:
     def _parse_statement_do(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwDo).parse_once()
-            p2 = self._parse_statement_block().parse_once()
-            p3 = self._parse_token(TokenType.KwWhile).parse_once()
-            p4 = self._parse_expression().parse_once()
-            p5 = self._parse_statement_loop_tag().parse_optional()
-            return DoWhileStatementAst(p2, p4, p5)
+            p2 = self._parse_statement_loop_tag().parse_optional()
+            p3 = self._parse_statement_block().parse_once()
+            p4 = self._parse_token(TokenType.KwWhile).parse_once()
+            p5 = self._parse_expression().parse_once()
+            return DoWhileStatementAst(p2, p3, p5)
         return BoundParser(self, inner)
 
     def _parse_statement_match(self) -> BoundParser:
