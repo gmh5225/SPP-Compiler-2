@@ -1,7 +1,7 @@
 import llvmlite.ir as ll
 import llvmlite.binding as llvm
 
-from src.Ast import *
+from src.SyntacticAnalysis.Ast import *
 
 
 class CodeGen:

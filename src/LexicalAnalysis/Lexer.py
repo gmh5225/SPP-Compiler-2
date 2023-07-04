@@ -1,4 +1,4 @@
-from src.Tokens import Token, TokenType
+from src.LexicalAnalysis.Tokens import Token, TokenType
 import re
 
 

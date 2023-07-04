@@ -1,5 +1,5 @@
 import cProfile
-from src.Compiler import Compiler
+from src.Compiler.Compiler import Compiler
 
 
 if __name__ == "__main__":

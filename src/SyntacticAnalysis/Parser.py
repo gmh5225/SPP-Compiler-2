@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import functools
 from typing import Callable, Any
-from src.Ast import *
-from src.Tokens import TokenType, Token
+from src.SyntacticAnalysis.Ast import *
+from src.LexicalAnalysis.Tokens import TokenType, Token
 
 
 class ParseSyntaxError(Exception):

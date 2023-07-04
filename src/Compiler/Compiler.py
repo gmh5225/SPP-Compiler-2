@@ -1,7 +1,7 @@
-from src.Ast import ProgramAst
-from src.Lexer import Lexer
-from src.Parser import Parser
-from src.Tokens import Token
+from src.LexicalAnalysis.Tokens import Token
+from src.LexicalAnalysis.Lexer import Lexer
+from src.SyntacticAnalysis.Ast import ProgramAst
+from src.SyntacticAnalysis.Parser import Parser
 import pprint, dataclasses
 
 class Compiler:
