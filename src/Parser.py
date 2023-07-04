@@ -390,11 +390,19 @@ class Parser:
             p3 = self._parse_token(TokenType.KwCls).parse_once()
             p4 = self._parse_class_identifier().parse_once()
             p5 = self._parse_type_generic_parameters().parse_optional()
-            p6 = self._parse_where_block().parse_optional()
-            p7 = self._parse_token(TokenType.TkLeftBrace).parse_once()
-            p8 = self._parse_class_implementation().parse_once()
-            p9 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return ClassPrototypeAst(p1, p2, p4, p5, p6, p8)
+            p6 = self._parse_classes_metaclass().parse_optional()
+            p7 = self._parse_where_block().parse_optional()
+            p8 = self._parse_token(TokenType.TkLeftBrace).parse_once()
+            p9 = self._parse_class_implementation().parse_once()
+            p10 = self._parse_token(TokenType.TkRightBrace).parse_once()
+            return ClassPrototypeAst(p1, p2, p4, p5, p6, p7, p8)
+        return BoundParser(self, inner)
+
+    def _parse_classes_metaclass(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_token(TokenType.KwMeta).parse_once()
+            p2 = self._parse_type_identifier().parse_once()
+            return p2
         return BoundParser(self, inner)
 
     def _parse_class_implementation(self) -> BoundParser:
@@ -502,7 +510,7 @@ class Parser:
 
     def _parse_sup_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_static_scoped_generic_identifier().parse_once()
+            p1 = self._parse_type_identifier().parse_once()
             return p1
         return BoundParser(self, inner)
 
@@ -833,7 +841,7 @@ class Parser:
 
     def _parse_where_constraint_chain_element(self) -> BoundParser:
         def inner():
-            p1 = self._parse_static_scoped_generic_identifier().parse_once()
+            p1 = self._parse_type_identifier().parse_once()
             return p1
         return BoundParser(self, inner)
 
@@ -871,7 +879,7 @@ class Parser:
 
     def _parse_decorator_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_static_scoped_generic_identifier().parse_once()
+            p1 = self._parse_type_identifier().parse_once()
             return p1
         return BoundParser(self, inner)
 
@@ -1055,7 +1063,7 @@ class Parser:
         def inner():
             p1 = self._parse_rvalue().delay_parse()
             p2 = self._parse_lambda().delay_parse()
-            p3 = self._parse_static_scoped_generic_identifier().delay_parse()
+            p3 = self._parse_type_identifier().delay_parse()
             p4 = self._parse_parenthesized_expression().delay_parse()
             p5 = self._parse_expression_placeholder().delay_parse()
             p6 = self._parse_statement_if().delay_parse()
@@ -1177,7 +1185,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.KwSelf).parse_once()
             p2 = self._parse_type_raw_identifiers_rest().parse_optional() or []
-            return TypeAst(ScopedGenericIdentifierAst([SelfTypeAst(), *p2]))
+            return TypeAst([SelfTypeAst(), *p2])
         return BoundParser(self, inner)
 
     def _parse_type_raw_identifiers_rest(self) -> BoundParser:
@@ -1682,20 +1690,6 @@ class Parser:
             p1 = self._parse_lexeme(TokenType.LxIdentifier).parse_once()
             p2 = self._parse_type_generic_arguments().parse_optional() or []
             return GenericIdentifierAst(p1, p2)
-        return BoundParser(self, inner)
-
-    def _parse_static_scoped_generic_identifier(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_generic_identifier().parse_once()
-            p2 = self._parse_static_scoped_generic_identifier_next().parse_zero_or_more()
-            return ScopedGenericIdentifierAst([p1, *p2])
-        return BoundParser(self, inner)
-
-    def _parse_static_scoped_generic_identifier_next(self) -> BoundParser:
-        def inner():
-            p3 = self._parse_token(TokenType.TkDoubleColon).parse_once()
-            p4 = self._parse_generic_identifier().parse_once()
-            return p4
         return BoundParser(self, inner)
 
     # Postfix operations

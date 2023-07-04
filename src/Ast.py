@@ -40,10 +40,6 @@ class SelfTypeAst:
     pass
 
 @dataclass
-class ScopedGenericIdentifierAst:
-    parts: list[SelfTypeAst | GenericIdentifierAst]
-
-@dataclass
 class MemberAccessAst:
     separator: TokenAst
     member: GenericIdentifierAst
@@ -112,6 +108,7 @@ class ClassPrototypeAst:
     modifier: Optional[AccessModifierAst]
     identifier: IdentifierAst
     generic_parameters: list[TypeGenericParameterAst]
+    metaclass: Optional[TypeAst]
     where_block: Optional[WhereBlockAst]
     body: ClassImplementationAst
 
@@ -187,7 +184,7 @@ class WhereBlockAst:
 @dataclass
 class WhereConstraintAst:
     types_to_constrain: list[TypeAst]
-    constraints: list[ScopedGenericIdentifierAst]
+    constraints: list[TypeAst]
 
 @dataclass
 class ValueGuardAst:
@@ -195,7 +192,7 @@ class ValueGuardAst:
 
 @dataclass
 class DecoratorAst:
-    identifier: IdentifierAst
+    identifier: TypeAst # can be namespaced and generic
     type_arguments: list[TypeGenericArgumentAst]
     arguments: list[FunctionArgumentAst]
 
@@ -276,10 +273,7 @@ def TypeGenericArgumentNormalAst(value: TypeAst):
 
 @dataclass
 class TypeAst:
-    # reference_type: TokenAst
-    identifier: ScopedGenericIdentifierAst
-    # postfixes: list[TokenAst]
-    # next_variant: Optional[TypeAst]
+    parts: list[SelfTypeAst | GenericIdentifierAst]
 
 @dataclass
 class IfStatementBranchAst:
@@ -379,13 +373,13 @@ class SupImplementationAst:
 @dataclass
 class SupPrototypeNormalAst:
     generic_parameters: list[TypeGenericParameterAst]
-    identifier: IdentifierAst
+    identifier: TypeAst
     where_block: Optional[WhereBlockAst]
     body: SupImplementationAst
 
 @dataclass
 class SupPrototypeInheritanceAst(SupPrototypeNormalAst):
-    super_class: GenericIdentifierAst
+    super_class: TypeAst
 
 @dataclass
 class SupMethodPrototypeAst(FunctionPrototypeAst):
@@ -479,7 +473,6 @@ class ListLiteralAst:
 class SetLiteralAst:
     values: list[ExpressionAst]
 
-
 @dataclass
 class MapLiteralAst:
     fields: list[PairLiteralAst]
@@ -506,7 +499,7 @@ class RangeLiteralAst:
 PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixIndexAccessAst | PostfixSliceAccessAst | PostfixStructInitializerAst | PostfixTypeCastAst | TokenAst
 NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiteralBase02Ast
 LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | ListLiteralAst | MapLiteralAst | SetLiteralAst | PairLiteralAst | RegexLiteralAst | TupleLiteralAst
-PrimaryExpressionAst = LiteralAst | IdentifierAst | ParenthesizedExpressionAst | LambdaAst | PlaceholderAst
+PrimaryExpressionAst = LiteralAst | IdentifierAst | ParenthesizedExpressionAst | LambdaAst | PlaceholderAst | TypeAst | IfStatementAst | MatchStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst
 ExpressionAst = UnaryExpressionAst | BinaryExpressionAst | PostfixExpressionAst | MultiAssignmentExpressionAst | PrimaryExpressionAst
 StatementAst = IfStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst | MatchStatementAst | WithStatementAst | ReturnStatementAst | YieldStatementAst | TypedefStatementAst | LetStatementAst | ExpressionAst
 ModuleMemberAst = EnumPrototypeAst | ClassPrototypeAst | FunctionPrototypeAst | SupPrototypeNormalAst | SupPrototypeInheritanceAst
