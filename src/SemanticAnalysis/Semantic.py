@@ -28,11 +28,8 @@ Semantic analysis module
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-from multimethod import multimethod
-from typing import Optional
 from src.SyntacticAnalysis import Ast
+from src.SemanticAnalysis.SymbolTables import SymbolTableGenerator, SymbolTableManager
 
 
 class SemanticAnalyser:
@@ -40,7 +37,7 @@ class SemanticAnalyser:
 
     def __init__(self, ast: Ast.ProgramAst):
         self._ast = ast
+        self._symbol_table = SymbolTableManager()
+        SymbolTableGenerator.build_symbols_program(self._ast, self._symbol_table)
 
-
-class UninitializedSymbol:
-    pass
+        print(self._symbol_table)
