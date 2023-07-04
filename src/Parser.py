@@ -395,7 +395,7 @@ class Parser:
             p8 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p9 = self._parse_class_implementation().parse_once()
             p10 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return ClassPrototypeAst(p1, p2, p4, p5, p6, p7, p8)
+            return ClassPrototypeAst(p1, p2, p4, p5, p6, p7, p9)
         return BoundParser(self, inner)
 
     def _parse_classes_metaclass(self) -> BoundParser:
