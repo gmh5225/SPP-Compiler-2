@@ -1000,7 +1000,7 @@ class Parser:
     def _parse_bitwise_or_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_bitwise_xor_expression(),
-            self._parse_token(TokenType.TkPipeBar),
+            self._parse_token(TokenType.TkPipe),
             self._parse_bitwise_or_expression)
 
     def _parse_bitwise_xor_expression(self) -> BoundParser:
@@ -1060,7 +1060,7 @@ class Parser:
     def _parse_pipe_expression(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_unary_expression(),
-            self._parse_token(TokenType.TkPipe),
+            self._parse_token(TokenType.TkPipeArrow),
             self._parse_pipe_expression)
 
     def _parse_unary_expression(self) -> BoundParser:

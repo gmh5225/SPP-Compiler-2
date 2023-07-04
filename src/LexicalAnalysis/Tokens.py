@@ -12,7 +12,7 @@ class TokenType(Enum):
     # Used for bitwise operations (AND, OR, XOR, NOT, SHL, SHR, ROL, ROR)
     TkAmpersand = "&"# Also used for references
     TkAmpersandEquals = "&="
-    TkPipeBar = "|"
+    TkPipe = "|"
     TkPipeEquals = "|="
     TkCaret = "^"
     TkCaretEquals = "^="
@@ -60,7 +60,7 @@ class TokenType(Enum):
     TkDoubleQuestionMark = "??"
     TkDoubleQuestionMarkEquals = "??="
 
-    TkPipe = "|>"
+    TkPipeArrow = "|>"
     TkDoubleDot = ".."
     TkTripleDot = "..."
     TkColon = ":"
