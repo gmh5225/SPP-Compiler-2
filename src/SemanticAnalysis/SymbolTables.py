@@ -182,11 +182,12 @@ class SymbolTableGenerator:
             case Ast.WithStatementAst(): raise NotImplementedError("WithStatementAst not implemented")
             case Ast.InnerScopeAst(): SymbolTableGenerator.build_symbols_inner_scope(ast, manager)
             case Ast.LetStatementAst(): SymbolTableGenerator.build_symbols_let_statement(ast, manager)
+            case Ast.FunctionPrototypeAst(): SymbolTableGenerator.build_symbols_function(ast, manager)
             case _: raise NotImplementedError(f"Unknown Statement {ast.__class__.__name__}")
 
     @staticmethod
-    @nest_next_scope
     def build_symbols_if_statement(ast: Ast.IfStatementAst, manager: SymbolTableManager) -> None:
+        # No @nest_next_scope because the branches themselves are new scopes, not this wrapper that contains each branch
         for branch in [ast.if_branch, *ast.elif_branches, ast.else_branch]:
             SymbolTableGenerator.build_symbols_if_statement_branch(branch, manager)
 
