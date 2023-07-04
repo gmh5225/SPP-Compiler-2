@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import functools
-from typing import Callable, Any
-from src.SyntacticAnalysis.Ast import *
+from typing import Callable, Any, Optional, ParamSpec, TypeVar, Generic
+from src.SyntacticAnalysis import Ast
 from src.LexicalAnalysis.Tokens import TokenType, Token
 
 
@@ -16,7 +16,9 @@ class ParserError(Exception):
     ...
 
 
-Rule = Callable
+P = ParamSpec("P")
+T = TypeVar("T")
+
 
 EXPECTED_TOKENS = []
 ERRS = []
@@ -79,20 +81,19 @@ class ErrorFormatter:
         return final_string
 
 
-class BoundParser:
-    _rule: Rule
+class BoundParser(Generic[T]):
+    _rule: Callable[P, T]
     _parser: Parser
     _delayed: bool
     _ast: Optional[Any]
-    _future_map: Callable
 
-    def __init__(self, parser: Parser, rule: Rule):
+    def __init__(self, parser: Parser, rule: Callable[P, T]):
         self._rule = rule
         self._parser = parser
         self._delayed = False
         self._ast = None
 
-    def parse_once(self):
+    def parse_once(self) -> T:
         # Try to parse the rule once. If there is an error whilst parsing the rule, then catch it, append the current
         # BoundParser's error to the error message, and re-raise the error. This allows for the error message to be
         # propagated up the call stack.
@@ -106,10 +107,10 @@ class BoundParser:
         self._ast = results
         return self._ast
 
-    def parse_optional(self):
+    def parse_optional(self) -> Optional[T]:
         # Save the current index of the parser -- it will need to be restored if the optional parse fails, so that the
         # next rule can start from this point.
-        restore_index = self._parser._current
+        restore_index = self._parser.current
 
         # Try to parse the rule by calling the 'parse_once()' parse function -- this allows for the error message to be
         # formatted before being returned to the optional parser. If the parse is successful, then return the ast (the
@@ -126,7 +127,7 @@ class BoundParser:
             return self._ast
 
 
-    def parse_zero_or_more(self):
+    def parse_zero_or_more(self) -> list[T]:
         results = []
 
         # Use a 'while True' sot hat the parsing can continue until an error causes the loop to be returned from. This
@@ -134,7 +135,7 @@ class BoundParser:
         while True:
 
             # Save the index for restoring when a parse fails.
-            restore_index = self._parser._current
+            restore_index = self._parser.current
 
             # Call the 'parse_once()' function to parse the rule and handle error message formatting. Append the result
             # to the result list.
@@ -145,11 +146,11 @@ class BoundParser:
             # If an error is caught, then the next parse has failed, so restore the index, and don't append anything to
             # the result list. Set the ast to the list of results (usually a list of other asts), and return this list.
             except (ParseSyntaxError, ParseSyntaxMultiError):
-                self._parser._current = restore_index
+                self._parser.current = restore_index
                 self._ast = results
                 return self._ast
 
-    def parse_one_or_more(self):
+    def parse_one_or_more(self) -> list[T]:
         results = self.parse_zero_or_more()
         if not results:
             raise ParseSyntaxError("Expected at least one result")
@@ -157,11 +158,6 @@ class BoundParser:
 
     def delay_parse(self) -> BoundParser:
         self._delayed = True
-        return self
-
-    def future_map(self, func: Callable) -> BoundParser:
-        assert self._delayed
-        self._future_map = func
         return self
 
     def __or__(self, that: BoundParser) -> BoundParser:
@@ -195,7 +191,7 @@ class MultiBoundParser(BoundParser):
 
     def parse_once(self):
         for bound_parser in self._bound_parsers:
-            restore_index = self._parser._current
+            restore_index = self._parser.current
             try:
                 result = bound_parser.parse_once()
                 return result
@@ -217,7 +213,7 @@ class Parser:
         self._indent = 0
         self._dedents_expected = 0
 
-    def parse(self) -> ProgramAst:
+    def parse(self) -> Ast.ProgramAst:
         try:
             program = self._parse_program().parse_once()
             return program
@@ -234,7 +230,7 @@ class Parser:
         def inner():
             p1 = self._parse_module_prototype().parse_once()
             p2 = self._parse_eof().parse_once()
-            return ProgramAst(p1)
+            return Ast.ProgramAst(p1)
         return BoundParser(self, inner)
 
     def _parse_eof(self) -> BoundParser:
@@ -250,21 +246,21 @@ class Parser:
             p3 = self._parse_module_identifier().parse_once()
             p4 = self._parse_token(TokenType.TkSemicolon).parse_once()
             p5 = self._parse_module_implementation().parse_once()
-            return ModulePrototypeAst(p1, p3, p5)
+            return Ast.ModulePrototypeAst(p1, p3, p5)
         return BoundParser(self, inner)
 
     def _parse_module_implementation(self) -> BoundParser:
         def inner():
             p1 = self._parse_import_block().parse_optional()
             p2 = self._parse_module_member().parse_zero_or_more()
-            return ModuleImplementationAst(p1, p2)
+            return Ast.ModuleImplementationAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_module_identifier(self) -> BoundParser:
         def inner():
             p1 = self._parse_identifier().parse_once()
             p2 = self._parse_module_identifier_next_part().parse_zero_or_more()
-            return ModuleIdentifierAst([p1, *p2])
+            return Ast.ModuleIdentifierAst([p1, *p2])
         return BoundParser(self, inner)
 
     def _parse_module_identifier_next_part(self) -> BoundParser:
@@ -290,7 +286,7 @@ class Parser:
     def _parse_import_block(self) -> BoundParser:
         def inner():
             p1 = self._parse_import_statement().parse_zero_or_more()
-            return ImportBlockAst(p1)
+            return Ast.ImportBlockAst(p1)
         return BoundParser(self, inner)
 
     def _parse_import_statement(self) -> BoundParser:
@@ -299,13 +295,13 @@ class Parser:
             p2 = self._parse_import_identifier().parse_once()
             p3 = self._parse_import_what().parse_once()
             p4 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return ImportStatementAst(p2, p3)
+            return Ast.ImportStatementAst(p2, p3)
         return BoundParser(self, inner)
 
     def _parse_import_identifier(self) -> BoundParser:
         def inner():
             p1 = self._parse_import_identifier_part().parse_one_or_more()
-            return ImportIdentifierAst(p1)
+            return Ast.ImportIdentifierAst(p1)
         return BoundParser(self, inner)
 
     def _parse_import_identifier_part(self) -> BoundParser:
@@ -327,13 +323,13 @@ class Parser:
     def _parse_import_all(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkAsterisk).parse_once()
-            return ImportTypesAllAst()
+            return Ast.ImportTypesAllAst()
         return BoundParser(self, inner)
 
     def _parse_import_single(self) -> BoundParser:
         def inner():
             p1 = self._parse_import_type().parse_once()
-            return ImportTypesIndividualAst([p1])
+            return Ast.ImportTypesIndividualAst([p1])
         return BoundParser(self, inner)
 
     def _parse_import_multiple(self) -> BoundParser:
@@ -341,7 +337,7 @@ class Parser:
             p1 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p2 = self._parse_import_types().parse_once()
             p3 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return ImportTypesIndividualAst(p2)
+            return Ast.ImportTypesIndividualAst(p2)
         return BoundParser(self, inner)
 
     def _parse_import_types(self) -> BoundParser:
@@ -362,7 +358,7 @@ class Parser:
         def inner():
             p1 = self._parse_identifier().parse_once()
             p2 = self._parse_import_type_alias().parse_optional()
-            return ImportTypeAst(p1, p2)
+            return Ast.ImportTypeAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_import_type_alias(self):
@@ -395,7 +391,7 @@ class Parser:
             p8 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p9 = self._parse_class_implementation().parse_once()
             p10 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return ClassPrototypeAst(p1, p2, p4, p5, p6, p7, p9)
+            return Ast.ClassPrototypeAst(p1, p2, p4, p5, p6, p7, p9)
         return BoundParser(self, inner)
 
     def _parse_classes_metaclass(self) -> BoundParser:
@@ -408,7 +404,7 @@ class Parser:
     def _parse_class_implementation(self) -> BoundParser:
         def inner():
             p1 = self._parse_class_member().parse_zero_or_more()
-            return ClassImplementationAst(p1)
+            return Ast.ClassImplementationAst(p1)
         return BoundParser(self, inner)
 
     def _parse_class_member(self) -> BoundParser:
@@ -427,7 +423,7 @@ class Parser:
             p4 = self._parse_token(TokenType.TkColon).parse_once()
             p5 = self._parse_type_identifier().parse_once()
             p6 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return ClassInstanceAttributeAst(p1, p2, p3, p5)
+            return Ast.ClassInstanceAttributeAst(p1, p2, p3, p5)
         return BoundParser(self, inner)
 
     def _parse_class_attribute_static(self) -> BoundParser:
@@ -438,7 +434,7 @@ class Parser:
             p4 = self._parse_token(TokenType.TkEqual).parse_once()
             p5 = self._parse_expression().parse_once()
             p6 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return ClassStaticAttributeAst(p1, p2, p3, p5)
+            return Ast.ClassStaticAttributeAst(p1, p2, p3, p5)
         return BoundParser(self, inner)
 
     def _parse_class_attribute_identifier(self) -> BoundParser:
@@ -478,7 +474,7 @@ class Parser:
             p8 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p9 = self._parse_sup_implementation().parse_once()
             p10 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return SupPrototypeNormalAst(p5, p6, p7, p9)
+            return Ast.SupPrototypeNormalAst(p5, p6, p7, p9)
         return BoundParser(self, inner)
 
     def _parse_sup_prototype_with_inherit(self):
@@ -491,13 +487,13 @@ class Parser:
             p10 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p11 = self._parse_sup_implementation().parse_once()
             p12 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return SupPrototypeInheritanceAst(p5, p8, p9, p11, p6)
+            return Ast.SupPrototypeInheritanceAst(p5, p8, p9, p11, p6)
         return BoundParser(self, inner)
 
     def _parse_sup_implementation(self) -> BoundParser:
         def inner():
             p1 = self._parse_sup_member().parse_zero_or_more()
-            return SupImplementationAst(p1)
+            return Ast.SupImplementationAst(p1)
         return BoundParser(self, inner)
 
     def _parse_sup_member(self) -> BoundParser:
@@ -518,13 +514,13 @@ class Parser:
         def inner():
             p1 = self._parse_access_modifier().parse_optional()
             p2 = self._parse_statement_typedef().parse_once()
-            return SupTypedefAst(p1, p2.old_type, p2.new_type)
+            return Ast.SupTypedefAst(p1, p2.old_type, p2.new_type)
         return BoundParser(self, inner)
 
     def _parse_sup_method_prototype(self) -> BoundParser:
         def inner():
             p1 = self._parse_function_prototype().parse_once()
-            return SupMethodPrototypeAst(p1.decorators, p1.modifier, p1.is_async, p1.identifier, p1.generic_parameters, p1.parameters, p1.return_type, p1.where_block, p1.value_guard, p1.body)
+            return Ast.SupMethodPrototypeAst(p1.decorators, p1.modifier, p1.is_async, p1.identifier, p1.generic_parameters, p1.parameters, p1.return_type, p1.where_block, p1.value_guard, p1.body)
         return BoundParser(self, inner)
 
     # Meta-classes
@@ -539,7 +535,7 @@ class Parser:
             p6 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p7 = self._parse_meta_implementation().parse_once()
             p8 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return MetaPrototypeAst(p3, p4, p5, p7)
+            return Ast.MetaPrototypeAst(p3, p4, p5, p7)
         return BoundParser(self, inner)
 
     def _parse_meta_identifier(self) -> BoundParser:
@@ -551,7 +547,7 @@ class Parser:
     def _parse_meta_implementation(self) -> BoundParser:
         def inner():
             p1 = self._parse_class_implementation().parse_once()
-            return MetaImplementationAst(p1.members)
+            return Ast.MetaImplementationAst(p1.members)
         return BoundParser(self, inner)
 
     # Enums
@@ -566,7 +562,7 @@ class Parser:
             p6 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p7 = self._parse_enum_implementation().parse_once()
             p8 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return EnumPrototypeAst(p1, p3, p4, p5, p7)
+            return Ast.EnumPrototypeAst(p1, p3, p4, p5, p7)
         return BoundParser(self, inner)
 
     def _parse_enum_implementation(self) -> BoundParser:
@@ -574,7 +570,7 @@ class Parser:
             p1 = self._parse_enum_member().parse_once()
             p2 = self._parse_enum_member_next().parse_zero_or_more()
             p3 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return EnumImplementationAst([p1, *p2])
+            return Ast.EnumImplementationAst([p1, *p2])
         return BoundParser(self, inner)
 
     def _parse_enum_member_next(self):
@@ -588,7 +584,7 @@ class Parser:
         def inner():
             p1 = self._parse_enum_member_identifier().parse_once()
             p2 = self._parse_enum_member_value_wrapper().parse_optional()
-            return EnumMemberAst(p1, p2)
+            return Ast.EnumMemberAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_enum_member_value_wrapper(self):
@@ -628,13 +624,13 @@ class Parser:
             p12 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p13 = self._parse_function_implementation().parse_once()
             p14 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return FunctionPrototypeAst(p1, p2, p3, p5, p6, p7, p9, p10, p11, p13)
+            return Ast.FunctionPrototypeAst(p1, p2, p3, p5, p6, p7, p9, p10, p11, p13)
         return BoundParser(self, inner)
 
     def _parse_function_implementation(self) -> BoundParser:
         def inner():
             p1 = self._parse_statement().parse_zero_or_more()
-            return FunctionImplementationAst(p1)
+            return Ast.FunctionImplementationAst(p1)
         return BoundParser(self, inner)
 
     def _parse_function_identifier(self) -> BoundParser:
@@ -694,7 +690,7 @@ class Parser:
             p1 = self._parse_unary_operator_reference().parse_optional()
             p2 = self._parse_operator_identifier_variadic().parse_optional() is not None
             p3 = self._parse_non_assignment_expression().parse_once()
-            return FunctionArgumentNormalAst(p1, p3, p2)
+            return Ast.FunctionArgumentNormalAst(p1, p3, p2)
         return BoundParser(self, inner)
 
     def _parse_function_call_named_argument(self) -> BoundParser:
@@ -703,12 +699,15 @@ class Parser:
             p2 = self._parse_token(TokenType.TkEqual).parse_once()
             p3 = self._parse_unary_operator_reference().parse_optional()
             p4 = self._parse_expression().parse_once()
-            return FunctionArgumentNamedAst(p1, p3, p4)
+            return Ast.FunctionArgumentNamedAst(p1, p3, p4)
         return BoundParser(self, inner)
 
     # Function Parameters
 
     def _parse_function_parameters(self) -> BoundParser:
+        """
+        Get the required parameters followed by the optional parameters
+        """
         def inner():
             p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
             p2 = self._parse_function_parameters_required_then_optional().parse_optional() or []
@@ -717,6 +716,12 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_function_parameters_required_then_optional(self) -> BoundParser:
+        """
+        The order of parsing, starting with Required as a minimum:
+            - Required+ -> Optional* -> Variadic?
+            - Optional+ -> Variadic?
+            - Variadic?
+        """
         def inner():
             p1 = self._parse_function_required_parameters().delay_parse()
             p2 = self._parse_function_optional_parameters().delay_parse()
@@ -726,6 +731,11 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_function_parameters_optional_then_variadic(self) -> BoundParser:
+        """
+        The order of parsing, starting with Optional as a minimum:
+            - Optional+ -> Variadic?
+            - Variadic?
+        """
         def inner():
             p1 = self._parse_function_optional_parameters().delay_parse()
             p2 = self._parse_function_variadic_parameter().delay_parse()
@@ -734,6 +744,10 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_function_required_parameters(self) -> BoundParser:
+        """
+        To parse parameters from a Required parameter and onwards, parse the Required parameter, and optionally the rest
+        of the parameters that are allowed to follow a Required parameter.
+        """
         def inner():
             p3 = self._parse_function_required_parameter().parse_once()
             p4 = self._parse_function_rest_of_required_parameters().parse_optional()
@@ -741,6 +755,10 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_function_rest_of_required_parameters(self) -> BoundParser:
+        """
+        To parse parameters that are allowed to follow Required parameters, parse the comma, and then parse either a
+        Required or Optional parameter, from self._parse_function_parameters_required_then_optional
+        """
         def inner():
             p1 = self._parse_token(TokenType.TkComma).parse_once()
             p2 = self._parse_function_parameters_required_then_optional().parse_once()
@@ -768,7 +786,7 @@ class Parser:
             p3 = self._parse_token(TokenType.TkColon).parse_once()
             p4 = self._parse_unary_operator_reference().parse_optional()
             p5 = self._parse_type_identifier().parse_once()
-            return FunctionParameterRequiredAst(p1 is not None, p2, p4, p5)
+            return Ast.FunctionParameterRequiredAst(p1 is not None, p2, p4, p5)
         return BoundParser(self, inner)
 
     def _parse_function_optional_parameter(self) -> BoundParser:
@@ -776,14 +794,14 @@ class Parser:
             p1 = self._parse_function_required_parameter().parse_once()
             p2 = self._parse_token(TokenType.TkEqual).parse_once()
             p3 = self._parse_expression().parse_once()
-            return FunctionParameterOptionalAst(p1, p3)
+            return Ast.FunctionParameterOptionalAst(p1, p3)
         return BoundParser(self, inner)
 
     def _parse_function_variadic_parameter(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkTripleDot).parse_once()
             p2 = self._parse_function_required_parameter().parse_once()
-            return FunctionParameterVariadicAst(p2)
+            return Ast.FunctionParameterVariadicAst(p2)
         return BoundParser(self, inner)
 
     def _parse_function_parameter_identifier(self) -> BoundParser:
@@ -800,7 +818,7 @@ class Parser:
             p2 = self._parse_token(TokenType.TkLeftBracket).parse_once()
             p3 = self._parse_where_constraints().parse_once()
             p4 = self._parse_token(TokenType.TkRightBracket).parse_once()
-            return WhereBlockAst(p3)
+            return Ast.WhereBlockAst(p3)
         return BoundParser(self, inner)
 
     def _parse_where_constraints(self) -> BoundParser:
@@ -822,7 +840,7 @@ class Parser:
             p1 = self._parse_type_identifiers().parse_once()
             p2 = self._parse_token(TokenType.TkColon).parse_once()
             p3 = self._parse_where_constraint_chain().parse_once()
-            return WhereConstraintAst(p1, p3)
+            return Ast.WhereConstraintAst(p1, p3)
         return BoundParser(self, inner)
 
     def _parse_where_constraint_chain(self) -> BoundParser:
@@ -849,7 +867,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.KwIf).parse_once()
             p2 = self._parse_expression().parse_once()
-            return ValueGuardAst(p2)
+            return Ast.ValueGuardAst(p2)
         return BoundParser(self, inner)
 
     # Decorators
@@ -860,7 +878,7 @@ class Parser:
             p2 = self._parse_decorator_identifier().parse_once()
             p3 = self._parse_type_generic_arguments().parse_optional()
             p4 = self._parse_function_call_arguments().parse_optional()
-            return DecoratorAst(p2, p3, p4)
+            return Ast.DecoratorAst(p2, p3, p4)
         return BoundParser(self, inner)
 
     def _parse_decorators(self) -> BoundParser:
@@ -926,7 +944,7 @@ class Parser:
             p6 = self._parse_token(TokenType.TkEqual).parse_once()
             p7 = self._parse_assignment_expression().parse_once()
             p8 = self._parse_assignment_multiple_rhs().parse_zero_or_more()
-            return MultiAssignmentExpressionAst([p4, *p5], [p7, *p8])
+            return Ast.MultiAssignmentExpressionAst([p4, *p5], [p7, *p8])
         return BoundParser(self, inner)
 
     def _parse_assignment_multiple_lhs(self) -> BoundParser:
@@ -1038,7 +1056,7 @@ class Parser:
             p1 = self._parse_operator_identifier_unary().parse_zero_or_more()
             p2 = self._parse_postfix_expression().parse_once()
             for op in reversed(p1):
-                p2 = UnaryExpressionAst(op, p2)
+                p2 = Ast.UnaryExpressionAst(op, p2)
             return p2
         return BoundParser(self, inner)
 
@@ -1047,7 +1065,7 @@ class Parser:
             p1 = self._parse_primary_expression().parse_once()
             p2 = self._parse_operator_identifier_postfix().parse_zero_or_more()
             for op in p2:
-                p1 = PostfixExpressionAst(p1, op)
+                p1 = Ast.PostfixExpressionAst(p1, op)
             return p1
         return BoundParser(self, inner)
 
@@ -1079,7 +1097,7 @@ class Parser:
         def inner(lhs, op, rhs):
             p1 = lhs.parse_once()
             p2 = self._parse_binary_expression_rhs(op, rhs).parse_optional()
-            return p1 if p2 is None else BinaryExpressionAst(p1, p2[0], p2[1])
+            return p1 if p2 is None else Ast.BinaryExpressionAst(p1, p2[0], p2[1])
         return BoundParser(self, functools.partial(inner, __lhs, __op, __rhs))
 
     def _parse_binary_expression_rhs(self, __op, __rhs) -> BoundParser:
@@ -1094,13 +1112,13 @@ class Parser:
             p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
             p2 = self._parse_expression().parse_once()
             p3 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
-            return ParenthesizedExpressionAst(p2)
+            return Ast.ParenthesizedExpressionAst(p2)
         return BoundParser(self, inner)
 
     def _parse_expression_placeholder(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkUnderscore).parse_once()
-            return PlaceholderAst()
+            return Ast.PlaceholderAst()
         return BoundParser(self, inner)
 
     # Lambda
@@ -1112,7 +1130,7 @@ class Parser:
             p3 = self._parse_lambda_parameters().parse_once()
             p4 = self._parse_token(TokenType.TkRightFatArrow).parse_once()
             p5 = self._parse_lambda_implementation().parse_once()
-            return LambdaAst(p1, p2, p3, p5)
+            return Ast.LambdaAst(p1, p2, p3, p5)
         return BoundParser(self, inner)
 
     def _parse_lambda_capture_list(self) -> BoundParser:
@@ -1135,7 +1153,7 @@ class Parser:
         def inner():
             p1 = self._parse_lambda_capture_item_alias().parse_optional()
             p2 = self._parse_expression().parse_once()
-            return LambdaCaptureItemAst(p1, p2)
+            return Ast.LambdaCaptureItemAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_lambda_capture_item_alias(self) -> BoundParser:
@@ -1171,7 +1189,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.KwMut).parse_optional()
             p2 = self._parse_function_parameter_identifier().parse_once()
-            return LambdaParameterAst(p1, p2)
+            return Ast.LambdaParameterAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_lambda_implementation(self) -> BoundParser:
@@ -1186,7 +1204,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.KwSelf).parse_once()
             p2 = self._parse_type_raw_identifiers_rest().parse_optional() or []
-            return TypeAst([SelfTypeAst(), *p2])
+            return Ast.TypeAst([Ast.SelfTypeAst(), *p2])
         return BoundParser(self, inner)
 
     def _parse_type_raw_identifiers_rest(self) -> BoundParser:
@@ -1287,7 +1305,7 @@ class Parser:
     def _parse_type_generic_normal_argument(self) -> BoundParser:
         def inner():
             p1 = self._parse_type_identifier().parse_once()
-            return TypeGenericArgumentNormalAst(p1)
+            return Ast.TypeGenericArgumentNormalAst(p1)
         return BoundParser(self, inner)
 
     def _parse_type_generic_named_argument(self) -> BoundParser:
@@ -1295,7 +1313,7 @@ class Parser:
             p1 = self._parse_identifier().parse_once()
             p2 = self._parse_token(TokenType.TkEqual).parse_once()
             p3 = self._parse_type_identifier().parse_once()
-            return TypeGenericArgumentNamedAst(p1, p3)
+            return Ast.TypeGenericArgumentNamedAst(p1, p3)
         return BoundParser(self, inner)
 
     # Type Generic Parameters
@@ -1357,7 +1375,7 @@ class Parser:
         def inner():
             p1 = self._parse_identifier().parse_once()
             p2 = self._parse_type_generic_parameter_inline_constraint().parse_optional()
-            return TypeGenericParameterRequiredAst(p1, p2)
+            return Ast.TypeGenericParameterRequiredAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_type_generic_optional_parameter(self) -> BoundParser:
@@ -1365,7 +1383,7 @@ class Parser:
             p1 = self._parse_type_generic_required_parameter().parse_once()
             p2 = self._parse_token(TokenType.TkEqual).parse_once()
             p3 = self._parse_type_identifier().parse_once()
-            return TypeGenericParameterOptionalAst(p1, p3)
+            return Ast.TypeGenericParameterOptionalAst(p1, p3)
         return BoundParser(self, inner)
 
     def _parse_type_generic_variadic_parameters(self) -> BoundParser:
@@ -1379,7 +1397,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.TkTripleDot).parse_once()
             p2 = self._parse_type_generic_required_parameter().parse_once()
-            return TypeGenericParameterVariadicAst(p2)
+            return Ast.TypeGenericParameterVariadicAst(p2)
         return BoundParser(self, inner)
 
     def _parse_type_generic_rest_of_variadic_parameters(self) -> BoundParser:
@@ -1405,7 +1423,7 @@ class Parser:
             p3 = self._parse_token(TokenType.TkEqual).parse_once()
             p4 = self._parse_expression().parse_once()
             p6 = self._parse_token(TokenType.TkComma).parse_once()
-            return LetStatementAst([p2], [p4], None)
+            return Ast.LetStatementAst([p2], [p4], None)
         return BoundParser(self, inner)
 
     def _parse_statement_if(self) -> BoundParser:
@@ -1413,7 +1431,7 @@ class Parser:
             p1 = self._parse_statement_if_branch().parse_once()
             p5 = self._parse_statement_elif_branch().parse_zero_or_more()
             p6 = self._parse_statement_else_branch().parse_optional()
-            return IfStatementAst(p1, p5, p6)
+            return Ast.IfStatementAst(p1, p5, p6)
         return BoundParser(self, inner)
 
     def _parse_statement_if_branch(self) -> BoundParser:
@@ -1422,7 +1440,7 @@ class Parser:
             p2 = self._parse_statement_inline_definition().parse_zero_or_more()
             p3 = self._parse_expression().parse_once()
             p4 = self._parse_statement_block().parse_once()
-            return IfStatementBranchAst(p2, p3, p4)
+            return Ast.IfStatementBranchAst(p2, p3, p4)
         return BoundParser(self, inner)
 
     def _parse_statement_elif_branch(self) -> BoundParser:
@@ -1431,14 +1449,14 @@ class Parser:
             p2 = self._parse_statement_inline_definition().parse_zero_or_more()
             p3 = self._parse_expression().parse_once()
             p4 = self._parse_statement_block().parse_once()
-            return ElifStatementBranchAst(p2, p3, p4)
+            return Ast.ElifStatementBranchAst(p2, p3, p4)
         return BoundParser(self, inner)
 
     def _parse_statement_else_branch(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwElse).parse_once()
             p2 = self._parse_statement_block().parse_once()
-            return ElseStatementBranchAst(p2)
+            return Ast.ElseStatementBranchAst(p2)
         return BoundParser(self, inner)
 
     def _parse_statement_while(self) -> BoundParser:
@@ -1447,7 +1465,7 @@ class Parser:
             p2 = self._parse_expression().parse_once()
             p3 = self._parse_statement_loop_tag().parse_optional()
             p4 = self._parse_statement_block().parse_once()
-            return WhileStatementAst(p2, p3, p4)
+            return Ast.WhileStatementAst(p2, p3, p4)
         return BoundParser(self, inner)
 
     def _parse_statement_for(self) -> BoundParser:
@@ -1458,7 +1476,7 @@ class Parser:
             p4 = self._parse_expression().parse_once()
             p5 = self._parse_statement_loop_tag().parse_optional()
             p6 = self._parse_statement_block().parse_once()
-            return ForStatementAst(p2, p4, p5, p6)
+            return Ast.ForStatementAst(p2, p4, p5, p6)
         return BoundParser(self, inner)
 
     def _parse_statement_do(self) -> BoundParser:
@@ -1468,7 +1486,7 @@ class Parser:
             p3 = self._parse_statement_block().parse_once()
             p4 = self._parse_token(TokenType.KwWhile).parse_once()
             p5 = self._parse_expression().parse_once()
-            return DoWhileStatementAst(p2, p3, p5)
+            return Ast.DoWhileStatementAst(p2, p3, p5)
         return BoundParser(self, inner)
 
     def _parse_statement_match(self) -> BoundParser:
@@ -1476,7 +1494,7 @@ class Parser:
             p1 = self._parse_token(TokenType.KwMatch).parse_once()
             p2 = self._parse_expression().parse_once()
             p3 = self._parse_statement_cases().parse_once()
-            return MatchStatementAst(p2, p3)
+            return Ast.MatchStatementAst(p2, p3)
         return BoundParser(self, inner)
 
     def _parse_statement_case_expression(self) -> BoundParser:
@@ -1505,7 +1523,7 @@ class Parser:
             p3 = self._parse_value_guard().parse_optional()
             p4 = self._parse_token(TokenType.TkRightFatArrow).parse_once()
             p5 = self._parse_statement_block().parse_once()
-            return CaseStatementAst(p2, p3, p5)
+            return Ast.CaseStatementAst(p2, p3, p5)
         return BoundParser(self, inner)
 
     def _parse_statement_with(self) -> BoundParser:
@@ -1514,7 +1532,7 @@ class Parser:
             p2 = self._parse_expression().parse_once()
             p3 = self._parse_statement_with_expression_alias().parse_optional()
             p4 = self._parse_statement_block().parse_once()
-            return WithStatementAst(p2, p3, p4)
+            return Ast.WithStatementAst(p2, p3, p4)
         return BoundParser(self, inner)
 
     def _parse_statement_with_expression_alias(self) -> BoundParser:
@@ -1529,7 +1547,7 @@ class Parser:
             p1 = self._parse_token(TokenType.KwReturn).parse_once()
             p2 = self._parse_expression().parse_optional()
             p3 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return ReturnStatementAst(p2)
+            return Ast.ReturnStatementAst(p2)
         return BoundParser(self, inner)
 
     def _parse_statement_yield(self) -> BoundParser:
@@ -1537,7 +1555,7 @@ class Parser:
             p1 = self._parse_token(TokenType.KwYield).parse_once()
             p2 = self._parse_expression().parse_optional()
             p3 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return YieldStatementAst(p2)
+            return Ast.YieldStatementAst(p2)
         return BoundParser(self, inner)
 
     def _parse_statement_typedef(self) -> BoundParser:
@@ -1547,7 +1565,7 @@ class Parser:
             p3 = self._parse_token(TokenType.KwAs).parse_once()
             p4 = self._parse_type_identifier().parse_once()
             p5 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return TypedefStatementAst(p2, p4)
+            return Ast.TypedefStatementAst(p2, p4)
         return BoundParser(self, inner)
 
     def _parse_statement_break(self) -> BoundParser:
@@ -1556,7 +1574,7 @@ class Parser:
             p2 = self._parse_tag_identifier().parse_optional()
             p3 = self._parse_expressions().parse_optional() or []
             p4 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return BreakStatementAst(p2, p3)
+            return Ast.BreakStatementAst(p2, p3)
         return BoundParser(self, inner)
 
     def _parse_statement_continue(self) -> BoundParser:
@@ -1564,7 +1582,7 @@ class Parser:
             p1 = self._parse_token(TokenType.KwContinue).parse_once()
             p2 = self._parse_tag_identifier().parse_optional()
             p3 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return ContinueStatementAst(p2)
+            return Ast.ContinueStatementAst(p2)
         return BoundParser(self, inner)
 
     def _parse_statement_loop_tag(self) -> BoundParser:
@@ -1577,7 +1595,7 @@ class Parser:
     def _parse_tag_identifier(self) -> BoundParser:
         def inner():
             p1 = self._parse_lexeme(TokenType.LxTag).parse_once()
-            return TagIdentifierAst(p1)
+            return Ast.TagIdentifierAst(p1)
         return BoundParser(self, inner)
 
     def _parse_statement_block(self) -> BoundParser:
@@ -1604,7 +1622,7 @@ class Parser:
             p4 = self._parse_statement_let_value().delay_parse()
             p5 = (p3 | p4).parse_once()
             p6 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return LetStatementAst(p2, [], p5) if isinstance(p5, TypeAst) else LetStatementAst(p2, p5, None)
+            return Ast.LetStatementAst(p2, [], p5) if isinstance(p5, Ast.TypeAst) else Ast.LetStatementAst(p2, p5, None)
         return BoundParser(self, inner)
 
     def _parse_statement_let_value(self) -> BoundParser:
@@ -1625,7 +1643,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.KwMut).parse_optional() is not None
             p2 = self._parse_identifier().parse_once()
-            return LocalVariableAst(p1, p2)
+            return Ast.LocalVariableAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_local_variable_identifiers(self) -> BoundParser:
@@ -1654,7 +1672,7 @@ class Parser:
             p1 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p2 = self._parse_statement().parse_zero_or_more()
             p3 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return InnerScopeAst(p2)
+            return Ast.InnerScopeAst(p2)
         return BoundParser(self, inner)
 
     def _parse_statement(self) -> BoundParser:
@@ -1683,14 +1701,14 @@ class Parser:
     def _parse_identifier(self) -> BoundParser:
         def inner():
             p1 = self._parse_lexeme(TokenType.LxIdentifier).parse_once()
-            return IdentifierAst(p1)
+            return Ast.IdentifierAst(p1)
         return BoundParser(self, inner)
 
     def _parse_generic_identifier(self) -> BoundParser:
         def inner():
             p1 = self._parse_lexeme(TokenType.LxIdentifier).parse_once()
             p2 = self._parse_type_generic_arguments().parse_optional() or []
-            return GenericIdentifierAst(p1, p2)
+            return Ast.GenericIdentifierAst(p1, p2)
         return BoundParser(self, inner)
 
     # Postfix operations
@@ -1699,14 +1717,14 @@ class Parser:
         def inner():
             p1 = self._parse_function_call_arguments().parse_once()
             p2 = self._parse_operator_identifier_variadic().parse_optional() is not None
-            return PostfixFunctionCallAst(p1, p2)
+            return Ast.PostfixFunctionCallAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_postfix_operator_member_access(self) -> BoundParser:
         def inner():
             p1 = self._parse_operator_identifier_member_access().parse_once()
             p2 = self._parse_generic_identifier().parse_once()
-            return PostfixMemberAccessAst(p1, p2)
+            return Ast.PostfixMemberAccessAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_postfix_operator_index_access(self) -> BoundParser:
@@ -1714,7 +1732,7 @@ class Parser:
             p1 = self._parse_token(TokenType.TkLeftBracket).parse_once()
             p2 = self._parse_expression().parse_once()
             p3 = self._parse_token(TokenType.TkRightBracket).parse_once()
-            return PostfixIndexAccessAst(p2)
+            return Ast.PostfixIndexAccessAst(p2)
         return BoundParser(self, inner)
 
     def _parse_iterable_step(self) -> BoundParser:
@@ -1729,7 +1747,7 @@ class Parser:
             p1 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p2 = self._parse_postfix_operator_struct_initializer_fields().parse_optional()
             p3 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return PostfixStructInitializerAst(p2)
+            return Ast.PostfixStructInitializerAst(p2)
         return BoundParser(self, inner)
 
     def _parse_postfix_operator_struct_initializer_fields(self) -> BoundParser:
@@ -1750,7 +1768,7 @@ class Parser:
         def inner():
             p1 = self._parse_postfix_operator_struct_initializer_field_identifier().parse_once()
             p2 = self._parse_postfix_operator_struct_initializer_field_value_different_to_identifier().parse_optional()
-            return PostfixStructInitializerFieldAst(p1, p2)
+            return Ast.PostfixStructInitializerFieldAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_postfix_operator_struct_initializer_field_value_different_to_identifier(self) -> BoundParser:
@@ -1880,7 +1898,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.TkAmpersand).parse_once()
             p2 = self._parse_token(TokenType.KwMut).parse_optional() is not None
-            return TokenAst(p1.primary, p2 is not None)
+            return Ast.TokenAst(p1.primary, p2 is not None)
         return BoundParser(self, inner)
 
     def _parse_operator_identifier_variadic(self) -> BoundParser:
@@ -1936,13 +1954,13 @@ class Parser:
     def _parse_literal_string(self) -> BoundParser:
         def inner():
             p1 = self._parse_lexeme(TokenType.LxDoubleQuoteStr).parse_once()
-            return StringLiteralAst(p1)
+            return Ast.StringLiteralAst(p1)
         return BoundParser(self, inner)
 
     def _parse_literal_char(self) -> BoundParser:
         def inner():
             p1 = self._parse_lexeme(TokenType.LxSingleQuoteChr).parse_once()
-            return CharLiteralAst(p1)
+            return Ast.CharLiteralAst(p1)
         return BoundParser(self, inner)
 
     def _parse_literal_boolean(self) -> BoundParser:
@@ -1950,7 +1968,7 @@ class Parser:
             p1 = self._parse_token(TokenType.KwTrue).delay_parse()
             p2 = self._parse_token(TokenType.KwFalse).delay_parse()
             p3 = (p1 | p2).parse_once()
-            return BoolLiteralAst(p3.primary.token_type == TokenType.KwTrue)
+            return Ast.BoolLiteralAst(p3.primary.token_type == TokenType.KwTrue)
         return BoundParser(self, inner)
 
     def _parse_literal_list(self) -> BoundParser:
@@ -1958,7 +1976,7 @@ class Parser:
             p1 = self._parse_token(TokenType.TkLeftBracket).parse_once()
             p2 = self._parse_expressions().parse_optional() or []
             p3 = self._parse_token(TokenType.TkRightBracket).parse_once()
-            return ListLiteralAst(p2)
+            return Ast.ListLiteralAst(p2)
         return BoundParser(self, inner)
 
     def _parse_literal_set(self) -> BoundParser:
@@ -1966,7 +1984,7 @@ class Parser:
             p1 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p2 = self._parse_expressions().parse_optional() or []
             p3 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return SetLiteralAst(p2)
+            return Ast.SetLiteralAst(p2)
         return BoundParser(self, inner)
 
     def _parse_literal_map(self) -> BoundParser:
@@ -1974,7 +1992,7 @@ class Parser:
             p1 = self._parse_token(TokenType.TkLeftBrace).parse_once()
             p2 = self._parse_internal_pairs().parse_once() # {} is a set
             p3 = self._parse_token(TokenType.TkRightBrace).parse_once()
-            return MapLiteralAst(p2)
+            return Ast.MapLiteralAst(p2)
         return BoundParser(self, inner)
 
     def _parse_internal_pair(self) -> BoundParser:
@@ -1982,7 +2000,7 @@ class Parser:
             p1 = self._parse_expression().parse_once()
             p2 = self._parse_token(TokenType.TkColon).parse_once()
             p3 = self._parse_expression().parse_once()
-            return PairLiteralAst(p1, p3)
+            return Ast.PairLiteralAst(p1, p3)
         return BoundParser(self, inner)
 
     def _parse_internal_pair_next(self) -> BoundParser:
@@ -2002,7 +2020,7 @@ class Parser:
     def _parse_literal_regex(self) -> BoundParser:
         def inner():
             p1 = self._parse_lexeme(TokenType.LxRegex).parse_once()
-            return RegexLiteralAst(p1)
+            return Ast.RegexLiteralAst(p1)
         return BoundParser(self, inner)
 
     def _parse_literal_tuple(self) -> BoundParser:
@@ -2012,7 +2030,7 @@ class Parser:
             p3 = self._parse_literal_tuple_with_multiple_elements().delay_parse()
             p4 = (p2 | p3).parse_once()
             p5 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
-            return TupleLiteralAst(p4)
+            return Ast.TupleLiteralAst(p4)
         return BoundParser(self, inner)
 
     def _parse_literal_tuple_with_0_or_1_element(self) -> BoundParser:
@@ -2041,13 +2059,13 @@ class Parser:
             p1 = self._parse_expression().parse_once()
             p2 = self._parse_token(TokenType.TkDoubleDot).parse_once()
             p3 = self._parse_expression().parse_optional()
-            return RangeLiteralAst(p1, p3)
+            return Ast.RangeLiteralAst(p1, p3)
         return BoundParser(self, inner)
 
     def _parse_literal_number_base_02(self) -> BoundParser:
         def inner():
             p1 = self._parse_lexeme(TokenType.LxBinDigits).parse_once()
-            return NumberLiteralBase02Ast(p1)
+            return Ast.NumberLiteralBase02Ast(p1)
         return BoundParser(self, inner)
 
     def _parse_literal_number_base_10(self) -> BoundParser:
@@ -2059,7 +2077,7 @@ class Parser:
     def _parse_literal_number_base_16(self) -> BoundParser:
         def inner():
             p1 = self._parse_lexeme(TokenType.LxHexDigits).parse_once()
-            return NumberLiteralBase16Ast(p1)
+            return Ast.NumberLiteralBase16Ast(p1)
         return BoundParser(self, inner)
 
     # Number
@@ -2070,7 +2088,7 @@ class Parser:
             p2 = self._parse_numeric_decimal().parse_optional()
             p3 = self._parse_numeric_complex().parse_optional()
             p4 = self._parse_numeric_exponent().parse_optional() is not None
-            return NumberLiteralBase10Ast(p1, p2, p3, p4)
+            return Ast.NumberLiteralBase10Ast(p1, p2, p3, p4)
         return BoundParser(self, inner)
 
     def _parse_numeric_integer(self) -> BoundParser:
@@ -2097,7 +2115,7 @@ class Parser:
             p1 = self._parse_character('e').parse_once()
             p2 = self._parse_operator_identifier_additive().parse_optional()
             p3 = self._parse_numeric_integer().parse_once()
-            return NumberExponentAst(p2, p3)
+            return Ast.NumberExponentAst(p2, p3)
         return BoundParser(self, inner)
 
     # Misc
@@ -2143,7 +2161,7 @@ class Parser:
 
             self._current += 1
 
-            return TokenAst(self._tokens[self._current - 1], None)
+            return Ast.TokenAst(self._tokens[self._current - 1], None)
         return BoundParser(self, inner)
 
     def _parse_lexeme(self, lexeme: TokenType) -> BoundParser:
@@ -2163,3 +2181,11 @@ class Parser:
     def _skip(self, token: TokenType):
         while self._current < len(self._tokens) and self._tokens[self._current].token_type == token:
             self._current += 1
+
+    @property
+    def current(self) -> int:
+        return self._current
+
+    @current.setter
+    def current(self, value: int) -> None:
+        self._current = value
