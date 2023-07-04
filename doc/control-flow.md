@@ -98,7 +98,7 @@ such as `.foo` or `()`, allowing chaining.
 
 #### Example:
 ```s++
-while x < y as $outer_loop {
+while x < y as 'outer_loop {
     do_something(x, y);
 }
 ```
@@ -120,7 +120,7 @@ while x < y as $outer_loop {
 
 #### Example:
 ```s++
-for x, y in z.iter() as $outer_loop {
+for x, y in z.iter() as 'outer_loop {
     do_something(x, y);
 }
 ```
@@ -131,6 +131,27 @@ for x, y in z.iter() as $outer_loop {
 #### Assignment from a `for` statement
 - See the [break section]()
 
+### The `do-while` Statement
+#### Structure
+- The `do-while` statement is used to repetitively execute a block of code
+- The `do` statement is followed by a block of code
+- The block of code is executed at least once
+- The block of code is followed by a `while` statement
+- The `while` statement is followed by a condition
+- The condition must evaluate to a boolean expression
+- The condition is optionally followed by a `loop tag`
+
+#### Example:
+```s++
+do as 'outer_loop {
+    do_something(x, y);
+} while x < y;
+```
+
+#### Assignment from a `do-while` statement
+- See the [break section]()
+
+
 ### The `break` Statement
 #### Structure
 - Break from a loop
@@ -139,9 +160,9 @@ for x, y in z.iter() as $outer_loop {
 
 #### Example:
 ```s++
-let x, y = while x < y as $outer_loop {
+let x, y = while x < y as 'outer_loop {
     if x > z {
-        break $outer_loop x, y;
+        break 'outer_loop x, y;
     }
     x += 1;
 };
