@@ -123,7 +123,7 @@ class FunctionPrototypeAst:
     return_type: Optional[TypeAst]
     where_block: Optional[WhereBlockAst]
     value_guard: Optional[ValueGuardAst]
-    body: list[StatementAst]
+    body: FunctionImplementationAst
 
 @dataclass
 class FunctionArgumentAst:
@@ -289,7 +289,7 @@ def ElseStatementBranchAst(body: list[StatementAst]):
 
 @dataclass
 class IfStatementAst:
-    if_branches: IfStatementBranchAst
+    if_branch: IfStatementBranchAst
     elif_branches: list[IfStatementBranchAst]
     else_branch: Optional[StatementAst]
 
@@ -359,7 +359,7 @@ class LetStatementAst:
 
 @dataclass
 class InnerScopeAst:
-    statements: list[StatementAst]
+    body: list[StatementAst]
 
 @dataclass
 class LocalVariableAst:
