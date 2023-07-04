@@ -747,17 +747,19 @@ class Parser:
         """
         To parse parameters from a Required parameter and onwards, parse the Required parameter, and optionally the rest
         of the parameters that are allowed to follow a Required parameter.
+        :return: A list of parameters starting with a Required parameter.
         """
         def inner():
             p3 = self._parse_function_required_parameter().parse_once()
-            p4 = self._parse_function_rest_of_required_parameters().parse_optional()
-            return [p3, p4]
+            p4 = self._parse_function_rest_of_required_parameters().parse_optional() or []
+            return [p3, *p4]
         return BoundParser(self, inner)
 
     def _parse_function_rest_of_required_parameters(self) -> BoundParser:
         """
         To parse parameters that are allowed to follow Required parameters, parse the comma, and then parse either a
         Required or Optional parameter, from self._parse_function_parameters_required_then_optional
+        :return: A list of parameters that are allowed to follow Required parameters.
         """
         def inner():
             p1 = self._parse_token(TokenType.TkComma).parse_once()
@@ -766,13 +768,23 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_function_optional_parameters(self) -> BoundParser:
+        """
+        To parse parameters from an Optional parameter and onwards, parse the Optional parameter, and optionally the
+        rest of the parameters that are allowed to follow an Optional parameter.
+        :return: A list of parameters starting with an Optional parameter.
+        """
         def inner():
             p3 = self._parse_function_optional_parameter().parse_once()
-            p4 = self._parse_function_rest_of_optional_parameters().parse_optional()
-            return [p3, p4]
+            p4 = self._parse_function_rest_of_optional_parameters().parse_optional() or []
+            return [p3, *p4]
         return BoundParser(self, inner)
 
     def _parse_function_rest_of_optional_parameters(self) -> BoundParser:
+        """
+        To parse parameters that are allowed to follow Optional parameters, parse the comma, and then parse either an
+        Optional or Variadic parameter, from self._parse_function_parameters_optional_then_variadic.
+        :return: A list of parameters that are allowed to follow Optional parameters.
+        """
         def inner():
             p1 = self._parse_token(TokenType.TkComma).parse_once()
             p2 = self._parse_function_parameters_optional_then_variadic().parse_once()
@@ -1346,8 +1358,8 @@ class Parser:
     def _parse_type_generic_required_parameters(self) -> BoundParser:
         def inner():
             p3 = self._parse_type_generic_required_parameter().parse_once()
-            p4 = self._parse_type_generic_rest_of_required_parameters().parse_optional()
-            return [p3, p4]
+            p4 = self._parse_type_generic_rest_of_required_parameters().parse_optional() or []
+            return [p3, *p4]
         return BoundParser(self, inner)
 
     def _parse_type_generic_rest_of_required_parameters(self) -> BoundParser:
@@ -1360,8 +1372,8 @@ class Parser:
     def _parse_type_generic_optional_parameters(self) -> BoundParser:
         def inner():
             p3 = self._parse_type_generic_optional_parameter().parse_once()
-            p4 = self._parse_type_generic_rest_of_optional_parameters().parse_optional()
-            return [p3, p4]
+            p4 = self._parse_type_generic_rest_of_optional_parameters().parse_optional() or []
+            return [p3, *p4]
         return BoundParser(self, inner)
 
     def _parse_type_generic_rest_of_optional_parameters(self) -> BoundParser:
