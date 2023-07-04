@@ -121,7 +121,6 @@
 | `std::ops::Pipe`         | `__pip__`                           | Binary `\|>`                     |
 | `std::ops::Neg`          | `__neg__`                           | Unary `-`                        |
 | `std::ops::Abs`          | `__abs__`                           | Unary `+`                        |
-| `std::ops::Variadic`     | `__pack__`, `__unpack__`            | Pack/unpack to/from type         |
 | `std::func::FunOnce`     | `__call_once__`                     | Postfix call                     |
 | `std::func::FunRef`      | `__call_ref__`                      | Postfix call                     |
 | `std::func::FunMut`      | `__call_mut__`                      | Postfix call                     |
