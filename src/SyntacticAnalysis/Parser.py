@@ -1251,7 +1251,7 @@ class Parser:
             p1 = self._parse_type_self_prefix().delay_parse()
             p2 = self._parse_type_raw_identifiers().delay_parse()
             p3 = (p1 | p2).parse_once()
-            return p3
+            return Ast.TypeAst(p3)
         return BoundParser(self, inner)
 
     def _parse_type_identifiers(self) -> BoundParser:
