@@ -129,7 +129,6 @@
 | `std::ops::IndexMut`     | `__index_mut__`                     | Postfix subscript                |
 | `std::ops::SliceRef`     | `__slice_ref__`                     | Postfix slice                    |
 | `std::ops::SliceMut`     | `__slice_mut__`                     | Postfix slice                    |
-| `std::ops::Cast<T>`      | `__cast__`                          | Postfix cast (`as`)              |
 | `std::ops::Try<T, E>`    | `__try__`                           | Postfix `?`                      |
 | `std::ops::Del`          | `__del__`                           | Destructor                       |
 | `std::ops::With`         | `__enter__`, `__exit__`             | For the `with` statement         |
