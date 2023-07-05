@@ -120,7 +120,7 @@ class FunctionPrototypeAst:
     identifier: IdentifierAst
     generic_parameters: list[TypeGenericParameterAst]
     parameters: list[FunctionParameterAst]
-    return_type: Optional[TypeAst]
+    return_types: list[TypeAst]
     where_block: Optional[WhereBlockAst]
     value_guard: Optional[ValueGuardAst]
     body: FunctionImplementationAst
