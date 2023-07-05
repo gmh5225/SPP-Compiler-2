@@ -1,24 +1,30 @@
 from __future__ import annotations
 
-import pprint
 from dataclasses import dataclass
-from typing import Any, Optional
-from multimethod import multimethod
+from typing import Optional
 
 from src.SyntacticAnalysis import Ast
 
 
-def type_string(type: Optional[Ast.TypeAst]) -> str:
+def type_to_string(type: Optional[Ast.TypeAst]) -> str:
     string = ""
     if type is None:
         return ""
     for part in type.parts:
         string += "::" + part.identifier
-        if len(part.generic):
+        if len(part.generic) > 0:
             string += "<"
-            string += ", ".join([generic.identifier.identifier for generic in part.generic])
+            string += ", ".join([type_to_string(generic.value) for generic in part.generic])
             string += ">"
     return string[2:]
+
+def class_to_type(class_: Ast.ClassPrototypeAst, global_scope: GlobalScope) -> Ast.TypeAst:
+    module_identifier = global_scope.scope_name
+    identifier = class_.identifier
+    module_identifier.parts.append(identifier)
+    generic_conversion = list(map(lambda i: Ast.GenericIdentifierAst(i.identifier, []), module_identifier.parts))
+    generic_conversion[-1].generic = class_.generic_parameters
+    return Ast.TypeAst(generic_conversion)
 
 @dataclass
 class SymbolTableEntry:
@@ -55,7 +61,7 @@ class SymbolTable:
         return self._symbols
 
     def __repr__(self):
-        return f"SymbolTable({', '.join([name + ': ' + type_string(type.type) for name, type in self._symbols.items()])})"
+        return f"SymbolTable({', '.join([name + ': ' + type_to_string(type.type) for name, type in self._symbols.items()])})"
 
 
 class Scope:
@@ -94,7 +100,7 @@ class Scope:
         return self._child_scopes
 
     def __repr__(self):
-        string = f"Scope ({self._symbol_table})"
+        string = f"Scope ({self._symbol_table}) ({self._type_table})"
         return string
 
 
@@ -108,11 +114,11 @@ class GlobalScope(Scope):
 
     @property
     def scope_name(self) -> Ast.ModuleIdentifierAst:
+        assert self._scope_name is not None
         return self._scope_name
 
     @scope_name.setter
     def scope_name(self, value: Ast.ModuleIdentifierAst):
-        assert self._scope_name is not None
         self._scope_name = value
 
 
@@ -138,8 +144,11 @@ class SymbolTableManager:
     def add_symbol(self, name: str, type: Ast.TypeAst):
         self._current_scope.symbol_table.add_symbol(name, type)
 
-    def add_type(self, name: str, type: Ast.TypeAst):
-        self._current_scope.type_table.add_symbol(name, type)
+    def add_type(self, name: str, type: Ast.TypeAst, scope_before: int = 0):
+        scope = self._current_scope
+        for i in range(scope_before):
+            scope = scope.parent_scope
+        scope.type_table.add_symbol(name, type)
 
     def lookup_symbol(self, name: str) -> Optional[SymbolTableEntry]:
         # look in this and parent scopes for the symbol
@@ -222,7 +231,7 @@ class SymbolTableGenerator:
     @staticmethod
     @nest_next_scope
     def build_symbols_class(ast: Ast.ClassPrototypeAst, manager: SymbolTableManager) -> None:
-        manager.add_type(ast.identifier.identifier)
+        manager.add_type(ast.identifier.identifier, class_to_type(ast, manager.global_scope), scope_before=1)
         for statement in ast.body.members:
             SymbolTableGenerator.build_symbols_class_attribute(statement, manager)
 
