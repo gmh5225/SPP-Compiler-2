@@ -16,7 +16,7 @@ class CodeGen:
 
     def _generate_llvm_function(self, ast: FunctionPrototypeAst) -> ll.Function:
         is_variadic = len(ast.parameters) and ast.parameters[-1].is_variadic
-        llvm_function_return_type = self._generate_llvm_type(ast.return_type)
+        llvm_function_return_type = self._generate_llvm_type(ast.return_types)
         llvm_function_parameter_types = self._generate_parameter_types(ast.parameters)
         llvm_function_type = ll.FunctionType(llvm_function_return_type, llvm_function_parameter_types, is_variadic)
 
