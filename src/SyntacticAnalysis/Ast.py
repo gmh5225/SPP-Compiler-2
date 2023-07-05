@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 from dataclasses import dataclass
-from src.LexicalAnalysis.Tokens import Token
+from src.LexicalAnalysis.Tokens import Token, TokenType
 
 
 @dataclass
@@ -17,6 +17,9 @@ class TokenAst:
 @dataclass
 class AccessModifierAst:
     modifier: TokenAst
+
+def AccessModifierPrivateAst() -> AccessModifierAst:
+    return AccessModifierAst(TokenAst(Token("priv", TokenType.KwPriv), None))
 
 @dataclass
 class IdentifierAst:
@@ -430,10 +433,6 @@ class PostfixStructInitializerFieldAst:
     value: Optional[ExpressionAst]
 
 @dataclass
-class PostfixTypeCastAst:
-    cast_type: TypeAst
-
-@dataclass
 class NumberLiteralBase10Ast:
     integer: str
     decimal: str
@@ -496,7 +495,7 @@ class RangeLiteralAst:
     end: Optional[ExpressionAst]
 
 
-PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixIndexAccessAst | PostfixSliceAccessAst | PostfixStructInitializerAst | PostfixTypeCastAst | TokenAst
+PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixIndexAccessAst | PostfixSliceAccessAst | PostfixStructInitializerAst | TokenAst
 NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiteralBase02Ast
 LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | ListLiteralAst | MapLiteralAst | SetLiteralAst | PairLiteralAst | RegexLiteralAst | TupleLiteralAst
 PrimaryExpressionAst = LiteralAst | IdentifierAst | ParenthesizedExpressionAst | LambdaAst | PlaceholderAst | TypeAst | IfStatementAst | MatchStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst
