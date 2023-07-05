@@ -29,7 +29,7 @@ class SymbolTableEntry:
     exists and what type it is.
     """
     name: str
-    type: str
+    type: Ast.TypeAst
 
 
 class SymbolTable:
@@ -44,7 +44,7 @@ class SymbolTable:
     def __init__(self):
         self._symbols = dict()
 
-    def add_symbol(self, name: str, type: str):
+    def add_symbol(self, name: str, type: Ast.TypeAst):
         self._symbols[name] = SymbolTableEntry(name, type)
 
     def lookup(self, name: str) -> Optional[SymbolTableEntry]:
@@ -55,7 +55,7 @@ class SymbolTable:
         return self._symbols
 
     def __repr__(self):
-        return f"SymbolTable({', '.join([name + ': ' + type.type for name, type in self._symbols.items()])})"
+        return f"SymbolTable({', '.join([name + ': ' + type_string(type.type) for name, type in self._symbols.items()])})"
 
 
 class Scope:
@@ -63,14 +63,14 @@ class Scope:
     A scope is a virtual representation of a scope in the program. The scope is a region of the program where a symbol
     is declared. A scope can be nested inside another scope, and the scope can be exited to return to the parent scope.
     """
-    _scope_name: str
     _symbol_table: SymbolTable
+    _type_table: SymbolTable
     _parent_scope: Optional[Scope]
     _child_scopes: list[Scope]
 
-    def __init__(self, scope_name: str, parent=None):
-        self._scope_name = scope_name
+    def __init__(self, parent=None):
         self._symbol_table = SymbolTable()
+        self._type_table = SymbolTable()
         self._parent_scope = parent
         self._child_scopes = []
 
@@ -86,12 +86,34 @@ class Scope:
         return self._symbol_table
 
     @property
+    def type_table(self) -> SymbolTable:
+        return self._type_table
+
+    @property
     def child_scopes(self) -> list[Scope]:
         return self._child_scopes
 
     def __repr__(self):
-        string = f"Scope {self._scope_name}({self._symbol_table})"
+        string = f"Scope ({self._symbol_table})"
         return string
+
+
+class GlobalScope(Scope):
+    _scope_name: Optional[Ast.ModuleIdentifierAst]
+
+    def __init__(self):
+        super().__init__()
+        self._parent_scope = None
+        self._scope_name = None
+
+    @property
+    def scope_name(self) -> Ast.ModuleIdentifierAst:
+        return self._scope_name
+
+    @scope_name.setter
+    def scope_name(self, value: Ast.ModuleIdentifierAst):
+        assert self._scope_name is not None
+        self._scope_name = value
 
 
 class SymbolTableManager:
@@ -99,28 +121,38 @@ class SymbolTableManager:
     The symbol table manager is used to manage the symbol tables for each scope. It is used to enter and exit scopes,
     and to add symbols to the current scope. It is also used to lookup symbols in the current scope and parent scopes.
     """
-    _global_scope: Scope
+    _global_scope: GlobalScope
     _current_scope: Scope
 
     def __init__(self):
-        self._global_scope = Scope("Global")
+        self._global_scope = GlobalScope()
         self._current_scope = self._global_scope
 
-    def enter_scope(self, scope_name: str):
-        next_scope = Scope(scope_name, self._current_scope)
+    def enter_scope(self):
+        next_scope = Scope(self._current_scope)
         self._current_scope = next_scope
 
     def exit_scope(self):
         self._current_scope = self._current_scope.parent_scope or self._current_scope
 
     def add_symbol(self, name: str, type: Ast.TypeAst):
-        self._current_scope.symbol_table.add_symbol(name, type_string(type))
+        self._current_scope.symbol_table.add_symbol(name, type)
+
+    def add_type(self, name: str, type: Ast.TypeAst):
+        self._current_scope.type_table.add_symbol(name, type)
 
     def lookup_symbol(self, name: str) -> Optional[SymbolTableEntry]:
         # look in this and parent scopes for the symbol
+        return self._lookup(lambda scope: scope.symbol_table.lookup(name))
+
+    def lookup_type(self, name: str) -> Optional[SymbolTableEntry]:
+        return self._lookup(lambda scope: scope.type_table.lookup(name))
+
+    def _lookup(self, func: callable) -> Optional[SymbolTableEntry]:
+        # look in this and parent scopes for the symbol
         scope = self._current_scope
         while scope:
-            symbol = scope.symbol_table.lookup(name)
+            symbol = func(scope)
             if symbol:
                 return symbol
             scope = scope.parent_scope
@@ -135,11 +167,19 @@ class SymbolTableManager:
             return string
         return inner_print(self._global_scope, 0)
 
+    @property
+    def global_scope(self) -> GlobalScope:
+        return self._global_scope
+
+    @property
+    def current_scope(self) -> Scope:
+        return self._current_scope
+
 
 
 def nest_next_scope(func: callable):
     def inner(ast, manager):
-        manager.enter_scope("".join(list(map(lambda x: x.title(), func.__name__.split("_")[2:]))))
+        manager.enter_scope() # "".join(list(map(lambda x: x.title(), func.__name__.split("_")[2:]))))
         func(ast, manager)
         manager.exit_scope()
     return inner
@@ -156,6 +196,7 @@ class SymbolTableGenerator:
     @staticmethod
     @nest_next_scope
     def build_symbols_program(ast: Ast.ProgramAst, manager: SymbolTableManager) -> None:
+        manager.global_scope.scope_name = ast.module.identifier
         for statement in ast.module.body.members:
             SymbolTableGenerator.build_symbols_module_member(statement, manager)
 
@@ -166,7 +207,7 @@ class SymbolTableGenerator:
             case Ast.MetaPrototypeAst(): raise NotImplementedError("MetaPrototypeAst not implemented")
             case Ast.SupPrototypeNormalAst(): raise NotImplementedError("SupPrototypeNormalAst not implemented")
             case Ast.SupPrototypeInheritanceAst(): raise NotImplementedError("SupPrototypeInheritanceAst not implemented")
-            case Ast.ClassPrototypeAst(): raise NotImplementedError("ClassPrototypeAst not implemented")
+            case Ast.ClassPrototypeAst(): SymbolTableGenerator.build_symbols_class(ast, manager)
             case Ast.EnumPrototypeAst(): raise NotImplementedError("EnumPrototypeAst not implemented")
             case _: raise NotImplementedError(f"Unknown module member: {ast.__class__.__name__}")
 
@@ -177,6 +218,28 @@ class SymbolTableGenerator:
             SymbolTableGenerator.build_symbols_parameters(parameter, manager)
         for statement in ast.body.statements:
             SymbolTableGenerator.build_symbols_statement(statement, manager)
+
+    @staticmethod
+    @nest_next_scope
+    def build_symbols_class(ast: Ast.ClassPrototypeAst, manager: SymbolTableManager) -> None:
+        manager.add_type(ast.identifier.identifier)
+        for statement in ast.body.members:
+            SymbolTableGenerator.build_symbols_class_attribute(statement, manager)
+
+    @staticmethod
+    def build_symbols_class_attribute(ast: Ast.ClassAttributeAst, manager: SymbolTableManager) -> None:
+        match ast:
+            case Ast.ClassInstanceAttributeAst(): SymbolTableGenerator.build_symbols_class_instance_attribute(ast, manager)
+            case Ast.ClassStaticAttributeAst(): SymbolTableGenerator.build_symbols_class_static_attribute(ast, manager)
+            case _: raise NotImplementedError(f"Unknown class attribute: {ast.__class__.__name__}")
+
+    @staticmethod
+    def build_symbols_class_instance_attribute(ast: Ast.ClassInstanceAttributeAst, manager: SymbolTableManager) -> None:
+        manager.add_symbol(ast.identifier.identifier, ast.type_annotation)
+
+    @staticmethod
+    def build_symbols_class_static_attribute(ast: Ast.ClassStaticAttributeAst, manager: SymbolTableManager) -> None:
+        manager.add_symbol(ast.identifier.identifier, TypeInference.infer_type(ast.value))
 
     @staticmethod
     def build_symbols_parameters(ast: Ast.FunctionParameterAst, manager: SymbolTableManager) -> None:
