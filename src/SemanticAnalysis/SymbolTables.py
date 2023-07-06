@@ -71,6 +71,8 @@ class Scope:
     """
     _symbol_table: SymbolTable
     _type_table: SymbolTable
+    _function_register
+
     _parent_scope: Optional[Scope]
     _child_scopes: list[Scope]
 

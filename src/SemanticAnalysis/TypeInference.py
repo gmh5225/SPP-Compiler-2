@@ -1,6 +1,3 @@
-from src.SyntacticAnalysis import Ast
-from src.LexicalAnalysis.Tokens import TokenType
-
 """
 Type inference
 - Type inference in "let" statements => only place where type-inference is used
@@ -20,6 +17,9 @@ Function calls
 - Compile the correct method signatures that match the type-constraints, parameter types, and number of arguments
 - Get the return type of the function (multiple signatures => only difference is value-guard, so return types are the same)
 """
+
+from src.SyntacticAnalysis import Ast
+from src.LexicalAnalysis.Tokens import TokenType
 
 
 class TypeInference:
