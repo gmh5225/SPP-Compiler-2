@@ -221,6 +221,14 @@ fn main() -> Void {}
 - If there are required, optional and variadic parameters, then optional arguments must all be specified, unnamed, 
   before the variadic arguments
 
+#### Base class resolution
+- If two base classes have the same signature for a method, and these classes are inherited into a sub-class, that 
+  doesn't override the method, then there is an ambiguity issue
+- Any attempt to call the method will result in a compile time error
+- 2 ways to resolve:
+  - Override the method in the sub-class
+  - Upcast the class to the correct super-type, and call the method on that => `std::upcast<A>(c).foo(1)`
+
 
 ## Other function features
 - [Struct methods]()
