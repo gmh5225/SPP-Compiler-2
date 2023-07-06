@@ -1,25 +1,26 @@
 """
-Type inference
-- Type inference in "let" statements => only place where type-inference is used
-- Work through the RHS expression and get the type for each operation / attribute etc
+Type-inference:
+-- Type inference in "let" statements => only place where type-inference is used.
+-- Work through the RHS expression and get the type for each operation / attribute, etc.
 
-Operations
-- Map to their respective operator classes (std::ops::...)
-- Check operator classes are implemented on the type of the item being operated on
-- Read the function signature to get the return type
+Operations:
+-- Map to their respective operator classes (std::ops::...).
+-- Check operator classes are implemented on the item being operated on.
+-- Read the function signature to get the return type.
 
-Attributes
-- Check attribute exists on the type of the item being operated on (read the symbol table)
-- Get the type of the attribute
+Attributes:
+-- Check attribute exists on the item being operated on (read the symbol table)
+-- Get the type the attribute is declared with.
 
-Function calls
-- Check function exists in the current scope (read the symbol table)
-- Compile the correct method signatures that match the type-constraints, parameter types, and number of arguments
-- Get the return type of the function (multiple signatures => only difference is value-guard, so return types are the same)
+Function calls:
+-- Check function exists in the current scope (read the scopes function registry).
+-- List the correct method signatures that match the type-constraints, parameter types, and number of arguments
+-- Get the function's return type (multiple signatures => only difference is value-guard, so return types are the same)
 """
 
-from src.SyntacticAnalysis import Ast
 from src.LexicalAnalysis.Tokens import TokenType
+from src.SyntacticAnalysis import Ast
+from src.SemanticAnalysis.SymbolTables import Scope
 
 
 class TypeInference:
