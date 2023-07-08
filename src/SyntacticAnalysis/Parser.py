@@ -1985,26 +1985,41 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_literal_tuple(self) -> BoundParser:
+        """
+        A tuple literal is a list of expressions separated by commas, surrounded by parentheses. The special exceptions
+        are for a tuple of 0 or 1 elements, where a trailing comma is required. This is to differentiate between a
+        tuple, and a parenthesised expression. For example, (1) is a parenthesized expression, but (1,) is a tuple.
+        But as (2, 3) cannot be a parenthesized expression, as there are no commas in an expression, the trailing comma
+        is not required. The 0-element tuple - (,) - will create a value with the type std::Tup<>.
+        :return:
+        """
         def inner():
             p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
-            p2 = self._parse_literal_tuple_with_0_or_1_element().delay_parse()
-            p3 = self._parse_literal_tuple_with_multiple_elements().delay_parse()
-            p4 = (p2 | p3).parse_once()
-            p5 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
-            return Ast.TupleLiteralAst(p4)
+            p2 = self._parse_literal_tuple_with_0_elements().delay_parse()
+            p3 = self._parse_literal_tuple_with_1_element().delay_parse()
+            p4 = self._parse_literal_tuple_with_n_elements().delay_parse()
+            p5 = (p2 | p3 | p4).parse_once()
+            p6 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
+            return Ast.TupleLiteralAst(p5)
         return BoundParser(self, inner)
 
-    def _parse_literal_tuple_with_0_or_1_element(self) -> BoundParser:
+    def _parse_literal_tuple_with_0_elements(self) -> BoundParser:
         def inner():
-            p6 = self._parse_expression().parse_optional()
-            p7 = self._parse_token(TokenType.TkComma).parse_optional()
-            return [p6] or []
+            p7 = self._parse_token(TokenType.TkComma).parse_once()
+            return []
         return BoundParser(self, inner)
 
-    def _parse_literal_tuple_with_multiple_elements(self) -> BoundParser:
+    def _parse_literal_tuple_with_1_element(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_expression().parse_once()
+            p2 = self._parse_token(TokenType.TkComma).parse_once()
+            return [p1]
+        return BoundParser(self, inner)
+
+    def _parse_literal_tuple_with_n_elements(self) -> BoundParser:
         def inner():
             p10 = self._parse_expression().parse_once()
-            p11 = self._parse_literal_tuple_with_multiple_elements_next().parse_zero_or_more()
+            p11 = self._parse_literal_tuple_with_multiple_elements_next().parse_one_or_more()
             return [p10, *p11]
         return BoundParser(self, inner)
 
