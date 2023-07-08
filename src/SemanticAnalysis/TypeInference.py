@@ -8,7 +8,7 @@ from src.SemanticAnalysis.SymbolTableGeneration import ScopeManager
 class TypeInference:
     # Entry function
     @staticmethod
-    def infer_type(ast: Ast.ExpressionAst, s: ScopeManager) -> Ast.TypeAst:
+    def infer_type_from_expression(ast: Ast.ExpressionAst, s: ScopeManager) -> Ast.TypeAst:
         match ast:
             case Ast.BinaryExpressionAst(): return TypeInference.infer_type_from_binary_operator(ast, s)
             case Ast.UnaryExpressionAst(): return TypeInference.infer_type_from_unary_operator(ast, s)
@@ -70,8 +70,8 @@ class TypeInference:
             TokenType.TkPipeArrow: "std::ops::Pipe::__pip__",
     
             TokenType.TkQuestionMark: "std::ops::Try::__try__",
-        }[ast.op.primary.token_type] + "#" + TypeInference.infer_type(ast.lhs, s).parts[-1].identifier
-        arg_types = [TypeInference.infer_type(ast.lhs, s), TypeInference.infer_type(ast.rhs, s)]
+        }[ast.op.primary.token_type] + "#" + TypeInference.infer_type_from_expression(ast.lhs, s).parts[-1].identifier
+        arg_types = [TypeInference.infer_type_from_expression(ast.lhs, s), TypeInference.infer_type_from_expression(ast.rhs, s)]
         function = s.current_scope.function_registry.get_symbol(function_identifier, argument_types=arg_types)
         return function.return_type
 
@@ -82,8 +82,8 @@ class TypeInference:
             TokenType.TkTilde: "std::ops::BitNot::__bit_not__",
             TokenType.TkPlus: "std::ops::Abs::__ans__",
             TokenType.TkHyphen: "std::ops::Neg::__neg__",
-        }[ast.op.primary.token_type] + "#" + TypeInference.infer_type(ast.rhs, s).parts[-1].identifier
-        arg_types = [TypeInference.infer_type(ast.rhs, s)]
+        }[ast.op.primary.token_type] + "#" + TypeInference.infer_type_from_expression(ast.rhs, s).parts[-1].identifier
+        arg_types = [TypeInference.infer_type_from_expression(ast.rhs, s)]
         function = s.current_scope.function_registry.get_symbol(function_identifier, argument_types=arg_types)
         return function.return_type
 
@@ -98,10 +98,31 @@ class TypeInference:
 
     @staticmethod
     def infer_type_from_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeManager) -> Ast.TypeAst:
-        function_identifier = TypeInference.infer_type(ast.lhs, s).parts[-1].identifier
-        arg_types = [TypeInference.infer_type(arg, s) for arg in ast.arguments]
+        function_identifier = TypeInference.infer_type_from_expression(ast.lhs, s).parts[-1].identifier
+        arg_types = [TypeInference.infer_type_from_expression(arg, s) for arg in ast.op.arguments]
         function = s.current_scope.function_registry.get_symbol(function_identifier, argument_types=arg_types)
         return function.return_type
+
+    @staticmethod
+    def infer_type_from_postfix_index(ast: Ast.PostfixExpressionAst, s: ScopeManager) -> Ast.TypeAst:
+        name = "IndexMut::__index_mut__" if ast.op.arguments[0].convention.modifier.token_type == TokenType.KwMut else "IndexRef::__index_ref__"
+        function_identifier = name + "#" + TypeInference.infer_type_from_expression(ast.lhs, s).parts[-1].identifier
+        arg_types = [TypeInference.infer_type_from_expression(arg, s) for arg in ast.op.arguments]
+        function = s.current_scope.function_registry.get_symbol(function_identifier, argument_types=arg_types)
+        return function.return_type
+
+    @staticmethod
+    def infer_type_from_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeManager) -> Ast.TypeAst:
+        class_type = TypeInference.infer_type_from_expression(ast.lhs, s)
+        member_name = ast.op.identifier.identifier
+        # todo - get member type from type-table? => or just read from ast as attribute types are known at compile time
+        # todo - return the type of the member
+        return None
+
+    @staticmethod
+    def infer_type_from_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeManager) -> Ast.TypeAst:
+        class_type = TypeInference.infer_type_from_expression(ast.lhs, s)
+        return class_type
 
     @staticmethod
     def infer_type_from_multi_assignment_operator(ast: Ast.MultiAssignmentExpressionAst, s: ScopeManager) -> Ast.TypeAst:
@@ -121,3 +142,21 @@ class TypeInference:
             case Ast.ForStatementAst(): return TypeInference.infer_type_from_for_statement(ast, s)
             case Ast.DoWhileStatementAst(): return TypeInference.infer_type_from_do_while_statement(ast, s)
             case _: raise NotImplementedError(f"Unknown expression type {ast.op.__class__.__name__}")
+
+    @staticmethod
+    def infer_type_from_identifier(ast: Ast.IdentifierAst, s: ScopeManager) -> Ast.TypeAst:
+        return s.current_scope.symbol_table.get_symbol(ast.identifier)
+
+    @staticmethod
+    def infer_type_from_if_statement(ast: Ast.IfStatementAst, s: ScopeManager) -> Ast.TypeAst:
+        return TypeInference.infer_type_from_expression(ast.if_branch.body[-1], s)
+
+    @staticmethod
+    def infer_type_from_match_statement(ast: Ast.MatchStatementAst, s: ScopeManager) -> Ast.TypeAst:
+        return TypeInference.infer_type_from_expression(ast.cases[0].body[-1], s)
+
+    @staticmethod
+    def infer_type_from_while_statement(ast: Ast.WhileStatementAst, s: ScopeManager) -> Ast.TypeAst:
+        break_statement = [statement for statement in ast.body if isinstance(statement, Ast.BreakStatementAst)][0]
+        return TypeInference.infer_type_from_expression(break_statement.returning_expression, s)
+

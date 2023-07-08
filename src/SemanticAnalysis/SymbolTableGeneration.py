@@ -150,7 +150,7 @@ class SymbolTableGenerator:
     @staticmethod
     @Utils.new_scope
     def build_symbols_with_statement(ast: Ast.WithStatementAst, s: ScopeManager) -> None:
-        s.current_scope.symbol_table.add_symbol(ast.alias.identifier.identifier, TypeInference.infer_type(ast.value, s))
+        s.current_scope.symbol_table.add_symbol(ast.alias.identifier.identifier, TypeInference.infer_type_from_expression(ast.value, s))
         for statement in ast.body:
             SymbolTableGenerator.build_symbols_statement(statement, s)
 
@@ -160,8 +160,8 @@ class SymbolTableGenerator:
 
     @staticmethod
     def build_symbols_let_statement(ast: Ast.LetStatementAst, s: ScopeManager) -> None:
-        for variable, value in zip(ast.variables, ast.values):
-            s.current_scope.symbol_table.add_symbol(variable.identifier.identifier, TypeInference.infer_type(value, s) if value else ast.type_annotation)
+        for variable, value in zip(ast.variables, ast.value):
+            s.current_scope.symbol_table.add_symbol(variable.identifier.identifier, TypeInference.infer_type_from_expression(value, s) if value else ast.type_annotation)
 
 
 
