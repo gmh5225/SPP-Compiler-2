@@ -1198,9 +1198,18 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_type_raw_identifier(self) -> BoundParser:
+        """
+        A raw type identifier is a part of a scoped type. For example, with Vec<Num>::ValueType, Vec<Num> is one part,
+        and ValueType is another part. As well as generic identifiers being usable for type identifiers, numbers can be
+        used to, as a "compile-time constant" type. This allows the accessing of the nth type from a variadic type, and
+        is especially useful for the Tup<...T> type. For example, Tup<Num, Str, Bool>::1 is Str.
+        :return:
+        """
         def inner():
-            p1 = self._parse_generic_identifier().parse_once()
-            return p1
+            p1 = self._parse_generic_identifier().delay_parse()
+            p2 = self._parse_numeric_integer().delay_parse()
+            p3 = (p1 | p2).parse_once()
+            return p3
         return BoundParser(self, inner)
 
     def _parse_type_identifier(self) -> BoundParser:

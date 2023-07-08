@@ -53,6 +53,5 @@ class Lexer:
             if f:
                 continue
 
-            print(self._code[current:current+len(TokenType.TkWhitespace.value)] == TokenType.TkWhitespace.value)
             raise Exception(f"Unknown token at {current}: {bytes(self._code[current], 'utf-8')}")
         return lexed_tokens + [Token("", TokenType.TkEOF)]
