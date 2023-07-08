@@ -213,7 +213,7 @@ class BinaryExpressionAst:
 @dataclass
 class MultiAssignmentExpressionAst:
     lhs: list[ExpressionAst]
-    rhs: list[ExpressionAst]
+    rhs: ExpressionAst
 
 @dataclass
 class PostfixExpressionAst:
@@ -348,7 +348,7 @@ class TypedefStatementAst:
 @dataclass
 class BreakStatementAst:
     loop_tag: Optional[TagIdentifierAst]
-    returning_expressions: list[ExpressionAst]
+    returning_expression: ExpressionAst
 
 @dataclass
 class ContinueStatementAst:
@@ -357,7 +357,7 @@ class ContinueStatementAst:
 @dataclass
 class LetStatementAst:
     variables: list[LocalVariableAst]
-    values: list[ExpressionAst]
+    value: Optional[ExpressionAst]
     type_annotation: Optional[TypeAst]
 
 @dataclass

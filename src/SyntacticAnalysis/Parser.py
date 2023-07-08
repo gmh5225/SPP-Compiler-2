@@ -70,14 +70,14 @@ class ErrorFormatter:
             spaces += len(token.token_metadata)
 
         # Format the line number into the error message string
-        line_number = str([t.token_type for t in tokens[:end_token_index]].count(TokenType.TkNewLine)) + " | "
+        line_number = str([t.token_type for t in self._tokens[:end_token_index]].count(TokenType.TkNewLine) + 1) + " | "
         current_line_string = line_number + current_line_string.lstrip("\n")
 
         # The number of "^" characters is the length of the current tokens metadata (ie the symbol or length of keyword
         # / lexeme). Append the repeated "^" characters to the spaces, and then add the error message to the string.
         error_length = max(1, len(self._tokens[error_position].token_metadata))
         error_line_string = " " * (len(line_number) - 2) + "| " + "".join([" " * spaces, "^" * error_length]) + " <- "
-        final_string = "\n".join(["", current_line_string, error_line_string])
+        final_string = "\n".join(["", " " * (len(line_number) - 2) + "| ", current_line_string, error_line_string])
         return final_string
 
 
@@ -125,7 +125,6 @@ class BoundParser(Generic[T]):
             self._parser._current = restore_index
             self._ast = None
             return self._ast
-
 
     def parse_zero_or_more(self) -> list[T]:
         results = []
@@ -909,9 +908,9 @@ class Parser:
 
     def _parse_assignment_expression(self) -> BoundParser:
         def inner():
-            p2 = self._parse_assignment_multiple().delay_parse()
             p1 = self._parse_null_coalescing_expression().delay_parse()
-            p3 = (p2 | p1).parse_once()
+            p2 = self._parse_assignment_multiple().delay_parse()
+            p3 = (p1 | p2).parse_once()
             return p3
         return BoundParser(self, inner)
 
@@ -924,24 +923,16 @@ class Parser:
     def _parse_assignment_multiple(self) -> BoundParser:
         def inner():
             p4 = self._parse_null_coalescing_expression().parse_once()
-            p5 = self._parse_assignment_multiple_lhs().parse_one_or_more()
+            p5 = self._parse_assignment_multiple_lhs().parse_zero_or_more()
             p6 = self._parse_token(TokenType.TkEqual).parse_once()
             p7 = self._parse_assignment_expression().parse_once()
-            p8 = self._parse_assignment_multiple_rhs().parse_one_or_more()
-            return Ast.MultiAssignmentExpressionAst([p4, *p5], [p7, *p8])
+            return Ast.MultiAssignmentExpressionAst([p4, *p5], p7)
         return BoundParser(self, inner)
 
     def _parse_assignment_multiple_lhs(self) -> BoundParser:
         def inner():
             p9 = self._parse_token(TokenType.TkComma).parse_once()
             p10 = self._parse_null_coalescing_expression().parse_once()
-            return p10
-        return BoundParser(self, inner)
-
-    def _parse_assignment_multiple_rhs(self) -> BoundParser:
-        def inner():
-            p9 = self._parse_token(TokenType.TkComma).parse_once()
-            p10 = self._parse_assignment_expression().parse_once()
             return p10
         return BoundParser(self, inner)
 
@@ -1401,7 +1392,7 @@ class Parser:
             p3 = self._parse_token(TokenType.TkEqual).parse_once()
             p4 = self._parse_expression().parse_once()
             p6 = self._parse_token(TokenType.TkComma).parse_once()
-            return Ast.LetStatementAst([p2], [p4], None)
+            return Ast.LetStatementAst([p2], p4, None)
         return BoundParser(self, inner)
 
     def _parse_statement_if(self) -> BoundParser:
@@ -1550,7 +1541,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.KwBreak).parse_once()
             p2 = self._parse_tag_identifier().parse_optional()
-            p3 = self._parse_expressions().parse_optional() or []
+            p3 = self._parse_expression().parse_optional() or []
             p4 = self._parse_token(TokenType.TkSemicolon).parse_once()
             return Ast.BreakStatementAst(p2, p3)
         return BoundParser(self, inner)
@@ -1600,13 +1591,13 @@ class Parser:
             p4 = self._parse_statement_let_value().delay_parse()
             p5 = (p3 | p4).parse_once()
             p6 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return Ast.LetStatementAst(p2, [], p5) if isinstance(p5, Ast.TypeAst) else Ast.LetStatementAst(p2, p5, None)
+            return Ast.LetStatementAst(p2, None, p5) if isinstance(p5, Ast.TypeAst) else Ast.LetStatementAst(p2, p5, None)
         return BoundParser(self, inner)
 
     def _parse_statement_let_value(self) -> BoundParser:
         def inner():
             p6 = self._parse_token(TokenType.TkEqual).parse_once()
-            p7 = self._parse_expressions().parse_once()
+            p7 = self._parse_expression().parse_once()
             return p7
         return BoundParser(self, inner)
 
@@ -2007,7 +1998,7 @@ class Parser:
         def inner():
             p6 = self._parse_expression().parse_optional()
             p7 = self._parse_token(TokenType.TkComma).parse_optional()
-            return p6
+            return [p6] or []
         return BoundParser(self, inner)
 
     def _parse_literal_tuple_with_multiple_elements(self) -> BoundParser:
