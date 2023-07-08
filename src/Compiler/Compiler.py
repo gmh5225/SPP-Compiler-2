@@ -2,7 +2,7 @@ from src.LexicalAnalysis.Tokens import Token
 from src.LexicalAnalysis.Lexer import Lexer
 from src.SyntacticAnalysis.Ast import ProgramAst
 from src.SyntacticAnalysis.Parser import Parser
-from src.SemanticAnalysis.Semantic import SemanticAnalyser
+# from src.SemanticAnalysis.Semantic import SemanticAnalyser
 import pprint, dataclasses
 
 class Compiler:
@@ -18,4 +18,4 @@ class Compiler:
         d = dataclasses.asdict(self._ast)
         open("ast.json", "w").write(pprint.pformat(d, indent=1, compact=True).replace("'", '"').replace("None", "null").replace("False", "false").replace("True", "true"))
 
-        SemanticAnalyser(self._ast)
+        # SemanticAnalyser(self._ast)

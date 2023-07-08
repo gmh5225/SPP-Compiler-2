@@ -1,0 +1,6 @@
+mod test2;
+
+
+fn test_function() -> std::Void {
+    let a = x<T>();
+}
