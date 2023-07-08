@@ -27,7 +27,7 @@ class IdentifierAst:
 
 @dataclass
 class TagIdentifierAst:
-    tag: str
+    identifier: str
 
 @dataclass
 class ModuleIdentifierAst:
@@ -123,7 +123,7 @@ class FunctionPrototypeAst:
     identifier: IdentifierAst
     generic_parameters: list[TypeGenericParameterAst]
     parameters: list[FunctionParameterAst]
-    return_types: list[TypeAst]
+    return_type: TypeAst
     where_block: Optional[WhereBlockAst]
     value_guard: Optional[ValueGuardAst]
     body: FunctionImplementationAst
@@ -218,7 +218,7 @@ class MultiAssignmentExpressionAst:
 @dataclass
 class PostfixExpressionAst:
     lhs: ExpressionAst
-    op: TokenAst
+    op: PostfixOperationAst
 
 @dataclass
 class ParenthesizedExpressionAst:
@@ -342,7 +342,7 @@ class YieldStatementAst:
 
 @dataclass
 class TypedefStatementAst:
-    new_type: GenericIdentifierAst
+    new_type: TypeAst
     old_type: TypeAst
 
 @dataclass
@@ -406,7 +406,6 @@ class MetaPrototypeAst:
 @dataclass
 class PostfixFunctionCallAst:
     arguments: list[FunctionArgumentAst]
-    is_variadic: bool
 
 @dataclass
 class PostfixMemberAccessAst:
@@ -416,12 +415,6 @@ class PostfixMemberAccessAst:
 @dataclass
 class PostfixIndexAccessAst:
     index: ExpressionAst
-
-@dataclass
-class PostfixSliceAccessAst:
-    start: Optional[ExpressionAst]
-    end: Optional[ExpressionAst]
-    step: Optional[ExpressionAst]
 
 @dataclass
 class PostfixStructInitializerAst:
@@ -495,7 +488,7 @@ class RangeLiteralAst:
     end: Optional[ExpressionAst]
 
 
-PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixIndexAccessAst | PostfixSliceAccessAst | PostfixStructInitializerAst | TokenAst
+PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixIndexAccessAst | PostfixStructInitializerAst | TokenAst
 NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiteralBase02Ast
 LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | ListLiteralAst | MapLiteralAst | SetLiteralAst | PairLiteralAst | RegexLiteralAst | TupleLiteralAst
 PrimaryExpressionAst = LiteralAst | IdentifierAst | ParenthesizedExpressionAst | LambdaAst | PlaceholderAst | TypeAst | IfStatementAst | MatchStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst
