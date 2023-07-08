@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
+from src.SemanticAnalysis.FunctionRegister import FunctionRegister
 from src.SyntacticAnalysis import Ast
 
 
@@ -71,7 +72,7 @@ class Scope:
     """
     _symbol_table: SymbolTable
     _type_table: SymbolTable
-    _function_register
+    _function_register: FunctionRegister
 
     _parent_scope: Optional[Scope]
     _child_scopes: list[Scope]
@@ -96,6 +97,10 @@ class Scope:
     @property
     def type_table(self) -> SymbolTable:
         return self._type_table
+
+    @property
+    def function_register(self) -> FunctionRegister:
+        return self._function_register
 
     @property
     def child_scopes(self) -> list[Scope]:
@@ -151,6 +156,9 @@ class SymbolTableManager:
         for i in range(scope_before):
             scope = scope.parent_scope
         scope.type_table.add_symbol(name, type)
+
+    def add_function(self, name: str, func: Ast.FunctionPrototypeAst):
+        self._current_scope.function_register.register_function(name, func)
 
     def lookup_symbol(self, name: str) -> Optional[SymbolTableEntry]:
         # look in this and parent scopes for the symbol
@@ -225,6 +233,7 @@ class SymbolTableGenerator:
     @staticmethod
     @nest_next_scope
     def build_symbols_function(ast: Ast.FunctionPrototypeAst, manager: SymbolTableManager) -> None:
+        manager.add_function(ast.identifier.identifier, ast)
         for parameter in ast.parameters:
             SymbolTableGenerator.build_symbols_parameters(parameter, manager)
         for statement in ast.body.statements:

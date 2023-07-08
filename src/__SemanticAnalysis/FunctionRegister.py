@@ -62,8 +62,5 @@ sup B for C {}
 from src.SyntacticAnalysis import Ast
 
 class FunctionRegister:
-    REGISTRY: dict[Ast.TypeAst, list[Ast.FunctionPrototypeAst]] = dict()
-
-    @staticmethod
-    def register_function(fq_fn_name: Ast.TypeAst, function_prototype: Ast.FunctionPrototypeAst):
-        FunctionRegister.REGISTRY[fq_fn_name] = FunctionRegister.REGISTRY.get(fq_fn_name, []) + [function_prototype]
+    def register_function(self, name: str, function: Ast.FunctionPrototypeAst):
+        pass
