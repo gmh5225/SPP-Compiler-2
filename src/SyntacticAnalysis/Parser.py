@@ -1700,8 +1700,10 @@ class Parser:
     def _parse_postfix_operator_member_access(self) -> BoundParser:
         def inner():
             p1 = self._parse_operator_identifier_member_access().parse_once()
-            p2 = self._parse_generic_identifier().parse_once()
-            return Ast.PostfixMemberAccessAst(p1, p2)
+            p2 = self._parse_generic_identifier().delay_parse()
+            p3 = self._parse_number().delay_parse()
+            p4 = (p2 | p3).parse_once()
+            return Ast.PostfixMemberAccessAst(p1, p4)
         return BoundParser(self, inner)
 
     def _parse_postfix_operator_index_access(self) -> BoundParser:

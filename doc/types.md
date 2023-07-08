@@ -46,6 +46,10 @@
 ## Variadic types
 - A generic looks like `<...Ts>`, then it is a variadic type - the pack using this type must be variadic ie `...args: Ts`
 - A variadic parameter must use this type - a single requires or optional parameter cannot be a variadic type
+- Variadic types can have the `::n` syntax applied, to get the nth type in the pack
+- Variadic types can be in a `use` statement, cannot be instantiated
+  - For example, in `Tup`, `use ValueTypes as T` is used to hold the value types
+  - Then `Tup<Num, Str, Bool>::ValueTypes::0` can be used to get `Num`
 
 ### Not allowed
 - A non-variadic parameter can not be denoted with a type declared as variadic (makes no sense)

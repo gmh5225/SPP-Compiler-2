@@ -276,7 +276,7 @@ def TypeGenericArgumentNormalAst(value: TypeAst):
 
 @dataclass
 class TypeAst:
-    parts: list[SelfTypeAst | GenericIdentifierAst]
+    parts: list[SelfTypeAst | GenericIdentifierAst | int]
 
 @dataclass
 class IfStatementBranchAst:
@@ -410,7 +410,7 @@ class PostfixFunctionCallAst:
 @dataclass
 class PostfixMemberAccessAst:
     separator: TokenAst
-    identifier: IdentifierAst
+    identifier: IdentifierAst | int
 
 @dataclass
 class PostfixIndexAccessAst:
