@@ -1,105 +1,123 @@
-"""
-Type-inference:
--- Type inference in "let" statements => only place where type-inference is used.
--- Work through the RHS expression and get the type for each operation / attribute, etc.
-
-Operations:
--- Map to their respective operator classes (std::ops::...).
--- Check operator classes are implemented on the item being operated on.
--- Read the function signature to get the return type.
-
-Attributes:
--- Check attribute exists on the item being operated on (read the symbol table)
--- Get the type the attribute is declared with.
-
-Function calls:
--- Check function exists in the current scope (read the scopes function registry).
--- List the correct method signatures that match the type-constraints, parameter types, and number of arguments
--- Get the function's return type (multiple signatures => only difference is value-guard, so return types are the same)
-"""
+from typing import Any
 
 from src.LexicalAnalysis.Tokens import TokenType
 from src.SyntacticAnalysis import Ast
-from src.SemanticAnalysis.SymbolTables import Scope
+from src.SemanticAnalysis.SymbolTableGeneration import ScopeManager
 
 
 class TypeInference:
-    def infer_type_binary_expression(self, binary_expression: Ast.BinaryExpressionAst):
-        cls, fn = get_operator_class(binary_expression.op.primary.token_type, Ast.BinaryExpressionAst)
+    # Entry function
+    @staticmethod
+    def infer_type(ast: Ast.ExpressionAst, s: ScopeManager) -> Ast.TypeAst:
+        match ast:
+            case Ast.BinaryExpressionAst(): return TypeInference.infer_type_from_binary_operator(ast, s)
+            case Ast.UnaryExpressionAst(): return TypeInference.infer_type_from_unary_operator(ast, s)
+            case Ast.PostfixExpressionAst(): return TypeInference.infer_type_from_postfix_operator(ast, s)
+            case Ast.MultiAssignmentExpressionAst(): return TypeInference.infer_type_from_multi_assignment_operator(ast, s)
+            case Ast.PrimaryExpressionAst(): return TypeInference.infer_type_from_primary_expression(ast, s)
+            case _: raise NotImplementedError(f"Unknown expression type {ast.op.__class__.__name__}")
 
-    def infer_type_unary_expression(self, unary_expression: Ast.UnaryExpressionAst):
-        pass
-
-    def infer_type_postfix_expression(self, postfix_expression: Ast.PostfixExpressionAst):
-        pass
-
-    def infer_type_parenthesized_expression(self, parenthesized_expression: Ast.ParenthesizedExpressionAst):
-        pass
-
-    def infer_type_expression(self, expression: Ast.ExpressionAst):
-        match expression:
-            case Ast.BinaryExpressionAst(binary_expression): self.infer_type_binary_expression(binary_expression)
-            case Ast.UnaryExpressionAst(unary_expression): self.infer_type_unary_expression(unary_expression)
-            case Ast.PostfixExpressionAst(postfix_expression): self.infer_type_postfix_expression(postfix_expression)
-            case Ast.ParenthesizedExpressionAst(parenthesized_expression): self.infer_type_parenthesized_expression(parenthesized_expression)
-            case _: raise Exception("Unknown expression type")
-
-
-def get_operator_class(operator: TokenType, ast: type):
-    match ast, operator:
-        case Ast.BinaryExpressionAst, TokenType.TkPlus: return "std::ops::Add", "__add__"
-        case Ast.BinaryExpressionAst, TokenType.TkPlusEquals: return "std::ops::AddAssign", "__add_assign__"
-        case Ast.BinaryExpressionAst, TokenType.TkHyphen: return "std::ops::Sub", "__sub__"
-        case Ast.BinaryExpressionAst, TokenType.TkHyphenEquals: return "std::ops::SubAssign", "__sub_assign__"
-        case Ast.BinaryExpressionAst, TokenType.TkAsterisk: return "std::ops::Mul", "__mul__"
-        case Ast.BinaryExpressionAst, TokenType.TkAsteriskEquals: return "std::ops::MulAssign", "__mul_assign__"
-        case Ast.BinaryExpressionAst, TokenType.TkForwardSlash: return "std::ops::Div", "__div__"
-        case Ast.BinaryExpressionAst, TokenType.TkForwardSlashEquals: return "std::ops::DivAssign", "__div_assign__"
-        case Ast.BinaryExpressionAst, TokenType.TkPercent: return "std::ops::Mod", "__mod__"
-        case Ast.BinaryExpressionAst, TokenType.TkPercentEquals: return "std::ops::ModAssign", "__mod_assign__"
-        case Ast.BinaryExpressionAst, TokenType.TkDoubleForwardSlash: return "std::ops::Flo", "__flo__"
-        case Ast.BinaryExpressionAst, TokenType.TkDoubleForwardSlashEquals: return "std::ops::FloAssign", "__flo_assign__"
-        case Ast.BinaryExpressionAst, TokenType.TkDoubleAsterisk: return "std::ops::Pow", "__pow__"
-        case Ast.BinaryExpressionAst, TokenType.TkDoubleAsteriskEquals: return "std::ops::PowAssign", "__pow_assign__"
-
-        case Ast.UnaryExpressionAst, TokenType.TkExclamation: return "std::ops::Not", "__not__"
-        case Ast.BinaryExpressionAst, TokenType.TkDoubleAmpersand: return "std::ops::And", "__and__"
-        case Ast.BinaryExpressionAst, TokenType.TkDoubleAmpersandEquals: return "std::ops::AndAssign", "__and_assign__"
-        case Ast.BinaryExpressionAst, TokenType.TkDoublePipe: return "std::ops::Or", "__or__"
-        case Ast.BinaryExpressionAst, TokenType.TkDoublePipeEquals: return "std::ops::OrAssign", "__or_assign__"
-
-        case Ast.UnaryExpressionAst, TokenType.TkTilde: return "std::ops::BitNot", "__bit_not__"
-        case Ast.BinaryExpressionAst, TokenType.TkAmpersand: return "std::ops::BitAnd", "__bit_and__"
-        case Ast.BinaryExpressionAst, TokenType.TkAmpersandEquals: return "std::ops::BitAndAssign", "__bit_and_assign__"
-        case Ast.BinaryExpressionAst, TokenType.TkPipeArrow: return "std::ops::BitOr", "__bit_or__"
-        case Ast.BinaryExpressionAst, TokenType.TkPipeEquals: return "std::ops::BitOrAssign", "__bit_or_assign__"
-        case Ast.BinaryExpressionAst, TokenType.TkCaret: return "std::ops::BitXor", "__bit_xor__"
-        case Ast.BinaryExpressionAst, TokenType.TkCaretEquals: return "std::ops::BitXorAssign", "__bit_xor_assign__"
-        case Ast.BinaryExpressionAst, TokenType.TkDoubleLeftAngleBracket: return "std::ops::Shl", "__shl__"
-        case Ast.BinaryExpressionAst, TokenType.TkDoubleLeftAngleBracketEquals: return "std::ops::ShlAssign", "__shl_assign__"
-        case Ast.BinaryExpressionAst, TokenType.TkDoubleRightAngleBracket: return "std::ops::Shr", "__shr__"
-        case Ast.BinaryExpressionAst, TokenType.TkDoubleRightAngleBracketEquals: return "std::ops::ShrAssign", "__shr_assign__"
-        case Ast.BinaryExpressionAst, TokenType.TkTripleLeftAngleBracket: return "std::ops::Rol", "__rol__"
-        case Ast.BinaryExpressionAst, TokenType.TkTripleLeftAngleBracketEquals: return "std::ops::RolAssign", "__rol_assign__"
-        case Ast.BinaryExpressionAst, TokenType.TkTripleRightAngleBracket: return "std::ops::Ror", "__ror__"
-        case Ast.BinaryExpressionAst, TokenType.TkTripleRightAngleBracketEquals: return "std::ops::RorAssign", "__ror_assign__"
-
-        case Ast.BinaryExpressionAst, TokenType.TkDoubleEquals: return "std::ops::Eq", "__eq__"
-        case Ast.BinaryExpressionAst, TokenType.TkExclamationEquals: return "std::ops::Ne", "__ne__"
-        case Ast.BinaryExpressionAst, TokenType.TkLeftAngleBracket: return "std::ops::Lt", "__lt__"
-        case Ast.BinaryExpressionAst, TokenType.TkLeftAngleBracketEquals: return "std::ops::Le", "__le__"
-        case Ast.BinaryExpressionAst, TokenType.TkRightAngleBracket: return "std::ops::Gt", "__gt__"
-        case Ast.BinaryExpressionAst, TokenType.TkRightAngleBracketEquals: return "std::ops::Ge", "__ge__"
-        case Ast.BinaryExpressionAst, TokenType.TkDoubleFatArrow: return "std::ops::Cmp", "__cmp__"
-
-        case Ast.BinaryExpressionAst, TokenType.TkDoubleQuestionMark: return "std::ops::Coalesce", "__coa__"
-        case Ast.BinaryExpressionAst, TokenType.TkDoubleQuestionMarkEquals: return "std::ops::CoalesceAssign", "__coa_assign__"
-        case Ast.BinaryExpressionAst, TokenType.TkPipeArrow: return "std::ops::Pipe", "__pip__"
-
-        case Ast.UnaryExpressionAst, TokenType.TkPlus: return "std::ops::Abs", "__ans__"
-        case Ast.UnaryExpressionAst, TokenType.TkHyphen: return "std::ops::Neg", "__neg__"
-
-        case Ast.PostfixExpressionAst, TokenType.TkQuestionMark: return "std::ops::Try", "__try__"
-        # todo : other postfix operators
+    @staticmethod
+    def infer_type_from_binary_operator(ast: Ast.BinaryExpressionAst, s: ScopeManager) -> Ast.TypeAst:
+        function_identifier = mapping = {
+            TokenType.TkPlus: "std::ops::Add::__add__",
+            TokenType.TkPlusEquals: "std::ops::AddAssign::__add_assign__",
+            TokenType.TkHyphen: "std::ops::Sub::__sub__",
+            TokenType.TkHyphenEquals: "std::ops::SubAssign::__sub_assign__",
+            TokenType.TkAsterisk: "std::ops::Mul::__mul__",
+            TokenType.TkAsteriskEquals: "std::ops::MulAssign::__mul_assign__",
+            TokenType.TkForwardSlash: "std::ops::Div::__div__",
+            TokenType.TkForwardSlashEquals: "std::ops::DivAssign::__div_assign__",
+            TokenType.TkPercent: "std::ops::Mod::__mod__",
+            TokenType.TkPercentEquals: "std::ops::ModAssign::__mod_assign__",
+            TokenType.TkDoubleForwardSlash: "std::ops::Flo::__flo__",
+            TokenType.TkDoubleForwardSlashEquals: "std::ops::FloAssign::__flo_assign__",
+            TokenType.TkDoubleAsterisk: "std::ops::Pow::__pow__",
+            TokenType.TkDoubleAsteriskEquals: "std::ops::PowAssign::__pow_assign__",
 
 
+            TokenType.TkDoubleAmpersand: "std::ops::And::__and__",
+            TokenType.TkDoubleAmpersandEquals: "std::ops::AndAssign::__and_assign__",
+            TokenType.TkDoublePipe: "std::ops::Or::__or__",
+            TokenType.TkDoublePipeEquals: "std::ops::OrAssign::__or_assign__",
+    
+
+            TokenType.TkAmpersand: "std::ops::BitAnd::__bit_and__",
+            TokenType.TkAmpersandEquals: "std::ops::BitAndAssign::__bit_and_assign__",
+            TokenType.TkPipe: "std::ops::BitOr::__bit_or__",
+            TokenType.TkPipeEquals: "std::ops::BitOrAssign::__bit_or_assign__",
+            TokenType.TkCaret: "std::ops::BitXor::__bit_xor__",
+            TokenType.TkCaretEquals: "std::ops::BitXorAssign::__bit_xor_assign__",
+            TokenType.TkDoubleLeftAngleBracket: "std::ops::Shl::__shl__",
+            TokenType.TkDoubleLeftAngleBracketEquals: "std::ops::ShlAssign::__shl_assign__",
+            TokenType.TkDoubleRightAngleBracket: "std::ops::Shr::__shr__",
+            TokenType.TkDoubleRightAngleBracketEquals: "std::ops::ShrAssign::__shr_assign__",
+            TokenType.TkTripleLeftAngleBracket: "std::ops::Rol::__rol__",
+            TokenType.TkTripleLeftAngleBracketEquals: "std::ops::RolAssign::__rol_assign__",
+            TokenType.TkTripleRightAngleBracket: "std::ops::Ror::__ror__",
+            TokenType.TkTripleRightAngleBracketEquals: "std::ops::RorAssign::__ror_assign__",
+    
+            TokenType.TkDoubleEquals: "std::ops::Eq::__eq__",
+            TokenType.TkExclamationEquals: "std::ops::Ne::__ne__",
+            TokenType.TkLeftAngleBracket: "std::ops::Lt::__lt__",
+            TokenType.TkLeftAngleBracketEquals: "std::ops::Le::__le__",
+            TokenType.TkRightAngleBracket: "std::ops::Gt::__gt__",
+            TokenType.TkRightAngleBracketEquals: "std::ops::Ge::__ge__",
+            TokenType.TkDoubleFatArrow: "std::ops::Cmp::__cmp__",
+    
+            TokenType.TkDoubleQuestionMark: "std::ops::Coalesce::__coa__",
+            TokenType.TkDoubleQuestionMarkEquals: "std::ops::CoalesceAssign::__coa_assign__",
+            TokenType.TkPipeArrow: "std::ops::Pipe::__pip__",
+    
+            TokenType.TkQuestionMark: "std::ops::Try::__try__",
+        }[ast.op.primary.token_type] + "#" + TypeInference.infer_type(ast.lhs, s).parts[-1].identifier
+        arg_types = [TypeInference.infer_type(ast.lhs, s), TypeInference.infer_type(ast.rhs, s)]
+        function = s.current_scope.function_registry.get_symbol(function_identifier, argument_types=arg_types)
+        return function.return_type
+
+    @staticmethod
+    def infer_type_from_unary_operator(ast: Ast.UnaryExpressionAst, s: ScopeManager) -> Ast.TypeAst:
+        function_identifier = mapping = {
+            TokenType.TkExclamation: "std::ops::Not::__not__",
+            TokenType.TkTilde: "std::ops::BitNot::__bit_not__",
+            TokenType.TkPlus: "std::ops::Abs::__ans__",
+            TokenType.TkHyphen: "std::ops::Neg::__neg__",
+        }[ast.op.primary.token_type] + "#" + TypeInference.infer_type(ast.rhs, s).parts[-1].identifier
+        arg_types = [TypeInference.infer_type(ast.rhs, s)]
+        function = s.current_scope.function_registry.get_symbol(function_identifier, argument_types=arg_types)
+        return function.return_type
+
+    @staticmethod
+    def infer_type_from_postfix_operator(ast: Ast.PostfixExpressionAst, s: ScopeManager) -> Ast.TypeAst:
+        match ast:
+            case Ast.PostfixFunctionCallAst(): return TypeInference.infer_type_from_postfix_function_call(ast, s)
+            case Ast.PostfixIndexAccessAst(): return TypeInference.infer_type_from_postfix_index(ast, s)
+            case Ast.PostfixMemberAccessAst(): return TypeInference.infer_type_from_postfix_member_access(ast, s)
+            case Ast.PostfixStructInitializerAst(): return TypeInference.infer_type_from_postfix_struct_initializer(ast, s)
+            case _: raise NotImplementedError(f"Type inference for postfix operator {ast} is not implemented")
+
+    @staticmethod
+    def infer_type_from_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeManager) -> Ast.TypeAst:
+        function_identifier = TypeInference.infer_type(ast.lhs, s).parts[-1].identifier
+        arg_types = [TypeInference.infer_type(arg, s) for arg in ast.arguments]
+        function = s.current_scope.function_registry.get_symbol(function_identifier, argument_types=arg_types)
+        return function.return_type
+
+    @staticmethod
+    def infer_type_from_multi_assignment_operator(ast: Ast.MultiAssignmentExpressionAst, s: ScopeManager) -> Ast.TypeAst:
+        ...
+    
+    @staticmethod
+    def infer_type_from_primary_expression(ast: Ast.PrimaryExpressionAst, s: ScopeManager) -> Ast.TypeAst:
+        match ast:
+            case Ast.LiteralAst(): return TypeInference.infer_type_from_literal(ast, s)
+            case Ast.IdentifierAst(): return TypeInference.infer_type_from_identifier(ast, s)
+            case Ast.ParenthesizedExpressionAst(): return TypeInference.infer_type_from_parenthesized_expression(ast, s)
+            case Ast.LambdaAst(): return TypeInference.infer_type_from_lambda(ast, s)
+            case Ast.PlaceholderAst(): return TypeInference.infer_type_from_placeholder(ast, s)
+            case Ast.IfStatementAst(): return TypeInference.infer_type_from_if_statement(ast, s)
+            case Ast.MatchStatementAst(): return TypeInference.infer_type_from_match_statement(ast, s)
+            case Ast.WhileStatementAst(): return TypeInference.infer_type_from_while_statement(ast, s)
+            case Ast.ForStatementAst(): return TypeInference.infer_type_from_for_statement(ast, s)
+            case Ast.DoWhileStatementAst(): return TypeInference.infer_type_from_do_while_statement(ast, s)
+            case _: raise NotImplementedError(f"Unknown expression type {ast.op.__class__.__name__}")
