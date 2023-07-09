@@ -1050,7 +1050,7 @@ class Parser:
         def inner():
             p1 = self._parse_rvalue().delay_parse()
             p2 = self._parse_lambda().delay_parse()
-            p3 = self._parse_type_identifier().delay_parse()
+            p3 = self._parse_single_type_identifier().delay_parse()
             p4 = self._parse_parenthesized_expression().delay_parse()
             p5 = self._parse_expression_placeholder().delay_parse()
             p6 = self._parse_statement_if().delay_parse()
@@ -1214,10 +1214,26 @@ class Parser:
 
     def _parse_type_identifier(self) -> BoundParser:
         def inner():
+            p1 = self._parse_single_type_identifier().delay_parse()
+            p2 = self._parse_multiple_type_identifiers().delay_parse()
+            p3 = (p1 | p2).parse_once()
+            return p3
+        return BoundParser(self, inner)
+
+    def _parse_single_type_identifier(self) -> BoundParser:
+        def inner():
             p1 = self._parse_type_self_prefix().delay_parse()
             p2 = self._parse_type_raw_identifiers().delay_parse()
             p3 = (p1 | p2).parse_once()
-            return Ast.TypeAst(p3)
+            return Ast.SingleTypeAst(p3)
+        return BoundParser(self, inner)
+
+    def _parse_multiple_type_identifiers(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
+            p2 = self._parse_type_identifiers().parse_once()
+            p3 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
+            return Ast.TupleTypeAst(p2)
         return BoundParser(self, inner)
 
     def _parse_type_identifiers(self) -> BoundParser:
@@ -1543,7 +1559,7 @@ class Parser:
             p3 = self._parse_token(TokenType.KwAs).parse_once()
             p4 = self._parse_type_identifier().parse_once()
             p5 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return Ast.TypedefStatementAst(Ast.TypeAst([p2]), p4)
+            return Ast.TypedefStatementAst(Ast.SingleTypeAst([p2]), p4)
         return BoundParser(self, inner)
 
     def _parse_statement_break(self) -> BoundParser:

@@ -16,6 +16,6 @@ class Compiler:
         self._parser = Parser(self._tokens)
         self._ast = self._parser.parse()
         d = dataclasses.asdict(self._ast)
-        open("ast.json", "w").write(pprint.pformat(d, indent=1, compact=True).replace("'", '"').replace("None", "null").replace("False", "false").replace("True", "true"))
+        open("ast.json", "w").write(pprint.pformat(d, indent=1, compact=True, sort_dicts=False).replace("'", '"').replace("None", "null").replace("False", "false").replace("True", "true"))
 
         # SemanticAnalyser(self._ast)
