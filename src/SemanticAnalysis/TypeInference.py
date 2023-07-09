@@ -13,8 +13,9 @@ class TypeInference:
             case Ast.UnaryExpressionAst(): return TypeInference.infer_type_from_unary_operator(ast, s)
             case Ast.PostfixExpressionAst(): return TypeInference.infer_type_from_postfix_operator(ast, s)
             case Ast.AssignmentExpressionAst(): return TypeInference.infer_type_from_assignment_operator(ast, s)
-            case Ast.PrimaryExpressionAst(): return TypeInference.infer_type_from_primary_expression(ast, s)
-            case _: raise NotImplementedError(f"Unknown expression type {ast.op.__class__.__name__}")
+
+        if type(ast) in Ast.PrimaryExpressionAst.__args__: return TypeInference.infer_type_from_primary_expression(ast, s)
+        else: raise NotImplementedError(f"Unknown expression type {type(ast)}")
 
     @staticmethod
     def infer_type_from_binary_operator(ast: Ast.BinaryExpressionAst, s: ScopeManager) -> Ast.TypeAst:
@@ -69,9 +70,13 @@ class TypeInference:
             TokenType.TkPipeArrow: "std::ops::Pipe::__pip__",
     
             TokenType.TkQuestionMark: "std::ops::Try::__try__",
-        }[ast.op.primary.token_type] + "#" + TypeInference.infer_type_from_expression(ast.lhs, s).parts[-1].identifier
+        }[ast.op.primary.token_type] + "#" + "::".join([i.identifier for i in TypeInference.infer_type_from_expression(ast.lhs, s).parts])
         arg_types = [TypeInference.infer_type_from_expression(ast.lhs, s), TypeInference.infer_type_from_expression(ast.rhs, s)]
         function = s.current_scope.function_registry.get_symbol(function_identifier, argument_types=arg_types)
+
+        if function is None:
+            raise NotImplementedError(f"Unknown binary operator {ast.op.primary.token_type} calling {function_identifier}")
+
         return function.return_type
 
     @staticmethod
@@ -134,7 +139,6 @@ class TypeInference:
     @staticmethod
     def infer_type_from_primary_expression(ast: Ast.PrimaryExpressionAst, s: ScopeManager) -> Ast.TypeAst:
         match ast:
-            case Ast.LiteralAst(): return TypeInference.infer_type_from_literal(ast, s)
             case Ast.IdentifierAst(): return TypeInference.infer_type_from_identifier(ast, s)
             case Ast.ParenthesizedExpressionAst(): return TypeInference.infer_type_from_parenthesized_expression(ast, s)
             case Ast.LambdaAst(): return TypeInference.infer_type_from_lambda(ast, s)
@@ -144,7 +148,15 @@ class TypeInference:
             case Ast.WhileStatementAst(): return TypeInference.infer_type_from_while_statement(ast, s)
             case Ast.ForStatementAst(): return TypeInference.infer_type_from_for_statement(ast, s)
             case Ast.DoWhileStatementAst(): return TypeInference.infer_type_from_do_while_statement(ast, s)
-            case _: raise NotImplementedError(f"Unknown expression type {ast.op.__class__.__name__}")
+
+        if type(ast) in Ast.LiteralAst.__args__: return TypeInference.infer_type_from_literal(ast, s)
+        else: raise NotImplementedError(f"Unknown expression type {ast.op.__class__.__name__}")
+
+    @staticmethod
+    def infer_type_from_literal(ast: Ast.LiteralAst, s: ScopeManager) -> Ast.TypeAst:
+        match ast:
+            case Ast.NumberLiteralBase10Ast(): return Ast.SingleTypeAst([Ast.GenericIdentifierAst("std", []), Ast.GenericIdentifierAst("Num", [])])
+            case _: raise NotImplementedError(f"Type inference for literal {ast} is not implemented")
 
     @staticmethod
     def infer_type_from_identifier(ast: Ast.IdentifierAst, s: ScopeManager) -> Ast.TypeAst:

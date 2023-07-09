@@ -136,6 +136,29 @@ class SymbolTableGenerator:
         for member in ast.module.body.members:
             SymbolTableGenerator.build_symbols_module_member(member, s)
 
+        # execute all deferred type inference now that all the symbols are available
+        SymbolTableGenerator.infer_types(s)
+
+    @staticmethod
+    def infer_types(s: ScopeManager) -> None:
+        scope = s.global_scope
+        while True:
+            for i in range(len(scope.symbol_table._symbols.values())):
+                symbol = list(scope.symbol_table._symbols.values())[i]
+                if callable(symbol):
+                    scope.symbol_table._symbols[list(scope.symbol_table._symbols.keys())[i]] = symbol()
+            if scope.child_scopes:
+                scope = scope.child_scopes[0]
+            else:
+                cur_index = scope.parent_scope.child_scopes.index(scope)
+                if cur_index + 1 < len(scope.parent_scope.child_scopes):
+                    scope = scope.parent_scope.child_scopes[cur_index + 1]
+                else:
+                    scope = scope.parent_scope
+                    if scope == s.global_scope:
+                        break
+
+
     @staticmethod
     def build_symbols_module_member(ast: Ast.ModuleMemberAst, s: ScopeManager) -> None:
         match ast:
@@ -203,7 +226,7 @@ class SymbolTableGenerator:
         from src.SemanticAnalysis.TypeInference import TypeInference
 
         for variable in ast.variables: # todo : unpack value
-            s.current_scope.symbol_table.add_symbol(variable.identifier.identifier, None)  # lambda: TypeInference.infer_type_from_expression(value, s) if value else ast.type_annotation)
+            s.current_scope.symbol_table.add_symbol(variable.identifier.identifier, lambda: TypeInference.infer_type_from_expression(ast.value, s) if ast.value else ast.type_annotation)
 
     @staticmethod
     @Utils.new_scope
