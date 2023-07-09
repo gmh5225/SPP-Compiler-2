@@ -926,7 +926,7 @@ class Parser:
             p5 = self._parse_assignment_multiple_lhs().parse_zero_or_more()
             p6 = self._parse_token(TokenType.TkEqual).parse_once()
             p7 = self._parse_assignment_expression().parse_once()
-            return Ast.MultiAssignmentExpressionAst([p4, *p5], p7)
+            return Ast.AssignmentExpressionAst([p4, *p5], p7)
         return BoundParser(self, inner)
 
     def _parse_assignment_multiple_lhs(self) -> BoundParser:

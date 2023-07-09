@@ -211,7 +211,7 @@ class BinaryExpressionAst:
     rhs: ExpressionAst
 
 @dataclass
-class MultiAssignmentExpressionAst:
+class AssignmentExpressionAst:
     lhs: list[ExpressionAst]
     rhs: ExpressionAst
 
@@ -497,7 +497,7 @@ NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiter
 LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | ListLiteralAst | MapLiteralAst | SetLiteralAst | PairLiteralAst | RegexLiteralAst | TupleLiteralAst
 TypeAst = SingleTypeAst | TupleTypeAst
 PrimaryExpressionAst = LiteralAst | IdentifierAst | ParenthesizedExpressionAst | LambdaAst | PlaceholderAst | SingleTypeAst | IfStatementAst | MatchStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst
-ExpressionAst = UnaryExpressionAst | BinaryExpressionAst | PostfixExpressionAst | MultiAssignmentExpressionAst | PrimaryExpressionAst
+ExpressionAst = UnaryExpressionAst | BinaryExpressionAst | PostfixExpressionAst | AssignmentExpressionAst | PrimaryExpressionAst
 StatementAst = IfStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst | MatchStatementAst | WithStatementAst | ReturnStatementAst | YieldStatementAst | TypedefStatementAst | LetStatementAst | ExpressionAst
 ModuleMemberAst = EnumPrototypeAst | ClassPrototypeAst | FunctionPrototypeAst | SupPrototypeNormalAst | SupPrototypeInheritanceAst
 ClassAttributeAst = ClassInstanceAttributeAst | ClassStaticAttributeAst
