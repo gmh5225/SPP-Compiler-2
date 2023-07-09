@@ -1185,7 +1185,7 @@ class Parser:
 
     def _parse_type_raw_identifiers(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_raw_identifier().parse_once()
+            p1 = self._parse_generic_identifier().parse_once()
             p2 = self._parse_type_raw_identifiers_next().parse_zero_or_more()
             return [p1, *p2]
         return BoundParser(self, inner)
