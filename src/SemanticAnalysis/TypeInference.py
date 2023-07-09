@@ -1,9 +1,8 @@
-from typing import Any
+from __future__ import annotations
 
 from src.LexicalAnalysis.Tokens import TokenType
 from src.SyntacticAnalysis import Ast
 from src.SemanticAnalysis.SymbolTableGeneration import ScopeManager
-
 
 class TypeInference:
     # Entry function
@@ -13,7 +12,7 @@ class TypeInference:
             case Ast.BinaryExpressionAst(): return TypeInference.infer_type_from_binary_operator(ast, s)
             case Ast.UnaryExpressionAst(): return TypeInference.infer_type_from_unary_operator(ast, s)
             case Ast.PostfixExpressionAst(): return TypeInference.infer_type_from_postfix_operator(ast, s)
-            case Ast.MultiAssignmentExpressionAst(): return TypeInference.infer_type_from_multi_assignment_operator(ast, s)
+            case Ast.AssignmentExpressionAst(): return TypeInference.infer_type_from_assignment_operator(ast, s)
             case Ast.PrimaryExpressionAst(): return TypeInference.infer_type_from_primary_expression(ast, s)
             case _: raise NotImplementedError(f"Unknown expression type {ast.op.__class__.__name__}")
 
@@ -125,8 +124,12 @@ class TypeInference:
         return class_type
 
     @staticmethod
-    def infer_type_from_multi_assignment_operator(ast: Ast.MultiAssignmentExpressionAst, s: ScopeManager) -> Ast.TypeAst:
-        ...
+    def infer_type_from_assignment_operator(ast: Ast.AssignmentExpressionAst, s: ScopeManager) -> Ast.TypeAst:
+        number_of_lhs = len(ast.lhs)
+        if number_of_lhs > 1:
+            rhs_type = TypeInference.infer_type_from_expression(ast.rhs, s)
+            assert type(rhs_type) == Ast.TupleTypeAst and len(rhs_type.types) == number_of_lhs
+        return None
     
     @staticmethod
     def infer_type_from_primary_expression(ast: Ast.PrimaryExpressionAst, s: ScopeManager) -> Ast.TypeAst:
@@ -148,6 +151,10 @@ class TypeInference:
         return s.current_scope.symbol_table.get_symbol(ast.identifier)
 
     @staticmethod
+    def infer_type_from_parenthesized_expression(ast: Ast.ParenthesizedExpressionAst, s: ScopeManager) -> Ast.TypeAst:
+        return TypeInference.infer_type_from_expression(ast.expression, s)
+
+    @staticmethod
     def infer_type_from_if_statement(ast: Ast.IfStatementAst, s: ScopeManager) -> Ast.TypeAst:
         return TypeInference.infer_type_from_expression(ast.if_branch.body[-1], s)
 
@@ -157,6 +164,16 @@ class TypeInference:
 
     @staticmethod
     def infer_type_from_while_statement(ast: Ast.WhileStatementAst, s: ScopeManager) -> Ast.TypeAst:
+        break_statement = [statement for statement in ast.body if isinstance(statement, Ast.BreakStatementAst)][0]
+        return TypeInference.infer_type_from_expression(break_statement.returning_expression, s)
+
+    @staticmethod
+    def infer_type_from_for_statement(ast: Ast.ForStatementAst, s: ScopeManager) -> Ast.TypeAst:
+        break_statement = [statement for statement in ast.body if isinstance(statement, Ast.BreakStatementAst)][0]
+        return TypeInference.infer_type_from_expression(break_statement.returning_expression, s)
+
+    @staticmethod
+    def infer_type_from_do_while_statement(ast: Ast.DoWhileStatementAst, s: ScopeManager) -> Ast.TypeAst:
         break_statement = [statement for statement in ast.body if isinstance(statement, Ast.BreakStatementAst)][0]
         return TypeInference.infer_type_from_expression(break_statement.returning_expression, s)
 
