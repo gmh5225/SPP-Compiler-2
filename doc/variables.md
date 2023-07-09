@@ -6,21 +6,20 @@
 - Provide no assignment, but a type - variable is unusable until assigned: `let variable: std::number`
 
 #### Multiple variable binding
-- Multiple variables can be defined at once
-- If values are provided, the types can be different: `let a, b, c = 1, "two", '3'`
+- Multiple variables can be defined at once throygh unpacking a tuple
+- If values are provided, the types can be different: `let a, b, c = (1, "two", '3')`
 - If no values are provided, the types must be the same: `let a, b, c: std::number`
 
 #### More values on RHS than LHS
-- If there are more values on the RHS than LHS, then "auto-packing" occurs
-- Variables are assigned one by one to the LHS, with the final LHS variable being assigned the remaining values in a 
-  tuple
-- For example, `let a, b = 1, 2, 3` is equivalent to `let a, b = 1, (2, 3)`
+- If there are more values on the RHS than LHS, then there is an error, as there are too many values to unpack
+- For example, `let a, b = (1, 2, 3)` is an error
 
 #### More values on LHS than RHS
-- If there are more values on the LHS than RHS, then "auto-unpacking" can occur
-- The RHS is unpacked as expansively as possible to the LHS, left-first
-- For example, `let a, b, c, d = (1, 2), (3, 4)` is equivalent to `let a, b, c, d = 1, 2, 3, 4`
-- Requires the RHS types to be unpackable types (see [unpackable types]())
+- If there are more values on the LHS than RHS, then there is an error, as there are too few values to unpack
+- For example, `let a, b, c = (1, 2)` is an error
+- Only one level of unpacking is allowed - `let a, b, c = (1, (2, 3))` is an error
+  - Design decision to keep the language simple, and remove ambiguities concerning which inner tuple would unpack
+  - Use `let a, b, c = (1, 2, 3)`
 
 #### Declaring a variable with no value
 - Uninitialized and cannot be used until set

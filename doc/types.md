@@ -47,9 +47,7 @@
 - A generic looks like `<...Ts>`, then it is a variadic type - the pack using this type must be variadic ie `...args: Ts`
 - A variadic parameter must use this type - a single requires or optional parameter cannot be a variadic type
 - Variadic types can have the `::n` syntax applied, to get the nth type in the pack
-- Variadic types can be in a `use` statement, cannot be instantiated
-  - For example, in `Tup`, `use ValueTypes as T` is used to hold the value types
-  - Then `Tup<Num, Str, Bool>::ValueTypes::0` can be used to get `Num`
+- Variadic types can be in a `use` statement, cannot be instantiated (used for type-checking)
 
 ### Not allowed
 - A non-variadic parameter can not be denoted with a type declared as variadic (makes no sense)
@@ -58,18 +56,24 @@ function func_variadic_3<...Ts>(a: Ts):
     std::print(a);
 ```
 
+## Tuples
+- Compiler builtin
+- Can be used to hold a fixed number of values of different types
+- Created by wrapping a comma-separated list of types in parentheses
+- Allows the `::n` syntax to access the nth type in the tuple
+- Also supports the `.n` syntax to access the nth value in the tuple
 
-### Accessing nth type of a pack
-There is a very simple way to access the nth type of a parameter pack, using the index after `::`. For example:
-```s++
-function func_variadic_4<...Ts>(...a: Ts):
-    other_func<Ts::0>(1);
-```
 
 ## Special types
-####  `std::Void`
+#### `std::Void`
+- Compiler built-in (special behavior)
 - The "nothing" type
 - Cannot be the type of a variable / attribute
 - Can be used as a return type for a function
 - Can be used as a generic type argument ie `std::Result<std::Void, std::String>`
 - Cannot be instantiated
+- When `std::void` is used as a generic `T`, methods that use `T` as a parameter type will have that parameter removed from the function signature
+
+#### `Unit type`
+- The empty tuple - `()`
+- Can act as a placeholder type, but `std::Void` should be preferred
