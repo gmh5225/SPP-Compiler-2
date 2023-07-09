@@ -1173,7 +1173,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.KwSelf).parse_once()
             p2 = self._parse_type_raw_identifiers_rest().parse_optional() or []
-            return Ast.TypeAst([Ast.SelfTypeAst(), *p2])
+            return Ast.SingleTypeAst([Ast.SelfTypeAst(), *p2])
         return BoundParser(self, inner)
 
     def _parse_type_raw_identifiers_rest(self) -> BoundParser:

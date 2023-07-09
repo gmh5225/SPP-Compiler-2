@@ -72,7 +72,7 @@ class TypeInference:
             TokenType.TkQuestionMark: "std::ops::Try::__try__",
         }[ast.op.primary.token_type] + "#" + "::".join([i.identifier for i in TypeInference.infer_type_from_expression(ast.lhs, s).parts])
         arg_types = [TypeInference.infer_type_from_expression(ast.lhs, s), TypeInference.infer_type_from_expression(ast.rhs, s)]
-        function = s.current_scope.function_registry.get_symbol(function_identifier, argument_types=arg_types)
+        function = s.get_function(function_identifier, argument_types=arg_types)
 
         if function is None:
             raise NotImplementedError(f"Unknown binary operator {ast.op.primary.token_type} calling {function_identifier}")
@@ -88,7 +88,7 @@ class TypeInference:
             TokenType.TkHyphen: "std::ops::Neg::__neg__",
         }[ast.op.primary.token_type] + "#" + TypeInference.infer_type_from_expression(ast.rhs, s).parts[-1].identifier
         arg_types = [TypeInference.infer_type_from_expression(ast.rhs, s)]
-        function = s.current_scope.function_registry.get_symbol(function_identifier, argument_types=arg_types)
+        function = s.get_function(function_identifier, argument_types=arg_types)
         return function.return_type
 
     @staticmethod
@@ -104,7 +104,7 @@ class TypeInference:
     def infer_type_from_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeManager) -> Ast.TypeAst:
         function_identifier = TypeInference.infer_type_from_expression(ast.lhs, s).parts[-1].identifier
         arg_types = [TypeInference.infer_type_from_expression(arg, s) for arg in ast.op.arguments]
-        function = s.current_scope.function_registry.get_symbol(function_identifier, argument_types=arg_types)
+        function = s.get_function(function_identifier, argument_types=arg_types)
         return function.return_type
 
     @staticmethod
@@ -112,7 +112,7 @@ class TypeInference:
         name = "IndexMut::__index_mut__" if ast.op.arguments[0].convention.modifier.token_type == TokenType.KwMut else "IndexRef::__index_ref__"
         function_identifier = name + "#" + TypeInference.infer_type_from_expression(ast.lhs, s).parts[-1].identifier
         arg_types = [TypeInference.infer_type_from_expression(arg, s) for arg in ast.op.arguments]
-        function = s.current_scope.function_registry.get_symbol(function_identifier, argument_types=arg_types)
+        function = s.get_function(function_identifier, argument_types=arg_types)
         return function.return_type
 
     @staticmethod
@@ -160,7 +160,7 @@ class TypeInference:
 
     @staticmethod
     def infer_type_from_identifier(ast: Ast.IdentifierAst, s: ScopeManager) -> Ast.TypeAst:
-        return s.current_scope.symbol_table.get_symbol(ast.identifier)
+        return s.get_symbol(ast.identifier)
 
     @staticmethod
     def infer_type_from_parenthesized_expression(ast: Ast.ParenthesizedExpressionAst, s: ScopeManager) -> Ast.TypeAst:

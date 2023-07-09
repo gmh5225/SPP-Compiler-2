@@ -1,11 +1,18 @@
 from __future__ import annotations
 from typing import Generic, Optional, TypeVar
 from inflection import camelize
+from dataclasses import dataclass
 
 from src.SyntacticAnalysis import Ast
 
 
 T = TypeVar("T")
+
+
+@dataclass
+class TypeWrapper:
+    type: Ast.TypeAst
+    base_classes: list[Ast.TypeAst]
 
 
 class SymbolTable(Generic[T]):
@@ -14,10 +21,10 @@ class SymbolTable(Generic[T]):
     def __init__(self):
         self._symbols = {}
 
-    def add_symbol(self, name: str, symbol: T):
+    def _add_symbol(self, name: str, symbol: T):
         self._symbols[name] = symbol
 
-    def get_symbol(self, name: str) -> Optional[T]:
+    def _get_symbol(self, name: str) -> Optional[T]:
         return self._symbols.get(name, None)
 
     def __repr__(self):
@@ -28,13 +35,13 @@ class SymbolTable(Generic[T]):
 
 
 class FunctionRegistry(SymbolTable[Ast.FunctionPrototypeAst]):
-    def get_symbol(self, name: str, type_generics: list[Ast.TypeAst] = [], argument_types: list[Ast.TypeAst] = []) -> Optional[Ast.FunctionPrototypeAst]:
+    def _get_symbol(self, name: str, type_generics: list[Ast.TypeAst] = [], argument_types: list[Ast.TypeAst] = []) -> Optional[Ast.FunctionPrototypeAst]:
         ...
 
 class Scope:
     _name: str
     _symbol_table: SymbolTable[Ast.TypeAst]
-    _type_table: SymbolTable[Ast.TypeAst]
+    _type_table: SymbolTable[TypeWrapper]
     _function_registry: FunctionRegistry
     _loop_tag_table: SymbolTable[None]
 
@@ -114,6 +121,54 @@ class ScopeManager:
     def global_scope(self) -> Scope:
         return self._global_scope
 
+    def get_symbol(self, name: str) -> Optional[Ast.TypeAst]:
+        scope = self._current_scope
+        while scope is not None:
+            symbol = scope.symbol_table._get_symbol(name)
+            if symbol is not None:
+                return symbol
+            scope = scope.parent_scope
+        raise Exception(f"Symbol {name} not found in any scope")
+
+    def get_type(self, name: str) -> Optional[TypeWrapper]:
+        scope = self._current_scope
+        while scope is not None:
+            symbol = scope.type_table._get_symbol(name)
+            if symbol is not None:
+                return symbol
+            scope = scope.parent_scope
+        raise Exception(f"Type {name} not found in any scope")
+
+    def get_function(self, name: str, type_generics: list[Ast.TypeAst] = [], argument_types: list[Ast.TypeAst] = []) -> Optional[Ast.FunctionPrototypeAst]:
+        scope = self._current_scope
+        while scope is not None:
+            symbol = scope.function_registry._get_symbol(name, type_generics, argument_types)
+            if symbol is not None:
+                return symbol
+            scope = scope.parent_scope
+        raise Exception(f"Function {name} not found in any scope")
+
+    def get_loop_tag(self, name: str) -> Optional[None]:
+        scope = self._current_scope
+        while scope is not None:
+            symbol = scope.loop_tag_table._get_symbol(name)
+            if symbol is not None:
+                return symbol
+            scope = scope.parent_scope
+        raise Exception(f"Loop tag {name} not found in any scope")
+
+    def add_symbol(self, name: str, symbol: Ast.TypeAst) -> None:
+        self._current_scope.symbol_table._add_symbol(name, symbol)
+
+    def add_type(self, name: str, symbol: TypeWrapper) -> None:
+        self._current_scope.type_table._add_symbol(name, symbol)
+
+    def add_function(self, name: str, symbol: Ast.FunctionPrototypeAst) -> None:
+        self._current_scope.function_registry._add_symbol(name, symbol)
+
+    def add_loop_tag(self, name: str) -> None:
+        self._current_scope.loop_tag_table._add_symbol(name, None)
+
 
 class Utils:
     @staticmethod
@@ -158,14 +213,40 @@ class SymbolTableGenerator:
                     if scope == s.global_scope:
                         break
 
-
     @staticmethod
     def build_symbols_module_member(ast: Ast.ModuleMemberAst, s: ScopeManager) -> None:
         match ast:
             case Ast.FunctionPrototypeAst(): SymbolTableGenerator.build_symbols_function_prototype(ast, s)
             case Ast.ClassPrototypeAst(): SymbolTableGenerator.build_symbols_class_prototype(ast, s)
             case Ast.EnumPrototypeAst(): SymbolTableGenerator.build_symbols_enum_prototype(ast, s)
+            case Ast.SupPrototypeNormalAst(): SymbolTableGenerator.build_symbols_sup_prototype_normal(ast, s)
+            case Ast.SupPrototypeInheritanceAst(): SymbolTableGenerator.build_symbols_sup_prototype_inheritance(ast, s)
             case _: raise NotImplementedError(f"Unknown module member type: {ast.__class__.__name__}")
+
+    @staticmethod
+    def build_symbols_sup_prototype_normal(ast: Ast.SupPrototypeNormalAst, s: ScopeManager) -> None:
+        for member in ast.body.members:
+            SymbolTableGenerator.build_symbols_sup_member(ast, member, s)
+
+    @staticmethod
+    def build_symbols_sup_prototype_inheritance(ast: Ast.SupPrototypeInheritanceAst, s: ScopeManager) -> None:
+        # Find the type in the scope and then add the super-type as a base-class
+        sub_class_type = s.get_type(ast.identifier.identifier)
+        sub_class_type.base_classes.append(ast.super_class)
+
+        for member in ast.body.members:
+            SymbolTableGenerator.build_symbols_sup_member(ast, member, s)
+
+    @staticmethod
+    def build_symbols_sup_member(enclosing: Ast.SupPrototypeNormalAst, ast: Ast.SupMemberAst, s: ScopeManager) -> None:
+        match ast:
+            case Ast.SupMethodPrototypeAst(): SymbolTableGenerator.build_symbols_sup_method_prototype(enclosing, ast, s)
+            case Ast.SupTypedefAst(): SymbolTableGenerator.build_symbols_sup_typedef(enclosing, ast, s)
+
+    @staticmethod
+    def build_symbols_sup_method_prototype(enclosing: Ast.SupPrototypeNormalAst, ast: Ast.SupMethodPrototypeAst, s: ScopeManager) -> None:
+        ast.identifier.identifier += "#" + "::".join([g.identifier for g in enclosing.identifier.parts])
+        SymbolTableGenerator.build_symbols_function_prototype(ast, s)
 
     @staticmethod
     def build_symbols_if_statement(ast: Ast.IfStatementAst, s: ScopeManager) -> None:
@@ -185,14 +266,14 @@ class SymbolTableGenerator:
     @Utils.new_scope
     def build_symbols_while_statement(ast: Ast.WhileStatementAst, s: ScopeManager) -> None:
         if ast.tag:
-            s.current_scope.loop_tag_table.add_symbol(ast.tag.identifier, None)
+            s.add_loop_tag(ast.tag.identifier)
         for statement in ast.body:
             SymbolTableGenerator.build_symbols_statement(statement, s)
 
     @staticmethod
     @Utils.new_scope
     def build_symbols_do_while_statement(ast: Ast.DoWhileStatementAst, s: ScopeManager) -> None:
-        s.current_scope.loop_tag_table.add_symbol(ast.tag.identifier, None)
+        s.add_loop_tag(ast.tag.identifier)
         for statement in ast.body:
             SymbolTableGenerator.build_symbols_statement(statement, s)
 
@@ -213,40 +294,44 @@ class SymbolTableGenerator:
     def build_symbols_with_statement(ast: Ast.WithStatementAst, s: ScopeManager) -> None:
         from src.SemanticAnalysis.TypeInference import TypeInference
 
-        s.current_scope.symbol_table.add_symbol(ast.alias.identifier.identifier, lambda: TypeInference.infer_type_from_expression(ast.value, s))
+        s.add_symbol(ast.alias.identifier.identifier, lambda: TypeInference.infer_type_from_expression(ast.value, s))
         for statement in ast.body:
             SymbolTableGenerator.build_symbols_statement(statement, s)
 
     @staticmethod
     def build_symbols_typedef_statement(ast: Ast.TypedefStatementAst, s: ScopeManager) -> None:
-        s.current_scope.type_table.add_symbol(ast.new_type.parts[-1].identifier, ast.old_type) # todo
+        s.add_type(ast.new_type.parts[-1].identifier, TypeWrapper(ast.old_type, [])) # todo (also copy base types?)
 
     @staticmethod
     def build_symbols_let_statement(ast: Ast.LetStatementAst, s: ScopeManager) -> None:
         from src.SemanticAnalysis.TypeInference import TypeInference
 
         for variable in ast.variables: # todo : unpack value
-            s.current_scope.symbol_table.add_symbol(variable.identifier.identifier, lambda: TypeInference.infer_type_from_expression(ast.value, s) if ast.value else ast.type_annotation)
+            s.add_symbol(variable.identifier.identifier, lambda: TypeInference.infer_type_from_expression(ast.value, s) if ast.value else ast.type_annotation)
 
     @staticmethod
-    @Utils.new_scope
     def build_symbols_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeManager) -> None:
-        s.current_scope.parent_scope.function_registry.add_symbol(ast.identifier.identifier, ast)
+        s.add_function(ast.identifier.identifier, ast)
+
+        s.enter_scope("FunctionPrototype")
         for parameter in ast.parameters:
-            s.current_scope.symbol_table.add_symbol(parameter.identifier.identifier, parameter.type_annotation)
+            s.add_symbol(parameter.identifier.identifier, parameter.type_annotation)
         for type_parameter in ast.generic_parameters:
-            s.current_scope.type_table.add_symbol(type_parameter.identifier.identifier, type_parameter) # todo -> replaced by true type on function call
+            s.add_symbol(type_parameter.identifier.identifier, type_parameter) # todo -> replaced by true type on function call
         for statement in ast.body.statements:
             SymbolTableGenerator.build_symbols_statement(statement, s)
+        s.exit_scope()
 
     @staticmethod
-    @Utils.new_scope
     def build_symbols_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeManager) -> None:
-        s.current_scope.parent_scope.type_table.add_symbol(ast.identifier.identifier, ast)
+        s.add_type(ast.identifier.identifier, TypeWrapper(ast, []))
+
+        s.enter_scope("ClassPrototype")
         for type_parameter in ast.generic_parameters:
-            s.current_scope.type_table.add_symbol(type_parameter.identifier.identifier, type_parameter)
+            s.add_type(type_parameter.identifier.identifier, TypeWrapper(type_parameter, []))
         for attribute in ast.body.members:
-            s.current_scope.symbol_table.add_symbol(attribute.identifier.identifier, attribute.type_annotation)
+            s.add_symbol(attribute.identifier.identifier, attribute.type_annotation)
+        s.exit_scope()
 
 
     @staticmethod
@@ -261,6 +346,7 @@ class SymbolTableGenerator:
             case Ast.TypedefStatementAst(): SymbolTableGenerator.build_symbols_typedef_statement(ast, s)
             case Ast.LetStatementAst(): SymbolTableGenerator.build_symbols_let_statement(ast, s)
             case Ast.FunctionPrototypeAst(): SymbolTableGenerator.build_symbols_function_prototype(ast, s)
+            case Ast.ReturnStatementAst(): pass
             case True if type(ast) in Ast.ExpressionAst.__args__: SymbolTableGenerator.build_symbols_expression_statement(ast, s)
             case _: raise NotImplementedError(f"Statement {ast} not implemented")
 
