@@ -2,8 +2,9 @@ from src.LexicalAnalysis.Tokens import Token
 from src.LexicalAnalysis.Lexer import Lexer
 from src.SyntacticAnalysis.Ast import ProgramAst
 from src.SyntacticAnalysis.Parser import Parser
-# from src.SemanticAnalysis.Semantic import SemanticAnalyser
+from src.SemanticAnalysis.SemanticAnalysis import SemanticAnalysis
 import pprint, dataclasses
+from src.Compiler.Printer import save_json
 
 class Compiler:
     _code: str
@@ -16,6 +17,6 @@ class Compiler:
         self._parser = Parser(self._tokens)
         self._ast = self._parser.parse()
         d = dataclasses.asdict(self._ast)
-        open("ast.json", "w").write(pprint.pformat(d, indent=1, compact=True, sort_dicts=False).replace("'", '"').replace("None", "null").replace("False", "false").replace("True", "true"))
+        save_json(d, "_out/ast.json")
 
-        # SemanticAnalyser(self._ast)
+        SemanticAnalysis(self._ast)
