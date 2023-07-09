@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Generic, Optional, TypeVar
+from inflection import camelize
 
 from src.SyntacticAnalysis import Ast
 
@@ -22,13 +23,16 @@ class SymbolTable(Generic[T]):
     def __repr__(self):
         return f"SymbolTable({self._symbols})"
 
+    def to_json(self) -> dict:
+        return {name: str(symbol) for name, symbol in self._symbols.items()}
+
 
 class FunctionRegistry(SymbolTable[Ast.FunctionPrototypeAst]):
     def get_symbol(self, name: str, type_generics: list[Ast.TypeAst] = [], argument_types: list[Ast.TypeAst] = []) -> Optional[Ast.FunctionPrototypeAst]:
         ...
 
-
 class Scope:
+    _name: str
     _symbol_table: SymbolTable[Ast.TypeAst]
     _type_table: SymbolTable[Ast.TypeAst]
     _function_registry: FunctionRegistry
@@ -37,14 +41,16 @@ class Scope:
     _parent_scope: Optional[Scope]
     _child_scopes: list[Scope]
 
-    def __init__(self, parent_scope: Optional[Scope] = None):
+    def __init__(self, name: str, parent_scope: Optional[Scope] = None):
+        self._name = name
         self._parent_scope = parent_scope
         self._parent_scope._child_scopes.append(self) if self._parent_scope is not None else None
         self._child_scopes = []
 
         self._symbol_table = SymbolTable()
         self._type_table = SymbolTable()
-        self._function_registry = SymbolTable()
+        self._function_registry = FunctionRegistry()
+        self._loop_tag_table = SymbolTable()
 
     @property
     def parent_scope(self) -> Optional[Scope]:
@@ -70,13 +76,30 @@ class Scope:
     def loop_tag_table(self) -> SymbolTable[None]:
         return self._loop_tag_table
 
+    def to_json(self) -> dict:
+        # Convert the symbol table, type table, function registry, and loop tag table to JSON
+        # Add the child scopes as json in a list, named "child_scopes"
+        # Return the JSON string
+        return {
+            "name": self._name,
+            "symbol_table": self._symbol_table.to_json(),
+            "type_table": self._type_table.to_json(),
+            "function_registry": self._function_registry.to_json(),
+            "loop_tag_table": self._loop_tag_table.to_json(),
+            "child_scopes": [scope.to_json() for scope in self._child_scopes]
+        }
+
 
 class ScopeManager:
     _global_scope: Scope
     _current_scope: Scope
 
-    def enter_scope(self):
-        self._current_scope = Scope(self._current_scope)
+    def __init__(self):
+        self._global_scope = Scope("Global")
+        self._current_scope = self._global_scope
+
+    def enter_scope(self, name: str):
+        self._current_scope = Scope(name, self._current_scope)
 
     def exit_scope(self):
         assert self._current_scope != self._global_scope
@@ -96,7 +119,7 @@ class Utils:
     @staticmethod
     def new_scope(function: callable) -> callable:
         def inner(ast, s: ScopeManager):
-            s.enter_scope()
+            s.enter_scope(camelize(function.__name__.replace("build_symbols_", "")))
             function(ast, s)
             s.exit_scope()
         return inner
@@ -108,6 +131,20 @@ class Utils:
 
 class SymbolTableGenerator:
     @staticmethod
+    @Utils.new_scope
+    def build_symbols_program(ast: Ast.ProgramAst, s: ScopeManager) -> None:
+        for member in ast.module.body.members:
+            SymbolTableGenerator.build_symbols_module_member(member, s)
+
+    @staticmethod
+    def build_symbols_module_member(ast: Ast.ModuleMemberAst, s: ScopeManager) -> None:
+        match ast:
+            case Ast.FunctionPrototypeAst(): SymbolTableGenerator.build_symbols_function_prototype(ast, s)
+            case Ast.ClassPrototypeAst(): SymbolTableGenerator.build_symbols_class_prototype(ast, s)
+            case Ast.EnumPrototypeAst(): SymbolTableGenerator.build_symbols_enum_prototype(ast, s)
+            case _: raise NotImplementedError(f"Unknown module member type: {ast.__class__.__name__}")
+
+    @staticmethod
     def build_symbols_if_statement(ast: Ast.IfStatementAst, s: ScopeManager) -> None:
         branches = [ast.if_branch, *ast.elif_branches, ast.else_branch]
         for branch in branches:
@@ -117,14 +154,15 @@ class SymbolTableGenerator:
     @Utils.new_scope
     def build_symbols_if_branch(ast: Ast.IfStatementBranchAst, s: ScopeManager) -> None:
         for definition in ast.definitions:
-            SymbolTableGenerator.build_variable_declaration(definition, s)
+            SymbolTableGenerator.build_symbols_let_statement(definition, s)
         for statement in ast.body:
             SymbolTableGenerator.build_symbols_statement(statement, s)
 
     @staticmethod
     @Utils.new_scope
     def build_symbols_while_statement(ast: Ast.WhileStatementAst, s: ScopeManager) -> None:
-        s.current_scope.loop_tag_table.add_symbol(ast.tag.identifier, None)
+        if ast.tag:
+            s.current_scope.loop_tag_table.add_symbol(ast.tag.identifier, None)
         for statement in ast.body:
             SymbolTableGenerator.build_symbols_statement(statement, s)
 
@@ -150,7 +188,9 @@ class SymbolTableGenerator:
     @staticmethod
     @Utils.new_scope
     def build_symbols_with_statement(ast: Ast.WithStatementAst, s: ScopeManager) -> None:
-        s.current_scope.symbol_table.add_symbol(ast.alias.identifier.identifier, TypeInference.infer_type_from_expression(ast.value, s))
+        from src.SemanticAnalysis.TypeInference import TypeInference
+
+        s.current_scope.symbol_table.add_symbol(ast.alias.identifier.identifier, lambda: TypeInference.infer_type_from_expression(ast.value, s))
         for statement in ast.body:
             SymbolTableGenerator.build_symbols_statement(statement, s)
 
@@ -160,9 +200,30 @@ class SymbolTableGenerator:
 
     @staticmethod
     def build_symbols_let_statement(ast: Ast.LetStatementAst, s: ScopeManager) -> None:
-        for variable, value in zip(ast.variables, ast.value):
-            s.current_scope.symbol_table.add_symbol(variable.identifier.identifier, TypeInference.infer_type_from_expression(value, s) if value else ast.type_annotation)
+        from src.SemanticAnalysis.TypeInference import TypeInference
 
+        for variable in ast.variables: # todo : unpack value
+            s.current_scope.symbol_table.add_symbol(variable.identifier.identifier, None)  # lambda: TypeInference.infer_type_from_expression(value, s) if value else ast.type_annotation)
+
+    @staticmethod
+    @Utils.new_scope
+    def build_symbols_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeManager) -> None:
+        s.current_scope.parent_scope.function_registry.add_symbol(ast.identifier.identifier, ast)
+        for parameter in ast.parameters:
+            s.current_scope.symbol_table.add_symbol(parameter.identifier.identifier, parameter.type_annotation)
+        for type_parameter in ast.generic_parameters:
+            s.current_scope.type_table.add_symbol(type_parameter.identifier.identifier, type_parameter) # todo -> replaced by true type on function call
+        for statement in ast.body.statements:
+            SymbolTableGenerator.build_symbols_statement(statement, s)
+
+    @staticmethod
+    @Utils.new_scope
+    def build_symbols_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeManager) -> None:
+        s.current_scope.parent_scope.type_table.add_symbol(ast.identifier.identifier, ast)
+        for type_parameter in ast.generic_parameters:
+            s.current_scope.type_table.add_symbol(type_parameter.identifier.identifier, type_parameter)
+        for attribute in ast.body.members:
+            s.current_scope.symbol_table.add_symbol(attribute.identifier.identifier, attribute.type_annotation)
 
 
     @staticmethod
@@ -176,8 +237,8 @@ class SymbolTableGenerator:
             case Ast.WithStatementAst(): SymbolTableGenerator.build_symbols_with_statement(ast, s)
             case Ast.TypedefStatementAst(): SymbolTableGenerator.build_symbols_typedef_statement(ast, s)
             case Ast.LetStatementAst(): SymbolTableGenerator.build_symbols_let_statement(ast, s)
-            case Ast.ExpressionAst(): SymbolTableGenerator.build_symbols_expression_statement(ast, s)
             case Ast.FunctionPrototypeAst(): SymbolTableGenerator.build_symbols_function_prototype(ast, s)
+            case True if type(ast) in Ast.ExpressionAst.__args__: SymbolTableGenerator.build_symbols_expression_statement(ast, s)
             case _: raise NotImplementedError(f"Statement {ast} not implemented")
 
 
