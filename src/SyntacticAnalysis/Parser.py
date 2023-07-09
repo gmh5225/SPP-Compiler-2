@@ -2025,7 +2025,7 @@ class Parser:
             p2 = self._parse_literal_tuple_with_0_elements().delay_parse()
             p3 = self._parse_literal_tuple_with_1_element().delay_parse()
             p4 = self._parse_literal_tuple_with_n_elements().delay_parse()
-            p5 = (p2 | p3 | p4).parse_once()
+            p5 = (p4 | p2 | p3).parse_once()
             p6 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
             return Ast.TupleLiteralAst(p5)
         return BoundParser(self, inner)
