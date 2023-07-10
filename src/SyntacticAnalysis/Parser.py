@@ -1058,8 +1058,9 @@ class Parser:
             p8 = self._parse_statement_while().delay_parse()
             p9 = self._parse_statement_for().delay_parse()
             p10 = self._parse_statement_do().delay_parse()
-            p11 = (p6 | p7 | p8 | p9 | p10 | p3 | p2 | p1 | p4 | p5).parse_once()
-            return p11
+            p11 = self._parse_statement_new_scope().delay_parse()
+            p12 = (p6 | p7 | p8 | p9 | p10 | p11 | p3 | p2 | p1 | p4 | p5).parse_once()
+            return p12
         return BoundParser(self, inner)
 
     def _parse_binary_expression(self, __lhs, __op, __rhs) -> BoundParser:
