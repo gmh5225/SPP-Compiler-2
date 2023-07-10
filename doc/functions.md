@@ -53,6 +53,12 @@
 - `<...Ts>(...args: Ts)` -> `args` is a variadic parameter of type `Ts` ie n parameters of different types
 - Effectively the same as Python's `*args`, just replace `*` with `...`
 
+#### Parameter passing modes
+- Parameters can be passed by value, reference, or mutable reference
+- Passing by value is the default (destructive move)
+- Passing by reference is specified with `&`
+- Passing by mutable reference is specified with `&mut`
+
 ### Return type
 - Functions must have a return type
 - Returning nothing must return `std::Void`
