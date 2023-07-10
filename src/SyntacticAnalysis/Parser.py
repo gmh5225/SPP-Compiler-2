@@ -906,27 +906,27 @@ class Parser:
             return p1
         return BoundParser(self, inner)
 
-    def _parse_assignment_expression(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_assignment_single().delay_parse() # +=, -= etc
-            p2 = self._parse_assignment_multiple().delay_parse() # =
-            p3 = (p2 | p1).parse_once()
-            return p3
-        return BoundParser(self, inner)
-
     def _parse_non_assignment_expression(self) -> BoundParser:
         def inner():
             p1 = self._parse_null_coalescing_expression().parse_once()
             return p1
         return BoundParser(self, inner)
 
-    def _parse_assignment_single(self) -> BoundParser:
+    def _parse_assignment_expression(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_assignment_expression_single().delay_parse() # +=, -= etc
+            p2 = self._parse_assignment_expression_multiple().delay_parse() # =
+            p3 = (p2 | p1).parse_once()
+            return p3
+        return BoundParser(self, inner)
+
+    def _parse_assignment_expression_single(self) -> BoundParser:
         return self._parse_binary_expression(
             self._parse_null_coalescing_expression(),
             self._parse_operator_identifier_assignment(),
-            self._parse_assignment_single)
+            self._parse_assignment_expression_single)
 
-    def _parse_assignment_multiple(self) -> BoundParser:
+    def _parse_assignment_expression_multiple(self) -> BoundParser:
         def inner():
             p4 = self._parse_null_coalescing_expression().parse_once()
             p5 = self._parse_assignment_multiple_lhs().parse_zero_or_more()
@@ -1044,29 +1044,22 @@ class Parser:
             return p1
         return BoundParser(self, inner)
 
-    def _parse_rvalue(self) -> BoundParser:
+    def _parse_primary_expression(self) -> BoundParser:
         def inner():
             p1 = self._parse_identifier().delay_parse()
             p2 = self._parse_literal().delay_parse()
-            p3 = (p1 | p2).parse_once()
-            return p3
-        return BoundParser(self, inner)
-
-    def _parse_primary_expression(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_rvalue().delay_parse()
-            p2 = self._parse_lambda().delay_parse()
-            p3 = self._parse_single_type_identifier().delay_parse()
-            p4 = self._parse_parenthesized_expression().delay_parse()
-            p5 = self._parse_expression_placeholder().delay_parse()
-            p6 = self._parse_statement_if().delay_parse()
-            p7 = self._parse_statement_match().delay_parse()
-            p8 = self._parse_statement_while().delay_parse()
-            p9 = self._parse_statement_for().delay_parse()
-            p10 = self._parse_statement_do().delay_parse()
-            p11 = self._parse_statement_new_scope().delay_parse()
-            p12 = (p6 | p7 | p8 | p9 | p10 | p11 | p3 | p2 | p1 | p4 | p5).parse_once()
-            return p12
+            p3 = self._parse_lambda().delay_parse()
+            p4 = self._parse_single_type_identifier().delay_parse()
+            p5 = self._parse_parenthesized_expression().delay_parse()
+            p6 = self._parse_expression_placeholder().delay_parse()
+            p7 = self._parse_statement_if().delay_parse()
+            p8 = self._parse_statement_match().delay_parse()
+            p9 = self._parse_statement_while().delay_parse()
+            p10 = self._parse_statement_for().delay_parse()
+            p11 = self._parse_statement_do().delay_parse()
+            p12 = self._parse_statement_new_scope().delay_parse()
+            p13 = (p7 | p8 | p9 | p10 | p11 | p12 | p4 | p3 | p1 | p2 | p5 | p6).parse_once()
+            return p13
         return BoundParser(self, inner)
 
     def _parse_binary_expression(self, __lhs, __op, __rhs) -> BoundParser:
@@ -1128,8 +1121,9 @@ class Parser:
     def _parse_lambda_capture_item(self) -> BoundParser:
         def inner():
             p1 = self._parse_lambda_capture_item_alias().parse_optional()
-            p2 = self._parse_expression().parse_once()
-            return Ast.LambdaCaptureItemAst(p1, p2)
+            p2 = self._parse_parameter_passing_convention().parse_optional()
+            p3 = self._parse_identifier().parse_once()
+            return Ast.LambdaCaptureItemAst(p1, p2, p3)
         return BoundParser(self, inner)
 
     def _parse_lambda_capture_item_alias(self) -> BoundParser:

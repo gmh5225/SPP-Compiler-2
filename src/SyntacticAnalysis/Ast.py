@@ -238,7 +238,8 @@ class LambdaParameterAst:
 @dataclass
 class LambdaCaptureItemAst:
     identifier: Optional[IdentifierAst]
-    expression: ExpressionAst
+    calling_convention: Optional[TokenAst]
+    capture: IdentifierAst
 
 @dataclass
 class LambdaAst:
