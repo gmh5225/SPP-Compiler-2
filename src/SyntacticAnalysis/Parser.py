@@ -908,9 +908,9 @@ class Parser:
 
     def _parse_assignment_expression(self) -> BoundParser:
         def inner():
-            p1 = self._parse_null_coalescing_expression().delay_parse()
-            p2 = self._parse_assignment_multiple().delay_parse()
-            p3 = (p1 | p2).parse_once()
+            p1 = self._parse_assignment_single().delay_parse() # +=, -= etc
+            p2 = self._parse_assignment_multiple().delay_parse() # =
+            p3 = (p2 | p1).parse_once()
             return p3
         return BoundParser(self, inner)
 
@@ -919,6 +919,12 @@ class Parser:
             p1 = self._parse_null_coalescing_expression().parse_once()
             return p1
         return BoundParser(self, inner)
+
+    def _parse_assignment_single(self) -> BoundParser:
+        return self._parse_binary_expression(
+            self._parse_null_coalescing_expression(),
+            self._parse_operator_identifier_assignment(),
+            self._parse_assignment_single)
 
     def _parse_assignment_multiple(self) -> BoundParser:
         def inner():
