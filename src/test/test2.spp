@@ -2,13 +2,8 @@ mod test2;
 
 
 fn test_function() -> std::Void {
-    let a = (1, 2, 3);
-
-    use t_a as a::0;
-    use t_b as a::1;
-    use t_c as a::2;
-
-    let v_1 = a.0;
-    let v_2 = a.1;
-    let v_3 = a.2;
+    let a = {
+        let y = 1;
+        y;
+    };
 }
