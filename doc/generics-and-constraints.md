@@ -159,7 +159,7 @@ sup <T: std::fmt::Display & std::ops::Add & std::ops::Sub> Wrapper<T>:
 
 #### Constraints on optional and variadic generics work in the same way
 - Optional generics: `class Foo<T:std::Number & std::Display = my::FormattableNumber>`
-- Variadic generics: `class Foo<...Ts: std::Number & std::Display>` => any types that implement these 2 classes
+- Variadic generics: `class Foo<...Ts: std::Number & std::Display>` => all types in the variadic must implement the constraints
 
 <BR>
 
