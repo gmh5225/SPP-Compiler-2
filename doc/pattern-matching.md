@@ -1,17 +1,25 @@
-## Pattern Matching
-### Iterable sequence matching
-```s++
-let result = match ...command {
-    "add", x, y => {x + y;}
-    "sub", x, y => {x - y;}
-    "mul", x, y => {x * y;}
-    "div", x, y => {x / y;}
-}.to_string();
+# Note: Pattern Matching not fully implemented in Compiler yet
 
-# the std::Map<K, V>::iter() returns list of paris -> unpack
+# Pattern Matching
+### Iterable sequence matching
+#### Vector (iterator returns values)
+```s++
+let command = std::Vec::new("add", 5, 10);
+let result = match command {
+    "add", x, y => {std::ok(x + y);}
+    "sub", x, y => {std::ok(x - y);}
+    "mul", x, y => {std::ok(x * y);}
+    "div", x, y => {std::ok(x / y);}
+    _ => {std::err("Invalid operation");}
+}.map(std::Num::to_string)?;
+```
+
+#### Map (iterator returns pairs)
+```s++
 let result = match data {
-    [("text": text, "value": value)] => {...}
-    _ => {"Invalid data";}
+    ("1", "a"), ("2", var) => {...}
+    ("3", var), ("4", "d") => {...}
+    _ => {ret "Invalid data";}
 }
 ```
 
