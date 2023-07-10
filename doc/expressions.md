@@ -16,18 +16,20 @@
 | `Range`         | `1..10`         | Range              | `std::Range` |
 
 ## Primary Expressions
-| Primary Expression        | Description                                        | Example        |
-|---------------------------|----------------------------------------------------|----------------|
-| `Identifier`              | Some variable/function or type                     | `variable_a`   |
-| `Literal`                 | Create a new instance of a type using shorthand    | `[0, 1, 2]`    |
-| `ScopedGenericIdentifier` | Will be a namespaced type / function               | `std::Str`     |
-| `Lambda`                  | Closure function allowing an expression            | `(x) -> x + 1` |
-| `Parenthesized`           | Contain an expression to execute first             | `(1 + 2)`      |
-| `Placeholder`             | Placeholders for match/case, partial functions etc | `_`            |
-| `IfStatement`             |                                                    |                |
-| `MatchStatement`          |                                                    |                |
-| `WhileStatement`          |                                                    |                |
-| `ForStatement`            |                                                    |                |
+| Primary Expression        | Description                                                       | Example        |
+|---------------------------|-------------------------------------------------------------------|----------------|
+| `Identifier`              | Some variable/function or type                                    | `variable_a`   |
+| `Literal`                 | Create a new instance of a type using shorthand                   | `[0, 1, 2]`    |
+| `ScopedGenericIdentifier` | Will be a namespaced type / function                              | `std::Str`     |
+| `Lambda`                  | Closure function allowing an expression                           | `(x) -> x + 1` |
+| `Parenthesized`           | Contain an expression to execute first                            | `(1 + 2)`      |
+| `Placeholder`             | Placeholders for match/case, partial functions etc                | `_`            |
+| `IfStatement`             | Last expression per branch is the returning value                 |                |
+| `MatchStatement`          | Last expression per case is the returning value                   |                |
+| `WhileStatement`          | Expression bound the the `break` statement is the returning value |                |
+| `ForStatement`            | Expression bound the the `break` statement is the returning value |                |
+| `DoWhileStatement`        | Expression bound the the `break` statement is the returning value |                |
+| `InnerScope`              | Last expression in the scope if the returning value               |                |
 
 ## Operators
 ### Operator Tables
