@@ -58,13 +58,6 @@ enum Foo<T>:
     ...
 ```
 
-<BR>
-
-#### Metaclass definitions
-```s++
-meta Foo<T>:
-    ...
-```
 ---
 
 ### Generic inference
