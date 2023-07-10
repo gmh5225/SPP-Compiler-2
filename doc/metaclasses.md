@@ -3,5 +3,11 @@
 - Allow customizing the behavior of classes.
 
 ## Defining a meta-class
-- Use the `meta` keyword.
+- Define as a normal class
+
+## Attack to a class
+- Use the `with` keyword
+- Example: `pub cls Foo with Bar {...}`
+
+# TODO
 

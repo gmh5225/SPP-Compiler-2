@@ -85,26 +85,28 @@ TODO: explain how this is mitigated
 
 <BR>
 
-### Stack overflow
-There are certain optimizations that can be made to mitigate stack overflow, such as tail call optimization which
-are used to reduce the strain on the stack. However, the memory enforcer also ensures that the stack is never
-overflowed by tracking the size of the stack, and ensuring that it is never exceeded. The `std::allocator<T>`
-returns an `std::result<T, E>` type, which can be checked at runtime to ensure that the stack is not exceeded.
 
-If the stack does exceed at runtime, then there will be a runtime error, because the device simply cannot allocate
+### Stack overflow
+<s>
+- There are certain optimizations that can be made to mitigate stack overflow, such as tail call optimization which
+are used to reduce the strain on the stack. However, the memory enforcer also ensures that the stack is never
+overflowed by tracking the size of the stack, and ensuring that it is never exceeded. The `std::allocator`
+returns an `std::result` type, which can be checked at runtime to ensure that the stack is not exceeded.
+- If the stack does exceed at runtime, then there will be a runtime error, because the device simply cannot allocate
 any more memory. This is a fatal error, and the program will crash. However, before this happens, a number of
 actions will take place to try and prevent this from happening.
-
-References are stored on the stack, unless they are moved into an attribute for example, to extend their lifetime,
+- References are stored on the stack, unless they are moved into an attribute for example, to extend their lifetime,
 in which case they are stored on the heap. This means that the stack is only used for local variables, and so the
 stack size is only ever as large as the number of local variables in a function, allowing for the stack to rarely
 overflow.
-
+</s>
 
 <BR>
 
 ### Heap overflow
+<s>
 TODO: explain how this is mitigated
+</s>
 
 <BR>
 
