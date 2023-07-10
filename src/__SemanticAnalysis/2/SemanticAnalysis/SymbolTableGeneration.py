@@ -4,6 +4,7 @@ from inflection import camelize
 from dataclasses import dataclass
 
 from src.SyntacticAnalysis import Ast
+from src.Compiler.Printer import save_json
 
 
 T = TypeVar("T")
@@ -37,6 +38,7 @@ class SymbolTable(Generic[T]):
 class FunctionRegistry(SymbolTable[Ast.FunctionPrototypeAst]):
     def _get_symbol(self, name: str, type_generics: list[Ast.TypeAst] = [], argument_types: list[Ast.TypeAst] = []) -> Optional[Ast.FunctionPrototypeAst]:
         ...
+
 
 class Scope:
     _name: str
@@ -86,7 +88,6 @@ class Scope:
     def to_json(self) -> dict:
         # Convert the symbol table, type table, function registry, and loop tag table to JSON
         # Add the child scopes as json in a list, named "child_scopes"
-        # Return the JSON string
         return {
             "name": self._name,
             "symbol_table": self._symbol_table.to_json(),
@@ -186,12 +187,12 @@ class Utils:
 
 class SymbolTableGenerator:
     @staticmethod
-    @Utils.new_scope
     def build_symbols_program(ast: Ast.ProgramAst, s: ScopeManager) -> None:
         for member in ast.module.body.members:
             SymbolTableGenerator.build_symbols_module_member(member, s)
 
         # execute all deferred type inference now that all the symbols are available
+        save_json(s.global_scope.to_json(), "_out/symbols.json")
         SymbolTableGenerator.infer_types(s)
 
     @staticmethod

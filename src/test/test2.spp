@@ -2,15 +2,13 @@ mod test2;
 
 
 fn test_function() -> std::Void {
-    let a = Tup<Str, Num, Num>::new("a", 1, 2);
+    let a = (1, 2, 3);
 
-    use t0 as Tup<Str, Num, Num>::ValueTypes::0;
-    use t1 as Tup<Str, Num, Num>::ValueTypes::1;
-    use t2 as Tup<Str, Num, Num>::ValueTypes::2;
+    use t_a as a::0;
+    use t_b as a::1;
+    use t_c as a::2;
 
-    let x = a.0;
-    let y = a.1;
-    let z = a.2;
-
-    let b: (std::Num, std::Str);
+    let v_1 = a.0;
+    let v_2 = a.1;
+    let v_3 = a.2;
 }

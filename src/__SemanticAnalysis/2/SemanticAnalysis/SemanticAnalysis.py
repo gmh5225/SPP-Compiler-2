@@ -16,5 +16,4 @@ class SemanticAnalysis:
         scope_manager = ScopeManager()
         SymbolTableGenerator.build_symbols_program(self._program_ast, scope_manager)
         # json.dump(scope_manager.global_scope.to_json(), open("_out/symbols.json", "w"))
-        save_json(scope_manager.global_scope.to_json(), "_out/symbols.json")
 
