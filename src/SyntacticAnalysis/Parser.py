@@ -835,7 +835,7 @@ class Parser:
 
     def _parse_where_constraint_chain_element_next(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkPlus).parse_once()
+            p1 = self._parse_token(TokenType.TkAmpersand).parse_once()
             p2 = self._parse_where_constraint_chain_element().parse_once()
             return p2
         return BoundParser(self, inner)
