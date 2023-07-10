@@ -87,7 +87,7 @@ class TokenType(Enum):
     KwProt = "prot"
     KwPriv = "priv"
     KwAsync = "async"
-    KwFun = "fn"
+    KwFn = "fn"
     KwMut = "mut"
     KwLet = "let"
     KwIf = "if"

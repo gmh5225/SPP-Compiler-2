@@ -283,7 +283,7 @@ class Parser:
 
     def _parse_import_block(self) -> BoundParser:
         def inner():
-            p1 = self._parse_import_statement().parse_zero_or_more()
+            p1 = self._parse_import_statement().parse_one_or_more()
             return Ast.ImportBlockAst(p1)
         return BoundParser(self, inner)
 
@@ -584,7 +584,7 @@ class Parser:
             p1 = self._parse_decorators().parse_optional() or []
             p2 = self._parse_access_modifier().parse_once()
             p3 = self._parse_token(TokenType.KwAsync).parse_optional() is not None
-            p4 = self._parse_token(TokenType.KwFun).parse_once()
+            p4 = self._parse_token(TokenType.KwFn).parse_once()
             p5 = self._parse_function_identifier().parse_once()
             p6 = self._parse_type_generic_parameters().parse_optional() or []
             p7 = self._parse_function_parameters().parse_once()
@@ -658,7 +658,7 @@ class Parser:
 
     def _parse_function_call_normal_argument(self) -> BoundParser:
         def inner():
-            p1 = self._parse_unary_operator_reference().parse_optional()
+            p1 = self._parse_parameter_passing_convention().parse_optional()
             p2 = self._parse_operator_identifier_variadic().parse_optional() is not None
             p3 = self._parse_non_assignment_expression().parse_once()
             return Ast.FunctionArgumentNormalAst(p1, p3, p2)
@@ -668,8 +668,8 @@ class Parser:
         def inner():
             p1 = self._parse_identifier().parse_once()
             p2 = self._parse_token(TokenType.TkEqual).parse_once()
-            p3 = self._parse_unary_operator_reference().parse_optional()
-            p4 = self._parse_expression().parse_once()
+            p3 = self._parse_parameter_passing_convention().parse_optional()
+            p4 = self._parse_non_assignment_expression().parse_once()
             return Ast.FunctionArgumentNamedAst(p1, p3, p4)
         return BoundParser(self, inner)
 
@@ -767,7 +767,7 @@ class Parser:
             p1 = self._parse_token(TokenType.KwMut).parse_optional()
             p2 = self._parse_function_parameter_identifier().parse_once()
             p3 = self._parse_token(TokenType.TkColon).parse_once()
-            p4 = self._parse_unary_operator_reference().parse_optional()
+            p4 = self._parse_parameter_passing_convention().parse_optional()
             p5 = self._parse_type_identifier().parse_once()
             return Ast.FunctionParameterRequiredAst(p1 is not None, p2, p4, p5)
         return BoundParser(self, inner)
@@ -1879,7 +1879,7 @@ class Parser:
             return p6
         return BoundParser(self, inner)
 
-    def _parse_unary_operator_reference(self) -> BoundParser:
+    def _parse_parameter_passing_convention(self) -> BoundParser:
         """
         "&" => Reference of an expression
         "mut" => Mutable reference of an expression

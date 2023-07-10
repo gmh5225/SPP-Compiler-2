@@ -178,6 +178,8 @@ class EnumImplementationAst:
 class EnumPrototypeAst:
     modifier: Optional[AccessModifierAst]
     identifier: IdentifierAst
+    generic_parameters: list[TypeGenericParameterAst]
+    where_block: Optional[WhereBlockAst]
     body: EnumImplementationAst
 
 @dataclass
