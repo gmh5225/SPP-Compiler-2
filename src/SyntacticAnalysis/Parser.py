@@ -782,7 +782,7 @@ class Parser:
 
     def _parse_function_variadic_parameter(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkTripleDot).parse_once()
+            p1 = self._parse_operator_identifier_variadic().parse_once()
             p2 = self._parse_function_required_parameter().parse_once()
             return Ast.FunctionParameterVariadicAst(p2)
         return BoundParser(self, inner)
