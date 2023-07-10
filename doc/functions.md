@@ -118,7 +118,6 @@ fn foo<T, U>(a: T, b: U) -> std::Num if a > b {}
   - TODO
 
 ## Partial functions
-- Automatic currying allows for simple partial functions
 - Use the placeholder - `_` - to reserve a parameter for later
 - Reserve the variadic slot parameter with a single `_` too -- the compiler knows when variadics are being filled /
   reserved
