@@ -146,10 +146,10 @@ sup Foo:
 - List constraints after the generic type, separated by a `+` symbol
 - Constraints are checked at compile time
 ```s++
-class Wrapper<T: std::fmt::Display + std::ops::Add + std::ops::Sub>:
+class Wrapper<T: std::fmt::Display & std::ops::Add & std::ops::Sub>:
     value: T;
     
-sup <T: std::fmt::Display + std::ops::Add + std::ops::Sub> Wrapper<T>:
+sup <T: std::fmt::Display & std::ops::Add & std::ops::Sub> Wrapper<T>:
     @std::static_method
     pub fun new(value: T):
         let w = Wrapper{value: value};
@@ -158,8 +158,8 @@ sup <T: std::fmt::Display + std::ops::Add + std::ops::Sub> Wrapper<T>:
 <BR>
 
 #### Constraints on optional and variadic generics work in the same way
-- Optional generics: `class Foo<T:std::Number + std::Display = my::FormattableNumber>`
-- Variadic generics: `class Foo<...Ts: std::Number + std::Display>` => any types that implement these 2 classes
+- Optional generics: `class Foo<T:std::Number & std::Display = my::FormattableNumber>`
+- Variadic generics: `class Foo<...Ts: std::Number & std::Display>` => any types that implement these 2 classes
 
 <BR>
 
@@ -192,7 +192,7 @@ sup<T: std::Display> Wrapper<T>:
     pub fun new(value: T):
         let w = Wrapper{value: value};
 
-sup<T: std::Display + std::Default> Wrapper<T>:    
+sup<T: std::Display & std::Default> Wrapper<T>:    
     pub fun new_default():
         return Wrapper{value: T::__def__()};
 ```
