@@ -136,26 +136,17 @@ pub fun main():
 
 ## Variadic function, parameter packs
 ### Variadic function call
-Take the following functions:
+Take the following function:
 ```s++
 function func_variadic_helper_0<T>(...a: T) -> std::void:
     ...
-    
-function func_variadic_helper_1<T>(a: T) -> std::void:
-    ...
-    
-function func_variadic_helper_2<T>(a: T, b: T) -> std::void:
-    ...
 ```
 
-They can be called in the following ways:
+It can be called in the following ways:
 - `func_variadic_helper_0(...a);` -> calls `func_variadic_helper_0` with a single parameter pack
 - `func_variadic_helper_0(a);` -> calls `func_variadic_helper_0` with a single tuple type
-- `func_variadic_helper_1(a)...;` -> calls `func_variadic_helper_1` multiple times, once for each element in `a`
-- `func_variadic_helper_2(a)...;` -> calls `func_variadic_helper_2` multiple times, pairs are pulled out the tuple
-  (with overlap)
 
-## Decorators
+## Decorators (Definition protocols are going to change as this obviously doesn't work - partials etc)
 ### Defining a decorator for a function
 - Changes `my_method` to `decorator1(&my_method, 123)`
 - Add functionality before and after the function is called
