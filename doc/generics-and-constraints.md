@@ -96,6 +96,13 @@ fun main():
     test_fun(5);
 ```
 
+#### Deferred inference
+- In languages like Rust, the type parameter for `Vec` can deferred inference until the vector is used.
+- This is not the case in S++; the type parameter must be specified when the vector is created.
+- This is a design to
+  1. Reduce the complexity of the compiler
+  2. Enforce a strict and more explicit type system
+
 ---
 ### Optional generic types
 - Generics can be optional, by assigning a default type to the generic type
