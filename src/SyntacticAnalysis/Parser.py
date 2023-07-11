@@ -1964,36 +1964,9 @@ class Parser:
         """
         def inner():
             p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
-            p4 = self._parse_literal_tuple_with_n_elements().parse_optional() or []
+            p4 = self._parse_expressions().parse_optional() or []
             p6 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
             return Ast.TupleLiteralAst(p4) if len(p4) > 1 else p4[0]
-        return BoundParser(self, inner)
-
-    def _parse_literal_tuple_with_0_elements(self) -> BoundParser:
-        def inner():
-            p7 = self._parse_token(TokenType.TkComma).parse_once()
-            return []
-        return BoundParser(self, inner)
-
-    def _parse_literal_tuple_with_1_element(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_expression().parse_once()
-            p2 = self._parse_token(TokenType.TkComma).parse_once()
-            return [p1]
-        return BoundParser(self, inner)
-
-    def _parse_literal_tuple_with_n_elements(self) -> BoundParser:
-        def inner():
-            p10 = self._parse_expression().parse_once()
-            p11 = self._parse_literal_tuple_with_multiple_elements_next().parse_zero_or_more()
-            return [p10, *p11]
-        return BoundParser(self, inner)
-
-    def _parse_literal_tuple_with_multiple_elements_next(self) -> BoundParser:
-        def inner():
-            p8 = self._parse_token(TokenType.TkComma).parse_once()
-            p9 = self._parse_expression().parse_once()
-            return p9
         return BoundParser(self, inner)
 
     def _parse_literal_range(self) -> BoundParser:
