@@ -1050,7 +1050,7 @@ class Parser:
             p2 = self._parse_literal().delay_parse()
             p3 = self._parse_lambda().delay_parse()
             p4 = self._parse_single_type_identifier().delay_parse()
-            p5 = self._parse_parenthesized_expression().delay_parse()
+            # p5 = self._parse_parenthesized_expression().delay_parse()
             p6 = self._parse_expression_placeholder().delay_parse()
             p7 = self._parse_statement_if().delay_parse()
             p8 = self._parse_statement_match().delay_parse()
@@ -1058,7 +1058,7 @@ class Parser:
             p10 = self._parse_statement_for().delay_parse()
             p11 = self._parse_statement_do().delay_parse()
             p12 = self._parse_statement_new_scope().delay_parse()
-            p13 = (p7 | p8 | p9 | p10 | p11 | p12 | p4 | p3 | p1 | p2 | p5 | p6).parse_once()
+            p13 = (p7 | p8 | p9 | p10 | p11 | p12 | p4 | p3 | p1 | p2 | p6).parse_once()
             return p13
         return BoundParser(self, inner)
 
@@ -1958,21 +1958,15 @@ class Parser:
 
     def _parse_literal_tuple(self) -> BoundParser:
         """
-        A tuple literal is a list of expressions separated by commas, surrounded by parentheses. The special exceptions
-        are for a tuple of 0 or 1 elements, where a trailing comma is required. This is to differentiate between a
-        tuple, and a parenthesised expression. For example, (1) is a parenthesized expression, but (1,) is a tuple.
-        But as (2, 3) cannot be a parenthesized expression, as there are no commas in an expression, the trailing comma
-        is not required. The 0-element tuple - (,) - will create a value with the type std::Tup<>.
-        :return:
+        A tuple literal is a list of expressions separated by commas, surrounded by parentheses. In the case where there
+        is only 1 element, the tuple automatically decomposes into its inner value, such that 1-tuples don't exist.
+        0-tuples ("unit type") are represented by an empty tuple literal -- "()".
         """
         def inner():
             p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
-            p2 = self._parse_literal_tuple_with_0_elements().delay_parse()
-            p3 = self._parse_literal_tuple_with_1_element().delay_parse()
-            p4 = self._parse_literal_tuple_with_n_elements().delay_parse()
-            p5 = (p4 | p2 | p3).parse_once()
+            p4 = self._parse_literal_tuple_with_n_elements().parse_optional() or []
             p6 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
-            return Ast.TupleLiteralAst(p5)
+            return Ast.TupleLiteralAst(p4) if len(p4) > 1 else p4[0]
         return BoundParser(self, inner)
 
     def _parse_literal_tuple_with_0_elements(self) -> BoundParser:
@@ -1991,7 +1985,7 @@ class Parser:
     def _parse_literal_tuple_with_n_elements(self) -> BoundParser:
         def inner():
             p10 = self._parse_expression().parse_once()
-            p11 = self._parse_literal_tuple_with_multiple_elements_next().parse_one_or_more()
+            p11 = self._parse_literal_tuple_with_multiple_elements_next().parse_zero_or_more()
             return [p10, *p11]
         return BoundParser(self, inner)
 
