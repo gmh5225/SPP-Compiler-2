@@ -1216,7 +1216,7 @@ class Parser:
     def _parse_type_identifier(self) -> BoundParser:
         def inner():
             p1 = self._parse_single_type_identifier().delay_parse()
-            p2 = self._parse_multiple_type_identifiers().delay_parse()
+            p2 = self._parse_tuple_type_identifiers().delay_parse()
             p3 = (p1 | p2).parse_once()
             return p3
         return BoundParser(self, inner)
@@ -1229,7 +1229,7 @@ class Parser:
             return Ast.SingleTypeAst(p3)
         return BoundParser(self, inner)
 
-    def _parse_multiple_type_identifiers(self) -> BoundParser:
+    def _parse_tuple_type_identifiers(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
             p2 = self._parse_type_identifiers().parse_once()
