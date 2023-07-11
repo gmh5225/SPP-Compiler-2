@@ -1966,7 +1966,7 @@ class Parser:
             p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
             p4 = self._parse_expressions().parse_optional() or []
             p6 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
-            return Ast.TupleLiteralAst(p4) if len(p4) > 1 else p4[0]
+            return Ast.TupleLiteralAst(p4) if len(p4) != 1 else p4[0]
         return BoundParser(self, inner)
 
     def _parse_literal_range(self) -> BoundParser:
