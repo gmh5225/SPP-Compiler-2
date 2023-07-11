@@ -430,7 +430,7 @@ class Parser:
             p2 = self._parse_token(TokenType.KwMut).parse_optional()
             p3 = self._parse_class_attribute_static_identifier().parse_once()
             p4 = self._parse_token(TokenType.TkEqual).parse_once()
-            p5 = self._parse_expression().parse_once()
+            p5 = self._parse_non_assignment_expression().parse_once()
             p6 = self._parse_token(TokenType.TkSemicolon).parse_once()
             return Ast.ClassStaticAttributeAst(p1, p2, p3, p5)
         return BoundParser(self, inner)
@@ -561,7 +561,7 @@ class Parser:
     def _parse_enum_member_value_wrapper(self):
         def inner():
             p3 = self._parse_token(TokenType.TkEqual).parse_once()
-            p4 = self._parse_expression().parse_once()
+            p4 = self._parse_non_assignment_expression().parse_once()
             return p4
         return BoundParser(self, inner)
 
@@ -776,7 +776,7 @@ class Parser:
         def inner():
             p1 = self._parse_function_required_parameter().parse_once()
             p2 = self._parse_token(TokenType.TkEqual).parse_once()
-            p3 = self._parse_expression().parse_once()
+            p3 = self._parse_non_assignment_expression().parse_once()
             return Ast.FunctionParameterOptionalAst(p1, p3)
         return BoundParser(self, inner)
 
@@ -849,7 +849,7 @@ class Parser:
     def _parse_value_guard(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwIf).parse_once()
-            p2 = self._parse_expression().parse_once()
+            p2 = self._parse_non_assignment_expression().parse_once()
             return Ast.ValueGuardAst(p2)
         return BoundParser(self, inner)
 
@@ -924,14 +924,14 @@ class Parser:
         return self._parse_binary_expression(
             self._parse_null_coalescing_expression(),
             self._parse_operator_identifier_assignment(),
-            self._parse_assignment_expression_single)
+            self._parse_null_coalescing_expression)
 
     def _parse_assignment_expression_multiple(self) -> BoundParser:
         def inner():
             p4 = self._parse_null_coalescing_expression().parse_once()
             p5 = self._parse_assignment_multiple_lhs().parse_zero_or_more()
             p6 = self._parse_token(TokenType.TkEqual).parse_once()
-            p7 = self._parse_assignment_expression().parse_once()
+            p7 = self._parse_null_coalescing_expression().parse_once()
             return Ast.AssignmentExpressionAst([p4, *p5], p7)
         return BoundParser(self, inner)
 
@@ -1076,14 +1076,6 @@ class Parser:
             return p3, p4
         return BoundParser(self, functools.partial(inner, __op, __rhs))
 
-    def _parse_parenthesized_expression(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
-            p2 = self._parse_expression().parse_once()
-            p3 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
-            return Ast.ParenthesizedExpressionAst(p2)
-        return BoundParser(self, inner)
-
     def _parse_expression_placeholder(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkUnderscore).parse_once()
@@ -1164,7 +1156,7 @@ class Parser:
 
     def _parse_lambda_implementation(self) -> BoundParser:
         def inner():
-            p1 = self._parse_expression().parse_once()
+            p1 = self._parse_non_assignment_expression().parse_once()
             return p1
         return BoundParser(self, inner)
 
@@ -1416,7 +1408,7 @@ class Parser:
             p1 = self._parse_token(TokenType.KwLet).parse_once()
             p2 = self._parse_local_variable_identifier().parse_once()
             p3 = self._parse_token(TokenType.TkEqual).parse_once()
-            p4 = self._parse_expression().parse_once()
+            p4 = self._parse_non_assignment_expression().parse_once()
             p6 = self._parse_token(TokenType.TkComma).parse_once()
             return Ast.LetStatementAst([p2], p4, None)
         return BoundParser(self, inner)
@@ -1623,7 +1615,7 @@ class Parser:
     def _parse_statement_let_value(self) -> BoundParser:
         def inner():
             p6 = self._parse_token(TokenType.TkEqual).parse_once()
-            p7 = self._parse_expression().parse_once()
+            p7 = self._parse_non_assignment_expression().parse_once()
             return p7
         return BoundParser(self, inner)
 
@@ -1726,7 +1718,7 @@ class Parser:
     def _parse_postfix_operator_index_access(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkLeftBracket).parse_once()
-            p2 = self._parse_expression().parse_once()
+            p2 = self._parse_non_assignment_expression().parse_once()
             p3 = self._parse_token(TokenType.TkRightBracket).parse_once()
             return Ast.PostfixIndexAccessAst(p2)
         return BoundParser(self, inner)
@@ -1763,7 +1755,7 @@ class Parser:
     def _parse_postfix_operator_struct_initializer_field_value_different_to_identifier(self) -> BoundParser:
         def inner():
             p3 = self._parse_token(TokenType.TkColon).parse_once()
-            p4 = self._parse_expression().parse_once()
+            p4 = self._parse_non_assignment_expression().parse_once()
             return p4
         return BoundParser(self, inner)
 
