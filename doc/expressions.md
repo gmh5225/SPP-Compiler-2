@@ -9,11 +9,10 @@
 | `String`        | `"Hello"`       | String             | `std::Str`   |
 | `Char`          | `'a'`           | Character          | `std::Char`  |
 | `Bool`          | `true`, `false` | Boolean            | `std::Bool`  |
-| `Vector`        | `[1, 2, 3]`     | Vector             | `std::Vec`   |
 | `Tuple`         | `(1, 2, 3)`     | Tuple              | `std::Tup`   |
-| `Map`           | `{1: 2, 3: 4}`  | Map                | `std::Map`   |
-| `Set`           | `{1, 2, 3}`     | Set                | `std::Set`   |
 | `Range`         | `1..10`         | Range              | `std::Range` |
+- There is `Vec`, `Map` or `Set` literals, as variadic static methods can be used to construct types
+- Ie `std::Vec::new(...)`'s signature allows for variadic arguments
 
 ## Primary Expressions
 | Primary Expression        | Description                                                       | Example        |
