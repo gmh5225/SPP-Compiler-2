@@ -158,6 +158,10 @@ let foo = Foo {a, b, c}; # where a, b, and c are defined local variables
 let bar = Foo {a: 3, else: foo}; # specify some fields, and fill in the rest with another object
 ```
 
+- If `Foo` super-imposes `std::Default`, then `let baz = Foo{a: 3, else: Foo::default()}` allows for defaulting the variables and adjusting only the required ones
+- Works because the `::default()` will construct the `Foo` object and therefore all fields will be specified
+- An object in the `else` clause will be destructively moved, as any other assignment / [function call with no `&`] would
+
 #### Static methods
 - Static methods can return instances of the class
 - Wrap the struct initialization in a function, providing some default values if desired
