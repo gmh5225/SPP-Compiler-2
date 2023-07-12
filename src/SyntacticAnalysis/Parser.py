@@ -1405,12 +1405,9 @@ class Parser:
 
     def _parse_statement_inline_definition(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwLet).parse_once()
-            p2 = self._parse_local_variable_identifier().parse_once()
-            p3 = self._parse_token(TokenType.TkEqual).parse_once()
-            p4 = self._parse_non_assignment_expression().parse_once()
-            p6 = self._parse_token(TokenType.TkComma).parse_once()
-            return Ast.LetStatementAst([p2], p4, None, None)
+            p1 = self._parse_statement_let_with_value().parse_optional()
+            p2 = self._parse_token(TokenType.TkComma).parse_once()
+            return p1
         return BoundParser(self, inner)
 
     def _parse_statement_if(self) -> BoundParser:
@@ -1603,31 +1600,30 @@ class Parser:
 
     def _parse_statement_let(self) -> BoundParser:
         def inner():
+            p1 = self._parse_statement_let_with_value().delay_parse()
+            p2 = self._parse_statement_let_with_type().delay_parse()
+            p3 = (p1 | p2).parse_once()
+            p4 = self._parse_token(TokenType.TkSemicolon).parse_once()
+            return p3
+        return BoundParser(self, inner)
+
+    def _parse_statement_let_with_value(self) -> BoundParser:
+        def inner():
             p1 = self._parse_token(TokenType.KwLet).parse_once()
             p2 = self._parse_local_variable_identifiers().parse_once()
-            p3 = self._parse_statement_let_type_annotation().delay_parse()
-            p4 = self._parse_statement_let_value().delay_parse()
-            p5 = (p3 | p4).parse_once()
-            if not isinstance(p5, Ast.TypeAst):
-                p6 = self._parse_statement_else_branch().parse_optional()
-                p7 = self._parse_token(TokenType.TkSemicolon).parse_once()
-                return Ast.LetStatementAst(p2, p5, None, p6)
-            p7 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return Ast.LetStatementAst(p2, None, p5, None)
+            p3 = self._parse_token(TokenType.TkEqual).parse_once()
+            p4 = self._parse_non_assignment_expression().parse_once()
+            p5 = self._parse_statement_else_branch().parse_optional()
+            return Ast.LetStatementAst(p2, p4, None, p5)
         return BoundParser(self, inner)
 
-    def _parse_statement_let_value(self) -> BoundParser:
+    def _parse_statement_let_with_type(self) -> BoundParser:
         def inner():
-            p6 = self._parse_token(TokenType.TkEqual).parse_once()
-            p7 = self._parse_non_assignment_expression().parse_once()
-            return p7
-        return BoundParser(self, inner)
-
-    def _parse_statement_let_type_annotation(self) -> BoundParser:
-        def inner():
-            p6 = self._parse_token(TokenType.TkColon).parse_once()
-            p7 = self._parse_type_identifier().parse_once()
-            return p7
+            p1 = self._parse_token(TokenType.KwLet).parse_once()
+            p2 = self._parse_local_variable_identifiers().parse_once()
+            p3 = self._parse_token(TokenType.TkColon).parse_once()
+            p4 = self._parse_type_identifier().parse_once()
+            return Ast.LetStatementAst(p2, None, p4, None)
         return BoundParser(self, inner)
 
     def _parse_local_variable_identifier(self) -> BoundParser:
