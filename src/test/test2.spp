@@ -1,9 +1,42 @@
-mod test2;
+mod std::functional;
 
 
-fn test_function() -> std::Void {
-    let a = {
-        let y = 1;
-        y;
-    };
+pub cls FnOnce<Args: Tup, R> {}
+
+pub cls FnMut<Args: Tup, R> {}
+
+pub cls Fn<Args: Tup, R> {
+    __virtual__: bool;
+    __abstract__: bool;
+    __static__: bool;
+    __final__: bool;
+
+}
+
+
+sup<Args: Tup, R> FnOnce<Args, R> {
+    @std::abstract_method
+    pub fn __call_once__(self: Self, args: Args) -> R {}
+}
+
+sup<Args: Tup, R> FnMut<Args, R> {
+    @std::abstract_method
+    pub fn __call_mut__(self: &mut Self, args: Args) -> R {}
+}
+
+sup<Args: Tup, R> Fn<Args, R> {
+    @std::abstract_method
+    pub fn __call__(self: &Self, args: Args) -> R {}
+}
+
+sup<Args: Tup, R> FnOnce<Args, R> for FnMut<Args, R> {
+    pub fn __call_once__(self: Self, args: Args) -> R {
+        ret self.__call_mut__(...args);
+    }
+}
+
+sup<Args: Tup, R> FnMut<Args, R> for Fn<Args, R> {
+    pub fn __call_mut__(self: &mut Self, args: Args) -> R {
+        ret self.__call__(...args);
+    }
 }
