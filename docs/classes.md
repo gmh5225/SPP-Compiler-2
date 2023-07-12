@@ -61,6 +61,7 @@ cls Foo {
 #### Concept
 - Super-imposition relates to the implementation of methods, or other classes, in a class
 - Super-imposition is the process of "imposing" something on top of the current class
+- The class being imposed on must have be defined with the `cls` keyword in the file
 
 ### Methods
 #### Implement the class directly, listing the methods
