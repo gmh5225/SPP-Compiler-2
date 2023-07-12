@@ -43,16 +43,15 @@
 - Attributes, from inside the class, must be accessed with `self` or whatever the instance parameter is
 
 ### Static attributes
-- Define in the same way as an [attribute](#attributes), but without the `let` keyword
-- Must have a default value, and the type will be inferred
+- Define in the same way as an [attribute](#attributes), but with a value, not a type (inferred)
 - Static attributes must be accessed by the class name, even from inside the class
 
 Example
 ```s++
 cls Foo {
-    pub let a: std::Num;
-    pub let b: std::Num;
-    pub let c: std::Num;
+    pub a: std::Num;
+    pub b: std::Num;
+    pub c: std::Num;
     
     pub x = 2; # static
 }
