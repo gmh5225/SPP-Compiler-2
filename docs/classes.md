@@ -141,7 +141,7 @@ sup Bar<T: std::Copy> for Foo {
 ## Class instantiation
 #### No constructors
 - Classes do not support constructors
-- Static method exist and do the same thing -- remove ability for 2 types of initialization
+- Static methods exist and do the same thing => remove multiple ways to do the same thing
 
 #### Struct initialization
 - Raw initialization where each attribute must be given a value
