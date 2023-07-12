@@ -32,13 +32,13 @@
 - See [Where clause]() for more information
 
 ## Overview of class implementation
-#### Implementation must be provided
+### Implementation must be provided
 - Attributes
 - Static attributes
 
 ### Attributes
-- Defined in the same way as a [let statement]() + an access modifier
-- Attributes are defined with a type (no value), and will be initialized in the struct initializer
+- Defined by an access modifier, an identifier and a type
+- Attributes are defined with a type (no value), and must be initialized in the struct initializer
 - Attributes can be accessed by name, and can be given in any order to the struct initializer
 - Attributes, from inside the class, must be accessed with `self` or whatever the instance parameter is
 
