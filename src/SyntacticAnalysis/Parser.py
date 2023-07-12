@@ -676,9 +676,6 @@ class Parser:
     # Function Parameters
 
     def _parse_function_parameters(self) -> BoundParser:
-        """
-        Get the required parameters followed by the optional parameters
-        """
         def inner():
             p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
             p2 = self._parse_function_parameters_required_then_optional().parse_optional() or []
@@ -687,12 +684,6 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_function_parameters_required_then_optional(self) -> BoundParser:
-        """
-        The order of parsing, starting with Required as a minimum:
-            - Required+ -> Optional* -> Variadic?
-            - Optional+ -> Variadic?
-            - Variadic?
-        """
         def inner():
             p1 = self._parse_function_required_parameters().delay_parse()
             p2 = self._parse_function_optional_parameters().delay_parse()
@@ -702,11 +693,6 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_function_parameters_optional_then_variadic(self) -> BoundParser:
-        """
-        The order of parsing, starting with Optional as a minimum:
-            - Optional+ -> Variadic?
-            - Variadic?
-        """
         def inner():
             p1 = self._parse_function_optional_parameters().delay_parse()
             p2 = self._parse_function_variadic_parameter().delay_parse()
@@ -715,11 +701,6 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_function_required_parameters(self) -> BoundParser:
-        """
-        To parse parameters from a Required parameter and onwards, parse the Required parameter, and optionally the rest
-        of the parameters that are allowed to follow a Required parameter.
-        :return: A list of parameters starting with a Required parameter.
-        """
         def inner():
             p3 = self._parse_function_required_parameter().parse_once()
             p4 = self._parse_function_rest_of_required_parameters().parse_optional() or []
@@ -727,11 +708,6 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_function_rest_of_required_parameters(self) -> BoundParser:
-        """
-        To parse parameters that are allowed to follow Required parameters, parse the comma, and then parse either a
-        Required or Optional parameter, from self._parse_function_parameters_required_then_optional
-        :return: A list of parameters that are allowed to follow Required parameters.
-        """
         def inner():
             p1 = self._parse_token(TokenType.TkComma).parse_once()
             p2 = self._parse_function_parameters_required_then_optional().parse_once()
@@ -739,11 +715,6 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_function_optional_parameters(self) -> BoundParser:
-        """
-        To parse parameters from an Optional parameter and onwards, parse the Optional parameter, and optionally the
-        rest of the parameters that are allowed to follow an Optional parameter.
-        :return: A list of parameters starting with an Optional parameter.
-        """
         def inner():
             p3 = self._parse_function_optional_parameter().parse_once()
             p4 = self._parse_function_rest_of_optional_parameters().parse_optional() or []
@@ -751,11 +722,6 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_function_rest_of_optional_parameters(self) -> BoundParser:
-        """
-        To parse parameters that are allowed to follow Optional parameters, parse the comma, and then parse either an
-        Optional or Variadic parameter, from self._parse_function_parameters_optional_then_variadic.
-        :return: A list of parameters that are allowed to follow Optional parameters.
-        """
         def inner():
             p1 = self._parse_token(TokenType.TkComma).parse_once()
             p2 = self._parse_function_parameters_optional_then_variadic().parse_once()
@@ -1191,13 +1157,6 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_type_raw_identifier(self) -> BoundParser:
-        """
-        A raw type identifier is a part of a scoped type. For example, with Vec<Num>::ValueType, Vec<Num> is one part,
-        and ValueType is another part. As well as generic identifiers being usable for type identifiers, numbers can be
-        used to, as a "compile-time constant" type. This allows the accessing of the nth type from a variadic type, and
-        is especially useful for the Tup<...T> type. For example, Tup<Num, Str, Bool>::1 is Str.
-        :return:
-        """
         def inner():
             p1 = self._parse_generic_identifier().delay_parse()
             p2 = self._parse_numeric_integer().delay_parse()
@@ -1847,13 +1806,6 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_operator_identifier_unary(self) -> BoundParser:
-        """
-        "+" => Mathematical absolute of an expression
-        "-" => Mathematical negation of an expression
-        "~" => Bitwise complement of an expression
-        "!" => Logical negation of an expression
-        "await" => Await an expression
-        """
         def inner():
             p1 = self._parse_token(TokenType.TkPlus).delay_parse()
             p2 = self._parse_token(TokenType.TkHyphen).delay_parse()
@@ -1865,10 +1817,6 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_parameter_passing_convention(self) -> BoundParser:
-        """
-        "&" => Reference of an expression
-        "mut" => Mutable reference of an expression
-        """
         def inner():
             p1 = self._parse_token(TokenType.TkAmpersand).parse_once()
             p2 = self._parse_token(TokenType.KwMut).parse_optional() is not None
@@ -1949,11 +1897,6 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_literal_tuple(self) -> BoundParser:
-        """
-        A tuple literal is a list of expressions separated by commas, surrounded by parentheses. In the case where there
-        is only 1 element, the tuple automatically decomposes into its inner value, such that 1-tuples don't exist.
-        0-tuples ("unit type") are represented by an empty tuple literal -- "()".
-        """
         def inner():
             p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
             p4 = self._parse_expressions().parse_optional() or []

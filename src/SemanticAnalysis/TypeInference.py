@@ -15,6 +15,7 @@ from __future__ import annotations
 from src.LexicalAnalysis.Tokens import TokenType
 from src.SyntacticAnalysis import Ast
 from src.SemanticAnalysis import Exceptions
+from src.SemanticAnalysis.SymbolTable import Scope
 
 BINARY_FUNC_MAP = {
     # Mathematical operations
@@ -75,8 +76,23 @@ UNARY_FUNC_MAP = {
     TokenType.TkHyphen: "std::ops::Neg::__neg__",
 }
 
+FUNCTION_FUNC_MAP = {
+    (TokenType.TkAmpersand, False): "std::ops::Fn::__call__",
+    (TokenType.TkAmpersand, True): "std::ops::FnMut::__call__",
+    None: "std::ops::FnOnce::__call__",
+}
+
 
 class TypeInference:
+    def __infer_type_expression(self, expression: Ast.ExpressionAst, scope: Scope) -> Ast.TypeAst:
+        match expression:
+            case Ast.BinaryExpressionAst: return self.__infer_type_binary_expression(expression, scope)
+            case Ast.UnaryExpressionAst: return self.__infer_type_unary_expression(expression, scope)
+            case Ast.PostfixExpressionAst: return self.__infer_type_postfix_expression(expression, scope)
+
+        if type(expression) in Ast.PrimaryExpressionAst.__args__: return self.__infer_type_primary_expression(expression, scope)
+        raise NotImplementedError(f"Type inference for expression {expression} is not implemented")
+
     def __infer_type_binary_expression(self, binary_expression: Ast.BinaryExpressionAst, scope: Scope) -> Ast.TypeAst:
         # Get the operation from the BinaryExpression AST object, and inspect its token, to get the correct class and
         # function that the LHS needs to have implemented. This just acts as a wrapper to a regular function call.
@@ -95,7 +111,7 @@ class TypeInference:
         # "std::ops::Add::__add__", so look for "std::ops::Add::__add__(&std::Num, ...)" in the global scope.
         function_argument_types = [self.__infer_type_expression(binary_expression.lhs, scope), self.__infer_type_expression(binary_expression.rhs, scope)]
         function_type_arguments = []
-        function = scope.get_function(binary_function, function_argument_types, function_type_arguments)
+        function = scope.lookup_function(binary_function, function_argument_types, function_type_arguments)
 
         # If the function is not found, then the LHS does not implement the correct function, so raise an exception.
         if function is None:
@@ -106,7 +122,7 @@ class TypeInference:
         return function.return_type
 
 
-    def __infer_type_unary_expression(self, unary_expression: Ast.UnaryExpressionAst) -> Ast.TypeAst:
+    def __infer_type_unary_expression(self, unary_expression: Ast.UnaryExpressionAst, scope: Scope) -> Ast.TypeAst:
         # Get the operation from the UnaryExpression AST object, and inspect its token, to get the correct class and
         # function that the rhs needs to have implemented. This just acts as a wrapper to a regular function call.
         unary_operation = unary_expression.op.primary.token_type
@@ -116,7 +132,7 @@ class TypeInference:
         # correct class, so no extra check is required here, same as for the RHS of a binary expression.
         function_argument_types = [self.__infer_type_expression(unary_expression.rhs)]
         function_type_arguments = []
-        function = scope.get_function(unary_function, function_argument_types, function_type_arguments)
+        function = scope.lookup_function(unary_function, function_argument_types, function_type_arguments)
 
         # If the function is not found, then the RHS does not implement the correct function, so raise an exception.
         if function is None:
@@ -125,8 +141,60 @@ class TypeInference:
         return function.return_type
 
 
-    def __infer_type_postfix_expression(self, postfix_expression: Ast.PostfixExpressionAst) -> Ast.TypeAst:
-        ...
+    def __infer_type_postfix_expression(self, postfix_expression: Ast.PostfixExpressionAst, scope: Scope) -> Ast.TypeAst:
+        match postfix_expression.op:
+            case Ast.PostfixFunctionCallAst: return self.__infer_type_function_call(postfix_expression, scope)
+            case Ast.PostfixIndexAccessAst: return self.__infer_type_index(postfix_expression, scope)
+            case Ast.PostfixStructInitializerAst: return self.__infer_type_struct_initializer(postfix_expression, scope)
+            case Ast.PostfixMemberAccessAst: return self.__infer_type_member_access(postfix_expression, scope)
+            case Ast.TokenAst: return self.__infer_type_early_return(postfix_expression, scope)
+            case _: raise NotImplementedError(f"Unknown postfix expression type {postfix_expression.op}")
 
-    def __infer_type_parenthesized_expression(self, parenthesized_expression: Ast.ParenthesizedExpressionAst) -> Ast.TypeAst:
-        pass
+    def __infer_type_function_call(self, function_call: Ast.PostfixExpressionAst, scope: Scope) -> Ast.TypeAst:
+        # Now call either std::Fn::__call__, std::FnMut::__call_mut__, or std::FnOnce::__call_once__ depending on the
+        # type of the function, and return the return-type of the function.
+        try:
+            function_call_function = FUNCTION_FUNC_MAP[(function_call.op.arguments[-1].calling_convention.primary.token_type, function_call.op.arguments[-1].calling_convention.modifier)]
+        except AttributeError:
+            function_call_function = FUNCTION_FUNC_MAP[None]
+
+        # Functions are just objects in the global scope, whose type is either std::Fn, std::FnMut, or std::FnOnce. The
+        # standard function creation syntax ie `fn a() -> R` is just syntactic sugar to wrap the construction. Find the
+        # function in the global namespace, constrain the correct signature against the parameter types, type generic
+        # constraints and number of parameters.
+        function_argument_types = [self.__infer_type_expression(argument) for argument in function_call.op.arguments]
+        function_type = self.__infer_type_expression(function_call.lhs)
+        function_type_arguments = function_type.parts[-1].generics
+        function = scope.get_function(function_type, function_argument_types, function_type_arguments)
+
+        # If the function is not found, then the function does not exist, so raise an exception.
+        if function is None:
+            raise Exceptions.UnknownFunctionError(function_type, function_argument_types, function_type_arguments)
+
+        return function.return_type
+
+    def __infer_type_index(self, index: Ast.PostfixExpressionAst, scope: Scope) -> Ast.TypeAst:
+        # TODO : decide between __index__ or __index_mut__ (how?)
+        function_argument_type = self.__infer_type_expression(index.op.arguments[0])
+        function_type = self.__infer_type_expression(index.lhs)
+        function_type_arguments = function_type.parts[-1].generics
+        function = scope.get_function(function_type, [function_argument_type], function_type_arguments)
+
+        # If the function is not found, then the function does not exist, so raise an exception.
+        if function is None:
+            raise Exceptions.UnknownFunctionError(function_type, [function_argument_type], function_type_arguments)
+
+        return function.return_type
+
+    def __infer_type_struct_initializer(self, struct_initializer: Ast.PostfixExpressionAst, scope: Scope) -> Ast.TypeAst:
+        # The type of a struct initializer is the type of the struct itself, so just return the type of the struct.
+        # Ie std::Vec{} will return an std::Vec always (the struct-initializer ALWAYS returns the type of class being created).
+        return self.__infer_type_expression(struct_initializer.lhs)
+
+    def __infer_type_member_access(self, member_access: Ast.PostfixExpressionAst, scope: Scope) -> Ast.TypeAst:
+        # Look at the attribute types for the type being accessed, and return the type of the attribute being accessed.
+        # If the attribute does not exist, then raise an exception.
+        attribute_name = member_access.op.identifier
+        enclosing_type = self.__infer_type_expression(member_access.lhs)
+        attribute_type = scope.get_type(enclosing_type).get_attribute(attribute_name).type
+        return attribute_type

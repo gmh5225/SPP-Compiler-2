@@ -132,7 +132,7 @@ class FunctionPrototypeAst:
 class FunctionArgumentAst:
     identifier: Optional[IdentifierAst]
     value: ExpressionAst
-    convention: Optional[TokenAst]
+    calling_convention: Optional[TokenAst]
     unpack: bool
 
 def FunctionArgumentNamedAst(identifier: IdentifierAst, convention: Optional[TokenAst], value: ExpressionAst):
@@ -198,7 +198,7 @@ class ValueGuardAst:
 @dataclass
 class DecoratorAst:
     identifier: TypeAst # can be namespaced and generic
-    type_arguments: list[TypeGenericArgumentAst]
+    generic_arguments: list[TypeGenericArgumentAst]
     arguments: list[FunctionArgumentAst]
 
 @dataclass
