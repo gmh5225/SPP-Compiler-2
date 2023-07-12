@@ -206,6 +206,7 @@ let foo = Foo::new(1, 2, 3);
 - Types super-imposing the `std::ops::Try` class can have the postfix `?` operator applied
 - Mock safe access by combining the `?` with the `.` operator, ie access if the object is not null, otherwise return 
   the residual value
+  - If early return is not wanted but chaining is, the `.map(...)` function can be used 
 
 ## Virtual, Abstract, Static
 - The decorators show below apply mutations to the methods that another method in the basic meta-class can detect
