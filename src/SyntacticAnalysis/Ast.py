@@ -366,6 +366,7 @@ class LetStatementAst:
     variables: list[LocalVariableAst]
     value: Optional[ExpressionAst]
     type_annotation: Optional[TypeAst]
+    if_null: Optional[IfStatementBranchAst]
 
 @dataclass
 class InnerScopeAst:

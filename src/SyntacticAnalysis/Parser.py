@@ -1410,7 +1410,7 @@ class Parser:
             p3 = self._parse_token(TokenType.TkEqual).parse_once()
             p4 = self._parse_non_assignment_expression().parse_once()
             p6 = self._parse_token(TokenType.TkComma).parse_once()
-            return Ast.LetStatementAst([p2], p4, None)
+            return Ast.LetStatementAst([p2], p4, None, None)
         return BoundParser(self, inner)
 
     def _parse_statement_if(self) -> BoundParser:
@@ -1608,8 +1608,12 @@ class Parser:
             p3 = self._parse_statement_let_type_annotation().delay_parse()
             p4 = self._parse_statement_let_value().delay_parse()
             p5 = (p3 | p4).parse_once()
-            p6 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return Ast.LetStatementAst(p2, None, p5) if isinstance(p5, Ast.TypeAst) else Ast.LetStatementAst(p2, p5, None)
+            if not isinstance(p5, Ast.TypeAst):
+                p6 = self._parse_statement_else_branch().parse_optional()
+                p7 = self._parse_token(TokenType.TkSemicolon).parse_once()
+                return Ast.LetStatementAst(p2, p5, None, p6)
+            p7 = self._parse_token(TokenType.TkSemicolon).parse_once()
+            return Ast.LetStatementAst(p2, None, p5, None)
         return BoundParser(self, inner)
 
     def _parse_statement_let_value(self) -> BoundParser:
