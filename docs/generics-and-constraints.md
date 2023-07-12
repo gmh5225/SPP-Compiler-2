@@ -146,13 +146,15 @@ sup Foo:
 - List constraints after the generic type, separated by a `+` symbol
 - Constraints are checked at compile time
 ```s++
-class Wrapper<T: std::fmt::Display & std::ops::Add & std::ops::Sub>:
+class Wrapper<T: std::fmt::Display & std::ops::Add & std::ops::Sub> {
     value: T;
+}
     
-sup <T: std::fmt::Display & std::ops::Add & std::ops::Sub> Wrapper<T>:
+sup <T: std::fmt::Display & std::ops::Add & std::ops::Sub> Wrapper<T> {
     @std::static_method
     pub fun new(value: T):
         let w = Wrapper{value: value};
+}
 ```
 
 <BR>
@@ -171,9 +173,10 @@ sup <T: std::fmt::Display & std::ops::Add & std::ops::Sub> Wrapper<T>:
 ```s++
 class Wrapper<T, U> where [
         T: std::vector,
-        T::ValueType, U: std::fmt::Display:
+        T::ValueType, U: std::fmt::Display {
     value: T;
     other: U;
+}
 ```
 
 <BR>
@@ -184,16 +187,21 @@ class Wrapper<T, U> where [
 - For example, if a generic implements the `std::Default`, then more method that utilize the `std::Default` can be used.
 
 ```s++
-class Wrapper<T: std::Display>:
+class Wrapper<T: std::Display> {
     value: T;
+}
     
-sup<T: std::Display> Wrapper<T>:
+sup<T: std::Display> Wrapper<T> {
     @std::static_method
-    pub fun new(value: T):
+    pub fun new(value: T) {
         let w = Wrapper{value: value};
+    }
+}
 
-sup<T: std::Display & std::Default> Wrapper<T>:    
-    pub fun new_default():
+sup<T: std::Display & std::Default> Wrapper<T> {    
+    pub fun new_default() {
         return Wrapper{value: T::__def__()};
+    }
+}
 ```
 - Only if `T` implements `std::Default` can the `new_default` method be used.

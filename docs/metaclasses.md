@@ -5,7 +5,7 @@
 ## Defining a meta-class
 - Define as a normal class
 
-## Attack to a class
+## Attach to a class
 - Use the `with` keyword
 - Example: `pub cls Foo with Bar {...}`
 
