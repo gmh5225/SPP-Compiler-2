@@ -36,8 +36,7 @@
 | Binary Operator | Description                                                                 |
 |-----------------|-----------------------------------------------------------------------------|
 | `=`             | Assignment - Assign right expression to left expression                     |
-| `??`, `??=`     | Null coalescing - Return left expression if not null, else right            |
-| `?:`, `?:=`     | Elvis operator - Return right expression if not null, else left             |
+| `??`, `??=`     | Null coalescing - Return left expression if not residual, else right        |
 | `&&`, `&&=`     | Logical AND - Logical AND of two expressions                                |
 | `\|\|`, `\|\|=` | Logical OR - Logical OR of two expressions                                  |
 | `&`, `&=`       | Bitwise AND - Bitwise AND of two expressions                                |

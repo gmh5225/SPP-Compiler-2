@@ -17,9 +17,6 @@ if let x = f(), let y = g(), x.a > y.b {
 }
 ```
 
-#### Notes
-- Inline definitions are multiple single-definitions by design (not allowed multi-definition syntax)
-
 ### The `elif` Statement
 #### Structure
 - Same as `if`, just replace `if` with `elif`
