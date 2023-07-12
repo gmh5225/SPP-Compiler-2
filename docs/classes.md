@@ -181,7 +181,7 @@ let foo = Foo::new(1, 2, 3);
 - Cannot be used to access/call static attributes or methods
 - Followed by the `.` runtime access operator
 
-#### `self`s type in methods
+#### `self`'s type in methods
 - `self: &Self` -- an immutable reference to the current instance
 - `self: &mut Self` -- a mutable reference to the current instance
 - `self: Self` -- the current instance is moved into the method, and is no longer accessible outside the method
@@ -203,7 +203,7 @@ let foo = Foo::new(1, 2, 3);
 - Applicable to any object, or `self`
 
 #### Safe access
-- Types super-imposing the `std::ops::Residual` class can have the postfix `?` operator applied
+- Types super-imposing the `std::ops::Try` class can have the postfix `?` operator applied
 - Mock safe access by combining the `?` with the `.` operator, ie access if the object is not null, otherwise return 
   the residual value
 
