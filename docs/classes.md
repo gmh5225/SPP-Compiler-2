@@ -120,6 +120,9 @@ sup Bar for Foo {
 #### Compile-time conditionally enable classes with type-constraints
 - Classes can be conditionally enabled based on the type of the generic parameters
 - Enable certain classes if the constraints of the generic parameters are satisfied
+- Any type-constraints on the base class must also be on the `sup` definitions when inheriting it
+  - For example if `sup Bar<T: std::Default>` was the `sup` definition for `Bar`:
+  - Then to inherit it as below, it would have to be `sup Bar<T: std::Default & std::Copy> for Foo`
 
 ```s++
 sup Bar<T> {
