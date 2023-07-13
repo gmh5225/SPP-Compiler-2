@@ -1132,7 +1132,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.KwSelf).parse_once()
             p2 = self._parse_type_raw_identifiers_rest().parse_optional() or []
-            return Ast.SingleTypeAst([Ast.SelfTypeAst(), *p2])
+            return Ast.TypeSingleAst([Ast.SelfTypeAst(), *p2])
         return BoundParser(self, inner)
 
     def _parse_type_raw_identifiers_rest(self) -> BoundParser:
@@ -1177,7 +1177,7 @@ class Parser:
             p1 = self._parse_type_self_prefix().delay_parse()
             p2 = self._parse_type_raw_identifiers().delay_parse()
             p3 = (p1 | p2).parse_once()
-            return Ast.SingleTypeAst(p3)
+            return Ast.TypeSingleAst(p3)
         return BoundParser(self, inner)
 
     def _parse_tuple_type_identifiers(self) -> BoundParser:
@@ -1185,7 +1185,7 @@ class Parser:
             p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
             p2 = self._parse_type_identifiers().parse_once()
             p3 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
-            return Ast.TupleTypeAst(p2)
+            return Ast.TypeTupleAst(p2)
         return BoundParser(self, inner)
 
     def _parse_type_identifiers(self) -> BoundParser:
@@ -1508,7 +1508,7 @@ class Parser:
             p3 = self._parse_token(TokenType.KwAs).parse_once()
             p4 = self._parse_type_identifier().parse_once()
             p5 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return Ast.TypedefStatementAst(Ast.SingleTypeAst([p2]), p4)
+            return Ast.TypedefStatementAst(Ast.TypeSingleAst([p2]), p4)
         return BoundParser(self, inner)
 
     def _parse_statement_break(self) -> BoundParser:

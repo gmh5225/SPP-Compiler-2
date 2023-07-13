@@ -278,11 +278,11 @@ def TypeGenericArgumentNormalAst(value: TypeAst):
     return TypeGenericArgumentAst(None, value)
 
 @dataclass
-class SingleTypeAst:
+class TypeSingleAst:
     parts: list[SelfTypeAst | GenericIdentifierAst | int]
 
 @dataclass
-class TupleTypeAst:
+class TypeTupleAst:
     types: list[TypeAst]
 
 @dataclass
@@ -475,10 +475,10 @@ class SetLiteralAst:
 
 @dataclass
 class MapLiteralAst:
-    fields: list[PairLiteralAst]
+    fields: list[MapEntryAst]
 
 @dataclass
-class PairLiteralAst:
+class MapEntryAst:
     key: ExpressionAst
     value: ExpressionAst
 
@@ -498,9 +498,9 @@ class RangeLiteralAst:
 
 PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixIndexAccessAst | PostfixStructInitializerAst | TokenAst
 NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiteralBase02Ast
-LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | ListLiteralAst | MapLiteralAst | SetLiteralAst | PairLiteralAst | RegexLiteralAst | TupleLiteralAst
-TypeAst = SingleTypeAst | TupleTypeAst
-PrimaryExpressionAst = LiteralAst | IdentifierAst | ParenthesizedExpressionAst | LambdaAst | PlaceholderAst | SingleTypeAst | IfStatementAst | MatchStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst
+LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | ListLiteralAst | MapLiteralAst | SetLiteralAst | MapEntryAst | RegexLiteralAst | TupleLiteralAst
+TypeAst = TypeSingleAst | TypeTupleAst
+PrimaryExpressionAst = LiteralAst | IdentifierAst | ParenthesizedExpressionAst | LambdaAst | PlaceholderAst | TypeSingleAst | IfStatementAst | MatchStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst
 ExpressionAst = UnaryExpressionAst | BinaryExpressionAst | PostfixExpressionAst | AssignmentExpressionAst | PrimaryExpressionAst
 StatementAst = IfStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst | MatchStatementAst | WithStatementAst | ReturnStatementAst | YieldStatementAst | TypedefStatementAst | LetStatementAst | ExpressionAst
 ModuleMemberAst = EnumPrototypeAst | ClassPrototypeAst | FunctionPrototypeAst | SupPrototypeNormalAst | SupPrototypeInheritanceAst
