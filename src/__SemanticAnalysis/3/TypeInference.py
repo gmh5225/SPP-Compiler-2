@@ -162,10 +162,10 @@ class TypeInference:
         # standard function creation syntax ie `fn a() -> R` is just syntactic sugar to wrap the construction. Find the
         # function in the global namespace, constrain the correct signature against the parameter types, type generic
         # constraints and number of parameters.
-        function_argument_types = [self.__infer_type_expression(argument) for argument in function_call.op.arguments]
-        function_type = self.__infer_type_expression(function_call.lhs)
+        function_argument_types = [self.__infer_type_expression(argument, scope) for argument in function_call.op.arguments]
+        function_type = self.__infer_type_expression(function_call.lhs, scope)
         function_type_arguments = function_type.parts[-1].generics
-        function = scope.get_function(function_type, function_argument_types, function_type_arguments)
+        function = scope.lookup_function(function_type, function_argument_types, function_type_arguments)
 
         # If the function is not found, then the function does not exist, so raise an exception.
         if function is None:
@@ -175,10 +175,10 @@ class TypeInference:
 
     def __infer_type_index(self, index: Ast.PostfixExpressionAst, scope: Scope) -> Ast.TypeAst:
         # TODO : decide between __index__ or __index_mut__ (how?)
-        function_argument_type = self.__infer_type_expression(index.op.arguments[0])
-        function_type = self.__infer_type_expression(index.lhs)
+        function_argument_type = self.__infer_type_expression(index.op.arguments[0], scope)
+        function_type = self.__infer_type_expression(index.lhs, scope)
         function_type_arguments = function_type.parts[-1].generics
-        function = scope.get_function(function_type, [function_argument_type], function_type_arguments)
+        function = scope.lookup_function(function_type, [function_argument_type], function_type_arguments)
 
         # If the function is not found, then the function does not exist, so raise an exception.
         if function is None:
@@ -189,12 +189,19 @@ class TypeInference:
     def __infer_type_struct_initializer(self, struct_initializer: Ast.PostfixExpressionAst, scope: Scope) -> Ast.TypeAst:
         # The type of a struct initializer is the type of the struct itself, so just return the type of the struct.
         # Ie std::Vec{} will return an std::Vec always (the struct-initializer ALWAYS returns the type of class being created).
-        return self.__infer_type_expression(struct_initializer.lhs)
+        return self.__infer_type_expression(struct_initializer.lhs, scope)
 
     def __infer_type_member_access(self, member_access: Ast.PostfixExpressionAst, scope: Scope) -> Ast.TypeAst:
         # Look at the attribute types for the type being accessed, and return the type of the attribute being accessed.
         # If the attribute does not exist, then raise an exception.
         attribute_name = member_access.op.identifier
-        enclosing_type = self.__infer_type_expression(member_access.lhs)
-        attribute_type = scope.get_type(enclosing_type).get_attribute(attribute_name).type
+        enclosing_type = self.__infer_type_expression(member_access.lhs, scope)
+        attribute_type = scope.lookup_type(enclosing_type).get_attribute(attribute_name).type
         return attribute_type
+
+    def __infer_type_early_return(self, early_return: Ast.PostfixExpressionAst, scope: Scope) -> Ast.TypeAst:
+        # Return the function return type from the std::ops::Try::__try__ function.
+        function_name = "std::ops::Try::__try__"
+        function_argument_types = [self.__infer_type_expression(early_return.lhs, scope)]
+        function_type_arguments = []
+        function = scope.lookup_function(function_name, function_argument_types, function_type_arguments)
