@@ -10,4 +10,4 @@ class Semantic:
         self._scope_manager = ScopeManager(self._ast.module.identifier)
         SymbolTableBuilder.build_program(self._ast, self._scope_manager)
 
-        pprint(self._scope_manager.json())
+        pprint(self._scope_manager.json(), sort_dicts=False, indent=1)

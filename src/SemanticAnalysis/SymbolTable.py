@@ -4,6 +4,9 @@ Construct symbol tables for each scope in the program, including the global scop
 
 from __future__ import annotations
 from typing import Generic, Optional, TypeVar
+import inflection
+import inspect
+
 from src.SyntacticAnalysis import Ast
 from src.SemanticAnalysis.TypeInference import TypeInference
 
@@ -48,7 +51,11 @@ class SymbolType:
         return self._type
 
     def __repr__(self):
-        return f"{'::'.join([p.identifier for p in self._type.parts])}" if type(self._type) == Ast.TypeSingleAst else f"({','.join([repr(p) for p in self._type.parts])})"
+        match self._type:
+            case Ast.TypeSingleAst(): return f"{'::'.join([p.identifier for p in self._type.parts])}"
+            case Ast.TypeTupleAst(): return f"({','.join([repr(p) for p in self._type.parts])})"
+            case Ast.TypeGenericParameterAst(): return f"{self._type.identifier}"
+            case _: raise NotImplementedError(f"Type {type(self._type)} not implemented")
 
 
 class Symbol(Generic[T]):
@@ -84,10 +91,15 @@ class SymbolTable(Generic[T]):
         return self._symbols.get(name)
 
     def json(self):
-        return f"{[repr(k) + ':' + repr(v) for k, v in self._symbols.items()]}"
+        d = {}
+        for k, v in self._symbols.items():
+            d[repr(k)] = repr(v.type)
+        return d
 
 
 class Scope:
+    _name: str
+
     _symbol_table: SymbolTable[Ast.IdentifierAst]
     _type_table: SymbolTable[Ast.TypeAst]
     _tag_table: SymbolTable[Ast.TagIdentifierAst]
@@ -96,6 +108,8 @@ class Scope:
     _child_scopes: list[Scope]
 
     def __init__(self, parent_scope: Optional[Scope] = None):
+        self._name = inflection.camelize(inspect.stack()[2].function[1:])
+
         self._symbol_table = SymbolTable()
         self._type_table = SymbolTable()
         self._tag_table = SymbolTable()
@@ -140,6 +154,7 @@ class Scope:
 
     def json(self):
         return {
+            "Name": self._name,
             "Symbols": self._symbol_table.json(),
             "Types": self._type_table.json(),
             "Tags": self._tag_table.json(),
@@ -201,7 +216,6 @@ class ScopeManager:
 
     def json(self):
         return self._global_scope.json()
-
 
 
 class SymbolTableBuilder:
@@ -294,15 +308,15 @@ class SymbolTableBuilder:
 
     @staticmethod
     def _build_while_statement(ast: Ast.WhileStatementAst, s: ScopeManager) -> None:
-        s.define_tag(Symbol(SymbolName(ast.tag), None))
         s.enter_scope()
+        s.define_tag(Symbol(SymbolName(ast.tag), None))
         for statement in ast.body: SymbolTableBuilder._build_statement(statement, s)
         s.exit_scope()
 
     @staticmethod
     def _build_for_statement(ast: Ast.ForStatementAst, s: ScopeManager) -> None:
-        s.define_tag(Symbol(SymbolName(ast.tag), None))
         s.enter_scope()
+        s.define_tag(Symbol(SymbolName(ast.tag), None))
         iterable_type = iter([None] * 20) # TODO : iter(TypeInference.infer_type(ast.iterable, s)[0].types)
         for identifier in ast.identifiers: s.define_symbol(Symbol(SymbolName(identifier), next(iterable_type)))
         for statement in ast.body: SymbolTableBuilder._build_statement(statement, s)
@@ -310,8 +324,8 @@ class SymbolTableBuilder:
 
     @staticmethod
     def _build_do_while_statement(ast: Ast.DoWhileStatementAst, s: ScopeManager) -> None:
-        s.define_tag(Symbol(SymbolName(ast.tag), None))
         s.enter_scope()
+        s.define_tag(Symbol(SymbolName(ast.tag), None))
         for statement in ast.body: SymbolTableBuilder._build_statement(statement, s)
         s.exit_scope()
 
@@ -382,8 +396,6 @@ class SymbolTableBuilder:
             case Ast.SupMethodPrototypeAst: raise NotImplementedError(f"Sup method {ast} not implemented")
             case Ast.SupTypedefAst: raise NotImplementedError(f"Sup typedef {ast} not implemented")
             case _: raise NotImplementedError(f"Sup member {ast} not implemented")
-
-
 
 
 class Utils:
