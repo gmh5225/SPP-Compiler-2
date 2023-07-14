@@ -1,0 +1,2 @@
+1. Symbol Generation & Type Inference => define all the symbols that are valid - variable identifiers, types, and loop labels
+2. Symbol Checking & Type Checking => check that all symbols used are valid, and that the type of each argument is correct
