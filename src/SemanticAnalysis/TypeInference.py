@@ -80,8 +80,14 @@ class TypeInference:
 
     @staticmethod
     def _infer_type_from_binary_expression(ast: Ast.BinaryExpressionAst, s) -> Ast.TypeAst:
+        # Get the type of the LHS and RHS operators, and find the class that the operator belongs to, and the name of
+        # the method that the operator maps to. For example, 1 + 2 maps to std::ops::Add::__add__(std::Num, std::Num).
         lhs_type = TypeInference._infer_type_from_expression(ast.lhs, s)
         rhs_type = TypeInference._infer_type_from_expression(ast.rhs, s)
-        operator_method = BINARY_FUNC_MAP[ast.op.primary.token_type]
+        operator_class, method = BINARY_FUNC_MAP[ast.op.tok.token_type].rsplit("::", 1)
+
+        # Locate the function in the scope, and get the return type of the function. There might be > 1 matching
+        # function signatures in the scope, so we need to find the one that matches the LHS and RHS types and any
+        # generic constraints.
 
 

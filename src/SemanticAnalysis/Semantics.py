@@ -1,7 +1,7 @@
 from __future__ import annotations
 from src.SemanticAnalysis.SymbolTable import SymbolTableBuilder, ScopeManager
 from src.SyntacticAnalysis import Ast
-from pprint import pprint
+from src.Compiler.Printer import save_json
 
 
 class Semantic:
@@ -10,4 +10,4 @@ class Semantic:
         self._scope_manager = ScopeManager(self._ast.module.identifier)
         SymbolTableBuilder.build_program(self._ast, self._scope_manager)
 
-        pprint(self._scope_manager.json(), sort_dicts=False, indent=1)
+        save_json(self._scope_manager.json(), "_out/symbol_table.json")

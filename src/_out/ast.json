@@ -1,680 +1,212 @@
-{
-    "module": {
-        "modifier": {
-            "modifier": {
-                "primary": {
-                    "token_metadata": "priv",
-                    "token_type": {
-                        "py/reduce": [
-                            {
-                                "py/function": "builtins.getattr"
-                            },
-                            {
-                                "py/tuple": [
-                                    {
-                                        "py/type": "src.LexicalAnalysis.Tokens.TokenType"
-                                    },
-                                    "KwPriv"
-                                ]
-                            }
-                        ]
-                    }
-                },
-                "modifier": null
-            }
-        },
-        "identifier": {
-            "parts": [
-                {
-                    "identifier": "a"
-                },
-                {
-                    "identifier": "b"
-                }
-            ]
-        },
-        "body": {
-            "imports": null,
-            "members": [
-                {
-                    "decorators": [],
-                    "modifier": {
-                        "modifier": {
-                            "primary": {
-                                "token_metadata": "priv",
-                                "token_type": {
-                                    "py/id": 5
-                                }
-                            },
-                            "modifier": null
-                        }
-                    },
-                    "is_async": false,
-                    "identifier": {
-                        "identifier": "test"
-                    },
-                    "generic_parameters": [],
-                    "parameters": [
-                        {
-                            "is_mutable": false,
-                            "identifier": {
-                                "identifier": "a"
-                            },
-                            "calling_convention": null,
-                            "type_annotation": {
-                                "parts": [
-                                    {
-                                        "identifier": "std",
-                                        "generic": []
-                                    },
-                                    {
-                                        "identifier": "Str",
-                                        "generic": []
-                                    }
-                                ]
-                            },
-                            "default_value": null,
-                            "is_variadic": false
-                        }
-                    ],
-                    "return_type": {
-                        "parts": {
-                            "parts": [
-                                {}
-                            ]
-                        }
-                    },
-                    "where_block": null,
-                    "value_guard": null,
-                    "body": {
-                        "statements": [
-                            {
-                                "variables": [
-                                    {
-                                        "is_mutable": false,
-                                        "identifier": {
-                                            "identifier": "x"
-                                        }
-                                    }
-                                ],
-                                "value": {
-                                    "lhs": {
-                                        "parts": [
-                                            {
-                                                "identifier": "some_func",
-                                                "generic": [
-                                                    {
-                                                        "identifier": null,
-                                                        "value": {
-                                                            "parts": [
-                                                                {
-                                                                    "identifier": "T",
-                                                                    "generic": []
-                                                                }
-                                                            ]
-                                                        }
-                                                    }
-                                                ]
-                                            }
-                                        ]
-                                    },
-                                    "op": {
-                                        "arguments": [
-                                            {
-                                                "identifier": null,
-                                                "value": {
-                                                    "parts": [
-                                                        {
-                                                            "identifier": "a",
-                                                            "generic": []
-                                                        }
-                                                    ]
-                                                },
-                                                "calling_convention": null,
-                                                "unpack": false
-                                            }
-                                        ]
-                                    }
-                                },
-                                "type_annotation": null,
-                                "if_null": null
-                            },
-                            {
-                                "if_branch": {
-                                    "definitions": [],
-                                    "condition": {
-                                        "lhs": {
-                                            "parts": [
-                                                {
-                                                    "identifier": "x",
-                                                    "generic": []
-                                                }
-                                            ]
-                                        },
-                                        "op": {
-                                            "primary": {
-                                                "token_metadata": ">",
-                                                "token_type": {
-                                                    "py/reduce": [
-                                                        {
-                                                            "py/function": "builtins.getattr"
-                                                        },
-                                                        {
-                                                            "py/tuple": [
-                                                                {
-                                                                    "py/type": "src.LexicalAnalysis.Tokens.TokenType"
-                                                                },
-                                                                "TkRightAngleBracket"
-                                                            ]
-                                                        }
-                                                    ]
-                                                }
-                                            },
-                                            "modifier": null
-                                        },
-                                        "rhs": {
-                                            "integer": "100",
-                                            "decimal": null,
-                                            "exponent": null,
-                                            "is_imaginary": false
-                                        }
-                                    },
-                                    "body": [
-                                        {
-                                            "value": {
-                                                "integer": "1",
-                                                "decimal": null,
-                                                "exponent": null,
-                                                "is_imaginary": false
-                                            }
-                                        }
-                                    ]
-                                },
-                                "elif_branches": [],
-                                "else_branch": {
-                                    "definitions": [],
-                                    "condition": {
-                                        "value": true
-                                    },
-                                    "body": [
-                                        {
-                                            "value": {
-                                                "integer": "0",
-                                                "decimal": null,
-                                                "exponent": null,
-                                                "is_imaginary": false
-                                            }
-                                        }
-                                    ]
-                                }
-                            },
-                            {
-                                "condition": {
-                                    "lhs": {
-                                        "parts": [
-                                            {
-                                                "identifier": "x",
-                                                "generic": []
-                                            }
-                                        ]
-                                    },
-                                    "op": {
-                                        "primary": {
-                                            "token_metadata": "<",
-                                            "token_type": {
-                                                "py/reduce": [
-                                                    {
-                                                        "py/function": "builtins.getattr"
-                                                    },
-                                                    {
-                                                        "py/tuple": [
-                                                            {
-                                                                "py/type": "src.LexicalAnalysis.Tokens.TokenType"
-                                                            },
-                                                            "TkLeftAngleBracket"
-                                                        ]
-                                                    }
-                                                ]
-                                            }
-                                        },
-                                        "modifier": null
-                                    },
-                                    "rhs": {
-                                        "parts": [
-                                            {
-                                                "identifier": "y",
-                                                "generic": []
-                                            }
-                                        ]
-                                    }
-                                },
-                                "tag": {
-                                    "identifier": "'outer_loop"
-                                },
-                                "body": [
-                                    {
-                                        "variables": [
-                                            {
-                                                "is_mutable": false,
-                                                "identifier": {
-                                                    "identifier": "y"
-                                                }
-                                            }
-                                        ],
-                                        "value": {
-                                            "integer": "1",
-                                            "decimal": null,
-                                            "exponent": null,
-                                            "is_imaginary": false
-                                        },
-                                        "type_annotation": null,
-                                        "if_null": null
-                                    },
-                                    {
-                                        "variables": [
-                                            {
-                                                "is_mutable": false,
-                                                "identifier": {
-                                                    "identifier": "z"
-                                                }
-                                            }
-                                        ],
-                                        "value": {
-                                            "integer": "2",
-                                            "decimal": null,
-                                            "exponent": null,
-                                            "is_imaginary": false
-                                        },
-                                        "type_annotation": null,
-                                        "if_null": null
-                                    }
-                                ]
-                            },
-                            {
-                                "identifiers": [
-                                    {
-                                        "is_mutable": false,
-                                        "identifier": {
-                                            "identifier": "x"
-                                        }
-                                    },
-                                    {
-                                        "is_mutable": false,
-                                        "identifier": {
-                                            "identifier": "y"
-                                        }
-                                    },
-                                    {
-                                        "is_mutable": false,
-                                        "identifier": {
-                                            "identifier": "z"
-                                        }
-                                    }
-                                ],
-                                "iterable": {
-                                    "lhs": {
-                                        "lhs": {
-                                            "parts": [
-                                                {
-                                                    "identifier": "some_value",
-                                                    "generic": []
-                                                }
-                                            ]
-                                        },
-                                        "op": {
-                                            "separator": {
-                                                "primary": {
-                                                    "token_metadata": ".",
-                                                    "token_type": {
-                                                        "py/reduce": [
-                                                            {
-                                                                "py/function": "builtins.getattr"
-                                                            },
-                                                            {
-                                                                "py/tuple": [
-                                                                    {
-                                                                        "py/type": "src.LexicalAnalysis.Tokens.TokenType"
-                                                                    },
-                                                                    "TkDot"
-                                                                ]
-                                                            }
-                                                        ]
-                                                    }
-                                                },
-                                                "modifier": null
-                                            },
-                                            "identifier": {
-                                                "identifier": "iter",
-                                                "generic": []
-                                            }
-                                        }
-                                    },
-                                    "op": {
-                                        "arguments": []
-                                    }
-                                },
-                                "tag": null,
-                                "body": [
-                                    {
-                                        "variables": [
-                                            {
-                                                "is_mutable": false,
-                                                "identifier": {
-                                                    "identifier": "a"
-                                                }
-                                            }
-                                        ],
-                                        "value": {
-                                            "integer": "1",
-                                            "decimal": null,
-                                            "exponent": null,
-                                            "is_imaginary": false
-                                        },
-                                        "type_annotation": null,
-                                        "if_null": null
-                                    },
-                                    {
-                                        "variables": [
-                                            {
-                                                "is_mutable": false,
-                                                "identifier": {
-                                                    "identifier": "b"
-                                                }
-                                            }
-                                        ],
-                                        "value": {
-                                            "integer": "2",
-                                            "decimal": null,
-                                            "exponent": null,
-                                            "is_imaginary": false
-                                        },
-                                        "type_annotation": null,
-                                        "if_null": null
-                                    }
-                                ]
-                            },
-                            {
-                                "value": {
-                                    "parts": [
-                                        {
-                                            "identifier": "x",
-                                            "generic": []
-                                        }
-                                    ]
-                                },
-                                "cases": [
-                                    {
-                                        "pattern": [
-                                            {
-                                                "integer": "1",
-                                                "decimal": null,
-                                                "exponent": null,
-                                                "is_imaginary": false
-                                            }
-                                        ],
-                                        "guard": null,
-                                        "body": [
-                                            {
-                                                "variables": [
-                                                    {
-                                                        "is_mutable": false,
-                                                        "identifier": {
-                                                            "identifier": "a"
-                                                        }
-                                                    }
-                                                ],
-                                                "value": {
-                                                    "integer": "1",
-                                                    "decimal": null,
-                                                    "exponent": null,
-                                                    "is_imaginary": false
-                                                },
-                                                "type_annotation": null,
-                                                "if_null": null
-                                            },
-                                            {
-                                                "variables": [
-                                                    {
-                                                        "is_mutable": false,
-                                                        "identifier": {
-                                                            "identifier": "b"
-                                                        }
-                                                    }
-                                                ],
-                                                "value": {
-                                                    "integer": "2",
-                                                    "decimal": null,
-                                                    "exponent": null,
-                                                    "is_imaginary": false
-                                                },
-                                                "type_annotation": null,
-                                                "if_null": null
-                                            }
-                                        ]
-                                    },
-                                    {
-                                        "pattern": [
-                                            {
-                                                "integer": "2",
-                                                "decimal": null,
-                                                "exponent": null,
-                                                "is_imaginary": false
-                                            }
-                                        ],
-                                        "guard": null,
-                                        "body": [
-                                            {
-                                                "variables": [
-                                                    {
-                                                        "is_mutable": false,
-                                                        "identifier": {
-                                                            "identifier": "a"
-                                                        }
-                                                    }
-                                                ],
-                                                "value": {
-                                                    "integer": "1",
-                                                    "decimal": null,
-                                                    "exponent": null,
-                                                    "is_imaginary": false
-                                                },
-                                                "type_annotation": null,
-                                                "if_null": null
-                                            },
-                                            {
-                                                "variables": [
-                                                    {
-                                                        "is_mutable": false,
-                                                        "identifier": {
-                                                            "identifier": "b"
-                                                        }
-                                                    }
-                                                ],
-                                                "value": {
-                                                    "integer": "2",
-                                                    "decimal": null,
-                                                    "exponent": null,
-                                                    "is_imaginary": false
-                                                },
-                                                "type_annotation": null,
-                                                "if_null": null
-                                            }
-                                        ]
-                                    },
-                                    {
-                                        "pattern": [
-                                            {}
-                                        ],
-                                        "guard": null,
-                                        "body": [
-                                            {
-                                                "variables": [
-                                                    {
-                                                        "is_mutable": false,
-                                                        "identifier": {
-                                                            "identifier": "a"
-                                                        }
-                                                    }
-                                                ],
-                                                "value": {
-                                                    "integer": "1",
-                                                    "decimal": null,
-                                                    "exponent": null,
-                                                    "is_imaginary": false
-                                                },
-                                                "type_annotation": null,
-                                                "if_null": null
-                                            },
-                                            {
-                                                "variables": [
-                                                    {
-                                                        "is_mutable": false,
-                                                        "identifier": {
-                                                            "identifier": "b"
-                                                        }
-                                                    }
-                                                ],
-                                                "value": {
-                                                    "integer": "2",
-                                                    "decimal": null,
-                                                    "exponent": null,
-                                                    "is_imaginary": false
-                                                },
-                                                "type_annotation": null,
-                                                "if_null": null
-                                            }
-                                        ]
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                },
-                {
-                    "decorators": [],
-                    "modifier": {
-                        "modifier": {
-                            "primary": {
-                                "token_metadata": "priv",
-                                "token_type": {
-                                    "py/id": 5
-                                }
-                            },
-                            "modifier": null
-                        }
-                    },
-                    "is_async": false,
-                    "identifier": {
-                        "identifier": "test_2"
-                    },
-                    "generic_parameters": [
-                        {
-                            "identifier": {
-                                "identifier": "T"
-                            },
-                            "constraints": null,
-                            "default": null,
-                            "is_variadic": false
-                        }
-                    ],
-                    "parameters": [
-                        {
-                            "is_mutable": false,
-                            "identifier": {
-                                "identifier": "a"
-                            },
-                            "calling_convention": null,
-                            "type_annotation": {
-                                "parts": [
-                                    {
-                                        "identifier": "T",
-                                        "generic": []
-                                    }
-                                ]
-                            },
-                            "default_value": null,
-                            "is_variadic": false
-                        }
-                    ],
-                    "return_type": {
-                        "parts": [
-                            {
-                                "identifier": "std",
-                                "generic": []
-                            },
-                            {
-                                "identifier": "void",
-                                "generic": []
-                            }
-                        ]
-                    },
-                    "where_block": null,
-                    "value_guard": null,
-                    "body": {
-                        "statements": [
-                            {
-                                "variables": [
-                                    {
-                                        "is_mutable": false,
-                                        "identifier": {
-                                            "identifier": "x"
-                                        }
-                                    }
-                                ],
-                                "value": {
-                                    "lhs": {
-                                        "parts": [
-                                            {
-                                                "identifier": "some_func",
-                                                "generic": [
-                                                    {
-                                                        "identifier": null,
-                                                        "value": {
-                                                            "parts": [
-                                                                {
-                                                                    "identifier": "T",
-                                                                    "generic": []
-                                                                }
-                                                            ]
-                                                        }
-                                                    }
-                                                ]
-                                            }
-                                        ]
-                                    },
-                                    "op": {
-                                        "arguments": [
-                                            {
-                                                "identifier": null,
-                                                "value": {
-                                                    "parts": [
-                                                        {
-                                                            "identifier": "a",
-                                                            "generic": []
-                                                        }
-                                                    ]
-                                                },
-                                                "calling_convention": null,
-                                                "unpack": false
-                                            }
-                                        ]
-                                    }
-                                },
-                                "type_annotation": null,
-                                "if_null": null
-                            },
-                            {
-                                "value": {
-                                    "integer": "5",
-                                    "decimal": null,
-                                    "exponent": null,
-                                    "is_imaginary": false
-                                }
-                            }
-                        ]
-                    }
-                }
-            ]
-        }
-    }
-}
+{"module": {"access_modifier": {"modifier": {"tok": {"token_metadata": "priv",
+                                                     "token_type": <TokenType.KwPriv: "priv">}}},
+            "identifier": {"parts": [{"identifier": "a"}, {"identifier": "b"}]},
+            "body": {"imports": null,
+                     "members": [{"decorators": [],
+                                  "access_modifier": {"modifier": {"tok": {"token_metadata": "priv",
+                                                                           "token_type": <TokenType.KwPriv: "priv">}}},
+                                  "is_async": false,
+                                  "id_generator": false,
+                                  "identifier": {"identifier": "test"},
+                                  "generic_parameters": [],
+                                  "parameters": [{"is_mutable": false,
+                                                  "identifier": {"identifier": "a"},
+                                                  "calling_convention": null,
+                                                  "type_annotation": {"parts": [{"identifier": "std",
+                                                                                 "generic": []},
+                                                                                {"identifier": "Str",
+                                                                                 "generic": []}]},
+                                                  "default_value": null,
+                                                  "is_variadic": false}],
+                                  "return_type": {"parts": {"parts": [{}]}},
+                                  "where_block": null,
+                                  "value_guard": null,
+                                  "body": {"statements": [{"variables": [{"is_mutable": false,
+                                                                          "identifier": {"identifier": "x"}}],
+                                                           "value": {"lhs": {"parts": [{"identifier": "some_func",
+                                                                                        "generic": []}]},
+                                                                     "op": {"tok": {"token_metadata": "<",
+                                                                                    "token_type": <TokenType.TkLeftAngleBracket: "<">}},
+                                                                     "rhs": {"lhs": {"parts": [{"identifier": "T",
+                                                                                                "generic": []}]},
+                                                                             "op": {"tok": {"token_metadata": ">",
+                                                                                            "token_type": <TokenType.TkRightAngleBracket: ">">}},
+                                                                             "rhs": {"parts": [{"identifier": "a",
+                                                                                                "generic": []}]}}},
+                                                           "type_annotation": null,
+                                                           "if_null": null},
+                                                          {"if_branch": {"definitions": [],
+                                                                         "condition": {"lhs": {"parts": [{"identifier": "x",
+                                                                                                          "generic": []}]},
+                                                                                       "op": {"tok": {"token_metadata": ">",
+                                                                                                      "token_type": <TokenType.TkRightAngleBracket: ">">}},
+                                                                                       "rhs": {"integer": "100",
+                                                                                               "decimal": null,
+                                                                                               "exponent": null,
+                                                                                               "is_imaginary": false}},
+                                                                         "body": [{"value": {"integer": "1",
+                                                                                             "decimal": null,
+                                                                                             "exponent": null,
+                                                                                             "is_imaginary": false}}]},
+                                                           "elif_branches": [],
+                                                           "else_branch": {"definitions": [],
+                                                                           "condition": {"value": true},
+                                                                           "body": [{"value": {"integer": "0",
+                                                                                               "decimal": null,
+                                                                                               "exponent": null,
+                                                                                               "is_imaginary": false}}]}},
+                                                          {"condition": {"lhs": {"parts": [{"identifier": "x",
+                                                                                            "generic": []}]},
+                                                                         "op": {"tok": {"token_metadata": "<",
+                                                                                        "token_type": <TokenType.TkLeftAngleBracket: "<">}},
+                                                                         "rhs": {"parts": [{"identifier": "y",
+                                                                                            "generic": []}]}},
+                                                           "tag": {"identifier": "outer_loop"},
+                                                           "body": [{"variables": [{"is_mutable": false,
+                                                                                    "identifier": {"identifier": "y"}}],
+                                                                     "value": {"integer": "1",
+                                                                               "decimal": null,
+                                                                               "exponent": null,
+                                                                               "is_imaginary": false},
+                                                                     "type_annotation": null,
+                                                                     "if_null": null},
+                                                                    {"variables": [{"is_mutable": false,
+                                                                                    "identifier": {"identifier": "z"}}],
+                                                                     "value": {"integer": "2",
+                                                                               "decimal": null,
+                                                                               "exponent": null,
+                                                                               "is_imaginary": false},
+                                                                     "type_annotation": null,
+                                                                     "if_null": null}]},
+                                                          {"identifiers": [{"is_mutable": false,
+                                                                            "identifier": {"identifier": "x"}},
+                                                                           {"is_mutable": false,
+                                                                            "identifier": {"identifier": "y"}},
+                                                                           {"is_mutable": false,
+                                                                            "identifier": {"identifier": "z"}}],
+                                                           "iterable": {"lhs": {"lhs": {"parts": [{"identifier": "some_value",
+                                                                                                   "generic": []}]},
+                                                                                "op": {"separator": {"tok": {"token_metadata": ".",
+                                                                                                             "token_type": <TokenType.TkDot: ".">}},
+                                                                                       "identifier": {"identifier": "iter",
+                                                                                                      "generic": []}}},
+                                                                        "op": {"arguments": []}},
+                                                           "tag": null,
+                                                           "body": [{"variables": [{"is_mutable": false,
+                                                                                    "identifier": {"identifier": "a"}}],
+                                                                     "value": {"integer": "1",
+                                                                               "decimal": null,
+                                                                               "exponent": null,
+                                                                               "is_imaginary": false},
+                                                                     "type_annotation": null,
+                                                                     "if_null": null},
+                                                                    {"variables": [{"is_mutable": false,
+                                                                                    "identifier": {"identifier": "b"}}],
+                                                                     "value": {"integer": "2",
+                                                                               "decimal": null,
+                                                                               "exponent": null,
+                                                                               "is_imaginary": false},
+                                                                     "type_annotation": null,
+                                                                     "if_null": null}]},
+                                                          {"value": {"parts": [{"identifier": "x",
+                                                                                "generic": []}]},
+                                                           "cases": [{"pattern": [{"integer": "1",
+                                                                                   "decimal": null,
+                                                                                   "exponent": null,
+                                                                                   "is_imaginary": false}],
+                                                                      "guard": null,
+                                                                      "body": [{"variables": [{"is_mutable": false,
+                                                                                               "identifier": {"identifier": "a"}}],
+                                                                                "value": {"integer": "1",
+                                                                                          "decimal": null,
+                                                                                          "exponent": null,
+                                                                                          "is_imaginary": false},
+                                                                                "type_annotation": null,
+                                                                                "if_null": null},
+                                                                               {"variables": [{"is_mutable": false,
+                                                                                               "identifier": {"identifier": "b"}}],
+                                                                                "value": {"integer": "2",
+                                                                                          "decimal": null,
+                                                                                          "exponent": null,
+                                                                                          "is_imaginary": false},
+                                                                                "type_annotation": null,
+                                                                                "if_null": null}]},
+                                                                     {"pattern": [{"integer": "2",
+                                                                                   "decimal": null,
+                                                                                   "exponent": null,
+                                                                                   "is_imaginary": false}],
+                                                                      "guard": null,
+                                                                      "body": [{"variables": [{"is_mutable": false,
+                                                                                               "identifier": {"identifier": "a"}}],
+                                                                                "value": {"integer": "1",
+                                                                                          "decimal": null,
+                                                                                          "exponent": null,
+                                                                                          "is_imaginary": false},
+                                                                                "type_annotation": null,
+                                                                                "if_null": null},
+                                                                               {"variables": [{"is_mutable": false,
+                                                                                               "identifier": {"identifier": "b"}}],
+                                                                                "value": {"integer": "2",
+                                                                                          "decimal": null,
+                                                                                          "exponent": null,
+                                                                                          "is_imaginary": false},
+                                                                                "type_annotation": null,
+                                                                                "if_null": null}]},
+                                                                     {"pattern": [{}],
+                                                                      "guard": null,
+                                                                      "body": [{"variables": [{"is_mutable": false,
+                                                                                               "identifier": {"identifier": "a"}}],
+                                                                                "value": {"integer": "1",
+                                                                                          "decimal": null,
+                                                                                          "exponent": null,
+                                                                                          "is_imaginary": false},
+                                                                                "type_annotation": null,
+                                                                                "if_null": null},
+                                                                               {"variables": [{"is_mutable": false,
+                                                                                               "identifier": {"identifier": "b"}}],
+                                                                                "value": {"integer": "2",
+                                                                                          "decimal": null,
+                                                                                          "exponent": null,
+                                                                                          "is_imaginary": false},
+                                                                                "type_annotation": null,
+                                                                                "if_null": null}]}]}]}},
+                                 {"decorators": [],
+                                  "access_modifier": {"modifier": {"tok": {"token_metadata": "priv",
+                                                                           "token_type": <TokenType.KwPriv: "priv">}}},
+                                  "is_async": false,
+                                  "id_generator": true,
+                                  "identifier": {"identifier": "test_2"},
+                                  "generic_parameters": [{"identifier": {"identifier": "T"},
+                                                          "constraints": null,
+                                                          "default": null,
+                                                          "is_variadic": false}],
+                                  "parameters": [{"is_mutable": false,
+                                                  "identifier": {"identifier": "a"},
+                                                  "calling_convention": null,
+                                                  "type_annotation": {"parts": [{"identifier": "T",
+                                                                                 "generic": []}]},
+                                                  "default_value": null,
+                                                  "is_variadic": false}],
+                                  "return_type": {"parts": [{"identifier": "std",
+                                                             "generic": []},
+                                                            {"identifier": "void",
+                                                             "generic": []}]},
+                                  "where_block": null,
+                                  "value_guard": null,
+                                  "body": {"statements": [{"variables": [{"is_mutable": false,
+                                                                          "identifier": {"identifier": "x"}}],
+                                                           "value": {"lhs": {"parts": [{"identifier": "some_func",
+                                                                                        "generic": [{"identifier": null,
+                                                                                                     "value": {"parts": [{"identifier": "T",
+                                                                                                                          "generic": []}]}}]}]},
+                                                                     "op": {"arguments": [{"identifier": null,
+                                                                                           "value": {"parts": [{"identifier": "a",
+                                                                                                                "generic": []}]},
+                                                                                           "calling_convention": null,
+                                                                                           "unpack": false}]}},
+                                                           "type_annotation": null,
+                                                           "if_null": null},
+                                                          {"value": {"integer": "5",
+                                                                     "decimal": null,
+                                                                     "exponent": null,
+                                                                     "is_imaginary": false}}]}}]}}}

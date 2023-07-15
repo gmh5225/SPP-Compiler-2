@@ -21,7 +21,7 @@ class CodeGen:
         llvm_function_type = ll.FunctionType(llvm_function_return_type, llvm_function_parameter_types, is_variadic)
 
         llvm_function = ll.Function(self.module, llvm_function_type, name=ast.identifier)
-        llvm_function.linkage = self._generate_llvm_linkage(ast.modifier)
+        llvm_function.linkage = self._generate_llvm_linkage(ast.access_modifier)
 
         llvm_basic_block_entry = llvm_function.append_basic_block(name="entry")
         llvm_builder = ll.IRBuilder()

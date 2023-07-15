@@ -11,15 +11,18 @@ class ProgramAst:
 
 @dataclass
 class TokenAst:
-    primary: Token
-    modifier: Optional[Token]
+    tok: Token
+
+@dataclass
+class ParameterPassingConventionReferenceAst:
+    mutable: bool
 
 @dataclass
 class AccessModifierAst:
     modifier: TokenAst
 
 def AccessModifierPrivateAst() -> AccessModifierAst:
-    return AccessModifierAst(TokenAst(Token("priv", TokenType.KwPriv), None))
+    return AccessModifierAst(TokenAst(Token("priv", TokenType.KwPriv)))
 
 @dataclass
 class IdentifierAst:
@@ -83,20 +86,20 @@ class ModuleImplementationAst:
 
 @dataclass
 class ModulePrototypeAst:
-    modifier: Optional[AccessModifierAst]
+    access_modifier: Optional[AccessModifierAst]
     identifier: ModuleIdentifierAst
     body: ModuleImplementationAst
 
 @dataclass
 class ClassInstanceAttributeAst:
-    modifier: Optional[AccessModifierAst]
+    access_modifier: Optional[AccessModifierAst]
     mutable: bool
     identifier: IdentifierAst
     type_annotation: TypeAst
 
 @dataclass
 class ClassStaticAttributeAst:
-    modifier: Optional[AccessModifierAst]
+    access_modifier: Optional[AccessModifierAst]
     mutable: bool
     identifier: IdentifierAst
     value: ExpressionAst
@@ -108,7 +111,7 @@ class ClassImplementationAst:
 @dataclass
 class ClassPrototypeAst:
     decorators: list[DecoratorAst]
-    modifier: Optional[AccessModifierAst]
+    access_modifier: Optional[AccessModifierAst]
     identifier: IdentifierAst
     generic_parameters: list[TypeGenericParameterAst]
     metaclass: Optional[TypeAst]
@@ -118,8 +121,8 @@ class ClassPrototypeAst:
 @dataclass
 class FunctionPrototypeAst:
     decorators: list[DecoratorAst]
-    modifier: Optional[AccessModifierAst]
-    is_async: bool
+    access_modifier: Optional[AccessModifierAst]
+    id_generator: bool
     identifier: IdentifierAst
     generic_parameters: list[TypeGenericParameterAst]
     parameters: list[FunctionParameterAst]
@@ -132,7 +135,7 @@ class FunctionPrototypeAst:
 class FunctionArgumentAst:
     identifier: Optional[IdentifierAst]
     value: ExpressionAst
-    calling_convention: Optional[TokenAst]
+    calling_convention: Optional[ParameterPassingConventionReferenceAst]
     unpack: bool
 
 def FunctionArgumentNamedAst(identifier: IdentifierAst, convention: Optional[TokenAst], value: ExpressionAst):
@@ -145,7 +148,7 @@ def FunctionArgumentNormalAst(convention: Optional[TokenAst], value: ExpressionA
 class FunctionParameterAst:
     is_mutable: bool
     identifier: IdentifierAst
-    calling_convention: Optional[TokenAst]
+    calling_convention: Optional[ParameterPassingConventionReferenceAst]
     type_annotation: TypeAst
     default_value: Optional[ExpressionAst]
     is_variadic: bool
@@ -176,7 +179,7 @@ class EnumImplementationAst:
 
 @dataclass
 class EnumPrototypeAst:
-    modifier: Optional[AccessModifierAst]
+    access_modifier: Optional[AccessModifierAst]
     identifier: IdentifierAst
     generic_parameters: list[TypeGenericParameterAst]
     where_block: Optional[WhereBlockAst]
@@ -238,12 +241,11 @@ class LambdaParameterAst:
 @dataclass
 class LambdaCaptureItemAst:
     identifier: Optional[IdentifierAst]
-    calling_convention: Optional[TokenAst]
+    calling_convention: Optional[ParameterPassingConventionReferenceAst]
     capture: IdentifierAst
 
 @dataclass
 class LambdaAst:
-    is_async: bool
     captures: list[LambdaCaptureItemAst]
     parameters: list[LambdaParameterAst]
     expression: ExpressionAst
@@ -398,7 +400,7 @@ class SupMethodPrototypeAst(FunctionPrototypeAst):
 
 @dataclass
 class SupTypedefAst(TypedefStatementAst):
-    modifier: Optional[AccessModifierAst]
+    access_modifier: Optional[AccessModifierAst]
 
 @dataclass
 class MetaImplementationAst(ClassImplementationAst):

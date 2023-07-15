@@ -34,7 +34,9 @@ class SymbolName(Generic[T]):
         return self._symbol_name
 
     def __repr__(self):
-        return f"{'::'.join([p.identifier for p in self._module_name.parts])}::{self._symbol_name}"
+        mod = f"{'::'.join([p.identifier for p in self._module_name.parts])}::"
+        var = f"{self._symbol_name.identifier if self._symbol_name else ''}"
+        return f"{mod}{var}" if mod != "::" else f"{var}"
 
     def __hash__(self):
         return hash(self.__repr__())
@@ -211,7 +213,7 @@ class ScopeManager:
         return self._current_scope
 
     @property
-    def global_scope(self) -> Scope:
+    def global_scope(self) -> GlobalScope:
         return self._global_scope
 
     def json(self):
@@ -245,7 +247,7 @@ class SymbolTableBuilder:
     def _build_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeManager) -> None:
         # Define the function as an object in the current scope, as it needs to be accessible from whatever scope it
         # was defined in.
-        s.define_symbol(Symbol(SymbolName(ast.identifier), SymbolType(Utils.extract_function_type(ast))))
+        s.define_symbol(Symbol(SymbolName(ast.identifier, s.global_scope.module_name), SymbolType(Utils.extract_function_type(ast))))
 
         # Enter a new scope for the function, and build the symbols for the parameters. Register the type parameters,
         # which can be different per function call. However, their tue type is irrelevant at this point, as this stage
@@ -317,8 +319,8 @@ class SymbolTableBuilder:
     def _build_for_statement(ast: Ast.ForStatementAst, s: ScopeManager) -> None:
         s.enter_scope()
         s.define_tag(Symbol(SymbolName(ast.tag), None))
-        iterable_type = iter([None] * 20) # TODO : iter(TypeInference.infer_type(ast.iterable, s)[0].types)
-        for identifier in ast.identifiers: s.define_symbol(Symbol(SymbolName(identifier), next(iterable_type)))
+        iterable_type = iter([None] * 20) # TODO : iter(lambda: TypeInference.infer_type(ast.iterable, s)[0].types)
+        for identifier in ast.identifiers: s.define_symbol(Symbol(SymbolName(identifier.identifier), next(iterable_type)))
         for statement in ast.body: SymbolTableBuilder._build_statement(statement, s)
         s.exit_scope()
 
@@ -346,7 +348,7 @@ class SymbolTableBuilder:
     @staticmethod
     def _build_with_statement(ast: Ast.WithStatementAst, s: ScopeManager) -> None:
         s.enter_scope()
-        if ast.alias: s.define_symbol(Symbol(SymbolName(ast.alias), SymbolType(TypeInference.infer_type(ast.value, s))))
+        if ast.alias: s.define_symbol(Symbol(SymbolName(ast.alias), SymbolType(lambda: TypeInference.infer_type(ast.value, s))))
         for statement in ast.body: SymbolTableBuilder._build_statement(statement, s)
         s.exit_scope()
 
@@ -356,13 +358,13 @@ class SymbolTableBuilder:
 
     @staticmethod
     def _build_let_statement(ast: Ast.LetStatementAst, s: ScopeManager) -> None:
-        if len(ast.variables) > 1: assert ast.type_annotation or type(TypeInference.infer_type(ast.value, s)) == Ast.TypeTupleAst
+        if len(ast.variables) > 1: assert ast.type_annotation or type(lambda: TypeInference.infer_type(ast.value, s)) == Ast.TypeTupleAst
         if ast.type_annotation:
-            for variable in ast.variables: s.define_symbol(Symbol(SymbolName(variable), SymbolType(ast.type_annotation)))
+            for variable in ast.variables: s.define_symbol(Symbol(SymbolName(variable.identifier), SymbolType(ast.type_annotation)))
         else:
-            type_annotation = iter(TypeInference.infer_type(ast.value, s))
+            type_annotation = iter(lambda: TypeInference.infer_type(ast.value, s))
             for variable in ast.variables:
-                s.define_symbol(Symbol(SymbolName(variable), SymbolType(next(type_annotation))))
+                s.define_symbol(Symbol(SymbolName(variable.identifier), SymbolType(next(type_annotation))))
 
     @staticmethod
     def _build_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeManager) -> None:
@@ -372,14 +374,14 @@ class SymbolTableBuilder:
             if type(attr) == Ast.ClassInstanceAttributeAst:
                 s.define_symbol(Symbol(SymbolName(attr.identifier), SymbolType(attr.type_annotation)))
             else:
-                s.define_symbol(Symbol(SymbolName(attr.identifier), TypeInference.infer_type(attr.value, s)))
+                s.define_symbol(Symbol(SymbolName(attr.identifier), lambda: TypeInference.infer_type(attr.value, s)))
 
     @staticmethod
     def _build_enum_prototype(ast: Ast.EnumPrototypeAst, s: ScopeManager) -> None:
         s.define_type(Symbol(SymbolName(ast.identifier), SymbolType(ast)))
         s.enter_scope()
         for attr in ast.body.members:
-            s.define_symbol(Symbol(SymbolName(attr.identifier), TypeInference.infer_type(attr.value, s)))
+            s.define_symbol(Symbol(SymbolName(attr.identifier), lambda: TypeInference.infer_type(attr.value, s)))
         s.exit_scope()
 
     @staticmethod
@@ -393,8 +395,8 @@ class SymbolTableBuilder:
     @staticmethod
     def _build_sup_member(ast: Ast.SupMemberAst, s: ScopeManager) -> None:
         match ast:
-            case Ast.SupMethodPrototypeAst: raise NotImplementedError(f"Sup method {ast} not implemented")
-            case Ast.SupTypedefAst: raise NotImplementedError(f"Sup typedef {ast} not implemented")
+            case Ast.SupMethodPrototypeAst(): raise NotImplementedError(f"Sup method {ast} not implemented")
+            case Ast.SupTypedefAst(): raise NotImplementedError(f"Sup typedef {ast} not implemented")
             case _: raise NotImplementedError(f"Sup member {ast} not implemented")
 
 
