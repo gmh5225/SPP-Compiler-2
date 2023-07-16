@@ -1,5 +1,6 @@
 from src.SyntacticAnalysis.Parser import Parser
-from inflection import camelize, underscore, titleize
+from src.LexicalAnalysis.Tokens import TokenType
+from inflection import camelize, underscore
 from inspect import getsource
 
 
@@ -9,7 +10,7 @@ class Intellij:
         parse_functions = filter(lambda pair: pair[0].startswith("_parse"), Parser.__dict__.items())
         parse_functions = dict(parse_functions)
 
-        blacklist_functions = ["_parse_token", "_parse_lexeme", "_parse_binary_expression", "_parse_binary_expression_rhs", "_parse_character"]
+        blacklist_functions = ["_parse_token", "_parse_lexeme", "_parse_binary_expression", "_parse_binary_expression_rhs", "_parse_character", "_parse_eof"]
         out = ""
 
         for function_name, code in parse_functions.items():

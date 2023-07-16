@@ -7,7 +7,7 @@
 - The `cls` keyword is used to define a class.
 
 ## Overview of a class prototype
-- Access modifier -> `pub`, `prot`, `priv`, determines where the class can be accessed from
+- Access modifiers are applied as decorators to the class
 - Classes can have [decorators](#decorators), that wrap the function in extra behaviour
 - Classes can have [generic parameters & constraints](./6%20-%20generics%20&%20constraints.md)
 - Classes have an implementation

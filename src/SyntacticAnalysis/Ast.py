@@ -18,13 +18,6 @@ class ParameterPassingConventionReferenceAst:
     mutable: bool
 
 @dataclass
-class AccessModifierAst:
-    modifier: TokenAst
-
-def AccessModifierPrivateAst() -> AccessModifierAst:
-    return AccessModifierAst(TokenAst(Token("priv", TokenType.KwPriv)))
-
-@dataclass
 class IdentifierAst:
     identifier: str
 
@@ -86,20 +79,17 @@ class ModuleImplementationAst:
 
 @dataclass
 class ModulePrototypeAst:
-    access_modifier: Optional[AccessModifierAst]
     identifier: ModuleIdentifierAst
     body: ModuleImplementationAst
 
 @dataclass
 class ClassInstanceAttributeAst:
-    access_modifier: Optional[AccessModifierAst]
     mutable: bool
     identifier: IdentifierAst
     type_annotation: TypeAst
 
 @dataclass
 class ClassStaticAttributeAst:
-    access_modifier: Optional[AccessModifierAst]
     mutable: bool
     identifier: IdentifierAst
     value: ExpressionAst
@@ -111,7 +101,6 @@ class ClassImplementationAst:
 @dataclass
 class ClassPrototypeAst:
     decorators: list[DecoratorAst]
-    access_modifier: Optional[AccessModifierAst]
     identifier: IdentifierAst
     generic_parameters: list[TypeGenericParameterAst]
     metaclass: Optional[TypeAst]
@@ -121,7 +110,6 @@ class ClassPrototypeAst:
 @dataclass
 class FunctionPrototypeAst:
     decorators: list[DecoratorAst]
-    access_modifier: Optional[AccessModifierAst]
     id_generator: bool
     identifier: IdentifierAst
     generic_parameters: list[TypeGenericParameterAst]
@@ -179,7 +167,6 @@ class EnumImplementationAst:
 
 @dataclass
 class EnumPrototypeAst:
-    access_modifier: Optional[AccessModifierAst]
     identifier: IdentifierAst
     generic_parameters: list[TypeGenericParameterAst]
     where_block: Optional[WhereBlockAst]
@@ -400,7 +387,7 @@ class SupMethodPrototypeAst(FunctionPrototypeAst):
 
 @dataclass
 class SupTypedefAst(TypedefStatementAst):
-    access_modifier: Optional[AccessModifierAst]
+    ...
 
 @dataclass
 class MetaImplementationAst(ClassImplementationAst):
