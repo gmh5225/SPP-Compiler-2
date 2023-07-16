@@ -12,10 +12,10 @@
 - Classes can have [generic parameters & constraints](./6%20-%20generics%20&%20constraints.md)
 - Classes have an implementation
 
-### Access modifier
-- `pub`: exported out the module, any module can import it
-- `prot`: exported out the module, only sibling and child modules can import it
-- `priv`: not exported out the module, only the module it is defined in can use it
+### Access modifier (TODO - names might change)
+- `@meta::public`: exported out the module, any module can import it
+- `@meta::protected`: exported out the module, only sibling and child modules can import it
+- `@meta::private`: not exported out the module, only the module it is defined in can use it
 
 ### Decorators
 - Additional behaviour after a class has been created
@@ -37,23 +37,21 @@
 - Static attributes
 
 ### Attributes
-- Defined by an access modifier, an identifier and a type
+- Defined by an identifier and a type
 - Attributes are defined with a type (no value), and must be initialized in the struct initializer
 - Attributes can be accessed by name, and can be given in any order to the struct initializer
 - Attributes, from inside the class, must be accessed with `self` or whatever the instance parameter is
+- They are always private, but publci accessors can be defined to access them
 
 ### Static attributes
-- Define in the same way as an [attribute](#attributes), but with a value, not a type (inferred)
-- Static attributes must be accessed by the class name, even from inside the class
+- Not supported in S++.
 
 Example
 ```s++
 cls Foo {
-    pub a: std::Num;
-    pub b: std::Num;
-    pub c: std::Num;
-    
-    pub x = 2; # static
+    a: std::Num;
+    b: std::Num;
+    c: std::Num;
 }
 ```
 
@@ -71,12 +69,12 @@ cls Foo {
 
 ```s++
 sup Foo {
-    pub fn foo() -> Void {}
-    pub fn bar() -> Void {}
+    @meta::public fn foo() -> Void {}
+    @meta::public fn bar() -> Void {}
 }
 
 sup Foo {
-    pub fn baz() -> Void {}
+    @meta::public fn baz() -> Void {}
 }
 ```
 
@@ -86,13 +84,13 @@ sup Foo {
 
 ```s++
 sup Foo<T> {
-    pub fn foo() -> Void {}
-    pub fn bar() -> Void {}
-    pub fn baz() -> Void {}
+    @meta::public fn foo() -> Void {}
+    @meta::public fn bar() -> Void {}
+    @meta::public fn baz() -> Void {}
 }
 
 sup Foo<T: std::Default> {
-    pub fn def() -> Void {}
+    @meta::public fn def() -> Void {}
 }
 ```
 
@@ -103,17 +101,17 @@ sup Foo<T: std::Default> {
 
 #### Override methods from the super-class
 - Required to give explicit control over which methods can be overridden
-- Methods must be decorated with `@std::virtual` in the super-class to allow a sub-class to override
+- Methods must be decorated with `@meta::virtual` in the super-class to allow a sub-class to override
 
 ```s++
 sup Bar {
-    @std::virtual pub fn foo(self: &Self) -> Void {}
-    @std::virtual pub fn bar(self: &Self) -> Void {}
+    @meta::virtual @meta::public fn foo(self: &Self) -> Void {}
+    @meta::virtual @meta::public fn bar(self: &Self) -> Void {}
 }
 
 sup Bar for Foo {
-    pub fn foo(self: &Self) -> Void {...}
-    pub fn bar(self: &Self) -> Void {...}
+    @meta::public fn foo(self: &Self) -> Void {...}
+    @meta::public fn bar(self: &Self) -> Void {...}
 }
 ```
 
@@ -126,15 +124,15 @@ sup Bar for Foo {
 
 ```s++
 sup Bar<T> {
-    @std::virtual pub fn foo(self: &Self) -> Void {}
-    @std::virtual pub fn bar(self: &Self) -> Void {}
-    @std::virtual pub fn baz(self: &Self) -> Void {}
+    @meta::virtual @meta::public fn foo(self: &Self) -> Void {}
+    @meta::virtual @meta::public fn bar(self: &Self) -> Void {}
+    @meta::virtual @meta::public fn baz(self: &Self) -> Void {}
 }
 
 sup Bar<T: std::Copy> for Foo {
-    pub fn foo(self: &Self) -> Void {...}
-    pub fn bar(self: &Self) -> Void {...}
-    pub fn baz(self: &Self) -> Void {...}
+    @meta::public fn foo(self: &Self) -> Void {...}
+    @meta::public fn bar(self: &Self) -> Void {...}
+    @meta::public fn baz(self: &Self) -> Void {...}
 }
 ```
 
@@ -213,18 +211,18 @@ let foo = Foo::new(1, 2, 3);
 - This metaclass enforces a number of rules to ensure that explicit control is given regarding overriding methods
 
 #### Virtual classes
-- For a class to be inheritable, it must have 1+ methods decorated with `@std::virtual_method`
+- For a class to be inheritable, it must have 1+ methods decorated with `@meta::virtual_method`
 - A class with 1 or more virtual methods means that the class is virtual
-- Common to implement the `std::ops::DTor` class and decorate the `__del__` method as `@std::virtual`
+- Common to implement the `std::ops::DTor` class and decorate the `__del__` method as `@meta::virtual`
 - Virtual methods can, but do not have to be, implemented in the super-class
 
 #### Abstract classes
-- For a class to be abstract, it must have 1+ methods decorated with `@std::abstract_method`
+- For a class to be abstract, it must have 1+ methods decorated with `@meta::abstract_method`
 - Abstract classes cannot be instantiated
 - Abstract methods must be implemented in the super-class
 - Abstract classes can contain non-absract methods as well as abstract methods
 
 #### Static methods
-- For a method to be static, it must be decorated with `@std::static_method`
+- For a method to be static, it must be decorated with `@meta::static_method`
 - Static methods can be called without an instance of the class
 - Static methods cannot be called with an instance of the class -- use `type::` instead of `self.`

@@ -1,6 +1,5 @@
 # Functions
 ## Overview of functions
-- Functions can have an access modifier
 - Functions can have a calling convention - `async` or nothing
 - Functions can have [decorators](), that wrap the function in extra behaviour
 - Functions can have [generic parameters & constraints]()
@@ -12,14 +11,14 @@
 
 ### Access modifier
 #### Free function
-- `pub`: exported out the module, any module can import it
-- `prot`: exported out the module, only sibling and child modules can import it
-- `priv`: not exported out the module, only the module it is defined in can use it
+- `@meta::public`: exported out the module, any module can import it
+- `@meta::protected`: exported out the module, only sibling and child modules can import it
+- `@meta::private`: not exported out the module, only the module it is defined in can use it
 
 #### Class method
-- `pub`: exported out the class, any class' methods and free functions can use it
-- `prot`: only the class it is defined in can use it, and any sub-classes can use it
-- `priv`: only the class it is defined in can use it
+- `@meta::public`: exported out the class, any class' methods and free functions can use it
+- `@meta::protected`: only the class it is defined in can use it, and any sub-classes can use it
+- `@meta::private`: only the class it is defined in can use it
 
 ### Calling convention
 - Currently either nothing is specified, or `async`
@@ -123,10 +122,12 @@ fn foo<T, U>(a: T, b: U) -> std::Num if a > b {}
   reserved
 
 ```s++
-pub fun add(a: std::Number, b: std::Number, c: std::Number, d: std::Number = 0) -> std::Number:
+@meta::public
+fun add(a: std::Number, b: std::Number, c: std::Number, d: std::Number = 0) -> std::Number:
     return a + b + c;
     
-pub fun main():
+@meta::public
+fun main():
     let a = add(1, 2, _);
     std::io::println(a(3)); # 6
     
@@ -151,14 +152,16 @@ It can be called in the following ways:
 - Changes `my_method` to `decorator1(&my_method, 123)`
 - Add functionality before and after the function is called
 ```s++
-pub fun decorator1<F: std::FunRef>(func: &F, a: std::Number) -> F::RetType:
+@meta::public
+fun decorator1<F: std::FunRef>(func: &F, a: std::Number) -> F::RetType:
     std::io::println("decorator1 called - before function");
     let val = func();
     std::io::println("decorator1 called - after function");
     return val + a;
 
-@decorator1(123)
-pub fun my_method(a: std::Number) -> std::Number:
+@decorator1(123),
+@meta::public
+fun my_method(a: std::Number) -> std::Number:
     return a + 1;
 ```
 
@@ -166,20 +169,23 @@ pub fun my_method(a: std::Number) -> std::Number:
 - Changes `my_method` to `decorator1(decorator2(&my_method, 456), 123)`
 - Add functionality before and after the function is called
 ```s++
-pub fun decorator1<F: std::FunRef>(func: &F, a: std::Number) -> F::return_type:
+@meta::public
+fun decorator1<F: std::FunRef>(func: &F, a: std::Number) -> F::return_type:
     std::io::println("decorator1 called - before function");
     let val = func();
     std::io::println("decorator1 called - after function");
     return val + a;
 
-pub fun decorator2<F: std::FunRef>(func: &F, a: std::Number) -> F::return_type:
+@meta::public
+fun decorator2<F: std::FunRef>(func: &F, a: std::Number) -> F::return_type:
     std::io::println("decorator2 called - before function");
     let val = func();
     std::io::println("decorator2 called - after function");
     return val + a;
 
-@decorator1(123), @decorator2(456)
-pub fun my_method(self: &self_t, a: std::Number) -> std::Number:
+@decorator1(123), @decorator2(456),
+@meta::public
+fun my_method(self: &self_t, a: std::Number) -> std::Number:
     return a + 1;
 ```
 
@@ -188,14 +194,16 @@ pub fun my_method(self: &self_t, a: std::Number) -> std::Number:
 - Accept an already created class, and add functionality after the class is created
 - For a normal class, the decorator will return the instance of the class it received
 ```s++
-pub fun decorator1<T>(class: T, a: std::Number) -> T:
+@meta::public
+fun decorator1<T>(class: T, a: std::Number) -> T:
     class.attr = a;
     std::io::println("decorator1 called");
     return class;
     
 @decorator1(123)
-pub cls Foo:
-    pub attr: std::Number;
+@meta::public
+cls Foo:
+    attr: std::Number;
 ```
 
 ## Other information
