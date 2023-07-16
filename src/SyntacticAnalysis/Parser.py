@@ -816,16 +816,8 @@ class Parser:
 
     def _parse_decorators(self) -> BoundParser:
         def inner():
-            p1 = self._parse_decorator().parse_once()
-            p2 = self._parse_decorator_next().parse_zero_or_more()
-            return [p1, *p2]
-        return BoundParser(self, inner)
-
-    def _parse_decorator_next(self):
-        def inner():
-            p3 = self._parse_token(TokenType.TkComma).parse_once()
-            p4 = self._parse_decorator().parse_once()
-            return p4
+            p1 = self._parse_decorator().parse_zero_or_more()
+            return p1
         return BoundParser(self, inner)
 
     def _parse_decorator_identifier(self) -> BoundParser:
