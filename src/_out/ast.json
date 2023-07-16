@@ -1,4 +1,5 @@
-{"module": {"identifier": {"parts": [{"identifier": "a"}, {"identifier": "b"}]},
+{"module": {"decorators": [],
+            "identifier": {"parts": [{"identifier": "a"}, {"identifier": "b"}]},
             "body": {"imports": null,
                      "members": [{"decorators": [{"identifier": {"parts": [{"identifier": "decor1",
                                                                             "generic": []}]},

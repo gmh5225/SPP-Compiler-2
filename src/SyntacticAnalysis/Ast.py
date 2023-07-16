@@ -79,20 +79,16 @@ class ModuleImplementationAst:
 
 @dataclass
 class ModulePrototypeAst:
+    decorators: list[DecoratorAst]
     identifier: ModuleIdentifierAst
     body: ModuleImplementationAst
 
 @dataclass
-class ClassInstanceAttributeAst:
+class ClassAttributeAst:
+    decorators: list[DecoratorAst]
     mutable: bool
     identifier: IdentifierAst
     type_annotation: TypeAst
-
-@dataclass
-class ClassStaticAttributeAst:
-    mutable: bool
-    identifier: IdentifierAst
-    value: ExpressionAst
 
 @dataclass
 class ClassImplementationAst:
@@ -387,7 +383,7 @@ class SupMethodPrototypeAst(FunctionPrototypeAst):
 
 @dataclass
 class SupTypedefAst(TypedefStatementAst):
-    ...
+    decorators: list[DecoratorAst]
 
 @dataclass
 class MetaImplementationAst(ClassImplementationAst):
@@ -493,5 +489,4 @@ PrimaryExpressionAst = LiteralAst | IdentifierAst | ParenthesizedExpressionAst |
 ExpressionAst = UnaryExpressionAst | BinaryExpressionAst | PostfixExpressionAst | AssignmentExpressionAst | PrimaryExpressionAst
 StatementAst = IfStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst | MatchStatementAst | WithStatementAst | ReturnStatementAst | YieldStatementAst | TypedefStatementAst | LetStatementAst | ExpressionAst
 ModuleMemberAst = EnumPrototypeAst | ClassPrototypeAst | FunctionPrototypeAst | SupPrototypeNormalAst | SupPrototypeInheritanceAst
-ClassAttributeAst = ClassInstanceAttributeAst | ClassStaticAttributeAst
 SupMemberAst = SupMethodPrototypeAst | SupTypedefAst

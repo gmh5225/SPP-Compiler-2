@@ -371,7 +371,7 @@ class SymbolTableBuilder:
         s.define_type(Symbol(SymbolName(ast.identifier), SymbolType(ast)))
         s.enter_scope()
         for attr in ast.body.members:
-            if type(attr) == Ast.ClassInstanceAttributeAst:
+            if type(attr) == Ast.ClassAttributeAst:
                 s.define_symbol(Symbol(SymbolName(attr.identifier), SymbolType(attr.type_annotation)))
             else:
                 s.define_symbol(Symbol(SymbolName(attr.identifier), lambda: TypeInference.infer_type(attr.value, s)))

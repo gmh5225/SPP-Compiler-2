@@ -240,11 +240,12 @@ class Parser:
 
     def _parse_module_prototype(self) -> BoundParser:
         def inner():
+            p1 = self._parse_decorators().parse_optional() or []
             p2 = self._parse_token(TokenType.KwMod).parse_once()
             p3 = self._parse_module_identifier().parse_once()
             p4 = self._parse_token(TokenType.TkSemicolon).parse_once()
             p5 = self._parse_module_implementation().parse_once()
-            return Ast.ModulePrototypeAst(p3, p5)
+            return Ast.ModulePrototypeAst(p1, p3, p5)
         return BoundParser(self, inner)
 
     def _parse_module_implementation(self) -> BoundParser:
@@ -395,30 +396,19 @@ class Parser:
 
     def _parse_class_member(self) -> BoundParser:
         def inner():
-            p1 = self._parse_class_attribute().delay_parse()
-            p2 = self._parse_class_attribute_static().delay_parse()
-            p3 = (p1 | p2).parse_once()
-            return p3
+            p1 = self._parse_class_attribute().parse_once()
+            return p1
         return BoundParser(self, inner)
 
     def _parse_class_attribute(self) -> BoundParser:
         def inner():
+            p1 = self._parse_decorators().parse_optional() or []
             p2 = self._parse_token(TokenType.KwMut).parse_optional()
             p3 = self._parse_class_attribute_identifier().parse_once()
             p4 = self._parse_token(TokenType.TkColon).parse_once()
             p5 = self._parse_type_identifier().parse_once()
             p6 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return Ast.ClassInstanceAttributeAst(p2, p3, p5)
-        return BoundParser(self, inner)
-
-    def _parse_class_attribute_static(self) -> BoundParser:
-        def inner():
-            p2 = self._parse_token(TokenType.KwMut).parse_optional()
-            p3 = self._parse_class_attribute_static_identifier().parse_once()
-            p4 = self._parse_token(TokenType.TkEqual).parse_once()
-            p5 = self._parse_non_assignment_expression().parse_once()
-            p6 = self._parse_token(TokenType.TkSemicolon).parse_once()
-            return Ast.ClassStaticAttributeAst(p2, p3, p5)
+            return Ast.ClassAttributeAst(p1, p2, p3, p5)
         return BoundParser(self, inner)
 
     def _parse_class_attribute_identifier(self) -> BoundParser:
@@ -496,8 +486,9 @@ class Parser:
 
     def _parse_sup_typedef(self) -> BoundParser:
         def inner():
+            p1 = self._parse_decorators().parse_optional() or []
             p2 = self._parse_statement_typedef().parse_once()
-            return Ast.SupTypedefAst(p2.new_type, p2.old_type)
+            return Ast.SupTypedefAst(p1, p2.new_type, p2.old_type)
         return BoundParser(self, inner)
 
     def _parse_sup_method_prototype(self) -> BoundParser:
