@@ -662,7 +662,7 @@ class Parser:
         def inner():
             p1 = self._parse_function_required_parameters().delay_parse()
             p2 = self._parse_function_optional_parameters().delay_parse()
-            p3 = self._parse_function_variadic_parameter().delay_parse()
+            p3 = self._parse_function_variadic_parameters().delay_parse()
             p4 = (p3 | p2 | p1).parse_once()
             return p4
         return BoundParser(self, inner)
@@ -670,7 +670,7 @@ class Parser:
     def _parse_function_parameters_optional_then_variadic(self) -> BoundParser:
         def inner():
             p1 = self._parse_function_optional_parameters().delay_parse()
-            p2 = self._parse_function_variadic_parameter().delay_parse()
+            p2 = self._parse_function_variadic_parameters().delay_parse()
             p3 = (p2 | p1).parse_once()
             return p3
         return BoundParser(self, inner)
@@ -701,6 +701,12 @@ class Parser:
             p1 = self._parse_token(TokenType.TkComma).parse_once()
             p2 = self._parse_function_parameters_optional_then_variadic().parse_once()
             return p2
+        return BoundParser(self, inner)
+
+    def _parse_function_variadic_parameters(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_function_variadic_parameter().parse_once()
+            return [p1]
         return BoundParser(self, inner)
 
     def _parse_function_required_parameter(self) -> BoundParser:
