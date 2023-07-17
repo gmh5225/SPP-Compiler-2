@@ -1149,7 +1149,7 @@ class Parser:
     def _parse_tuple_type_identifiers(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkLeftParenthesis).parse_once()
-            p2 = self._parse_type_identifiers().parse_once()
+            p2 = self._parse_type_identifiers().parse_optional() or []
             p3 = self._parse_token(TokenType.TkRightParenthesis).parse_once()
             return Ast.TypeTupleAst(p2)
         return BoundParser(self, inner)
