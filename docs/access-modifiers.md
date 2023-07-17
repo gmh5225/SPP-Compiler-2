@@ -24,8 +24,8 @@
 - `@meta::public`:
   - `path`: the root of modules that this is public to -- by default, it is public to all modules.
 - `@meta::protected`:
-  - `enforce`: whether to enforce the protected access modifier (debugging)
+  - `enforce`: whether to enforce the protected access modifier (debugging) -- compiler warnings will be generated for accessing protected members
   - `friends`: a list of friends that can access protected the member
 - `@meta::private`:
-  - `enforce`: whether to enforce the private access modifier (debugging)
+  - `enforce`: whether to enforce the private access modifier (debugging) -- compiler warnings will be generated for accessing private members
   - `friends`: a list of friends that can access private the member
