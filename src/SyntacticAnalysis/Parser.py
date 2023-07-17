@@ -983,7 +983,7 @@ class Parser:
             p2 = self._parse_literal().delay_parse()
             p3 = self._parse_lambda().delay_parse()
             p4 = self._parse_single_type_identifier().delay_parse()
-            # p5 = self._parse_parenthesized_expression().delay_parse()
+            p5 = self._parse_operator_identifier_variadic().delay_parse()
             p6 = self._parse_expression_placeholder().delay_parse()
             p7 = self._parse_statement_if().delay_parse()
             p8 = self._parse_statement_match().delay_parse()
@@ -991,7 +991,7 @@ class Parser:
             p10 = self._parse_statement_for().delay_parse()
             p11 = self._parse_statement_do().delay_parse()
             p12 = self._parse_statement_new_scope().delay_parse()
-            p13 = (p7 | p8 | p9 | p10 | p11 | p12 | p4 | p3 | p1 | p2 | p6).parse_once()
+            p13 = (p7 | p8 | p9 | p10 | p11 | p12 | p4 | p3 | p1 | p2 | p5 | p6).parse_once()
             return p13
         return BoundParser(self, inner)
 

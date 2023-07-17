@@ -9,17 +9,6 @@
 - Functions can have a [value guard]()
 - Functions have a body
 
-### Access modifier
-#### Free function
-- `@meta::public`: exported out the module, any module can import it
-- `@meta::protected`: exported out the module, only sibling and child modules can import it
-- `@meta::private`: not exported out the module, only the module it is defined in can use it
-
-#### Class method
-- `@meta::public`: exported out the class, any class' methods and free functions can use it
-- `@meta::protected`: only the class it is defined in can use it, and any sub-classes can use it
-- `@meta::private`: only the class it is defined in can use it
-
 ### Calling convention
 - Currently either nothing is specified, or `async`
 - Functions marked `async` must return a `std::Promise<T>` type

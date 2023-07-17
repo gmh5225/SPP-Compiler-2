@@ -12,11 +12,6 @@
 - Classes can have [generic parameters & constraints](./6%20-%20generics%20&%20constraints.md)
 - Classes have an implementation
 
-### Access modifier (TODO - names might change)
-- `@meta::public`: exported out the module, any module can import it
-- `@meta::protected`: exported out the module, only sibling and child modules can import it
-- `@meta::private`: not exported out the module, only the module it is defined in can use it
-
 ### Decorators
 - Additional behaviour after a class has been created
 - See [decorating a class](./7%20-%20functions.md#defining-a-decorator-for-a-class)
