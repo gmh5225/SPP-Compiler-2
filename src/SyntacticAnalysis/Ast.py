@@ -188,11 +188,6 @@ class DecoratorAst:
     arguments: list[FunctionArgumentAst]
 
 @dataclass
-class UnaryExpressionAst:
-    op: TokenAst
-    rhs: ExpressionAst
-
-@dataclass
 class BinaryExpressionAst:
     lhs: ExpressionAst
     op: TokenAst
@@ -486,7 +481,7 @@ NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiter
 LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | ListLiteralAst | MapLiteralAst | SetLiteralAst | MapEntryAst | RegexLiteralAst | TupleLiteralAst
 TypeAst = TypeSingleAst | TypeTupleAst
 PrimaryExpressionAst = LiteralAst | IdentifierAst | ParenthesizedExpressionAst | LambdaAst | PlaceholderAst | TypeSingleAst | IfStatementAst | MatchStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst
-ExpressionAst = UnaryExpressionAst | BinaryExpressionAst | PostfixExpressionAst | AssignmentExpressionAst | PrimaryExpressionAst
+ExpressionAst = BinaryExpressionAst | PostfixExpressionAst | AssignmentExpressionAst | PrimaryExpressionAst
 StatementAst = IfStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst | MatchStatementAst | WithStatementAst | ReturnStatementAst | YieldStatementAst | TypedefStatementAst | LetStatementAst | ExpressionAst
 ModuleMemberAst = EnumPrototypeAst | ClassPrototypeAst | FunctionPrototypeAst | SupPrototypeNormalAst | SupPrototypeInheritanceAst
 SupMemberAst = SupMethodPrototypeAst | SupTypedefAst
