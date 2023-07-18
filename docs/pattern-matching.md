@@ -1,112 +1,89 @@
-# Note: Pattern Matching not fully implemented in Compiler yet
+# Unified condition expression [Not fully compiler-implemented]
 
-# Pattern Matching
-### Iterable sequence matching
-#### Vector (iterator returns values)
+## Comparison types
+### Different comparisons
+#### Member access
 ```s++
-let command = std::Vec::new("add", 5, 10);
-let result = match command {
-    "add", x, y => {std::ok(x + y);}
-    "sub", x, y => {std::ok(x - y);}
-    "mul", x, y => {std::ok(x * y);}
-    "div", x, y => {std::ok(x / y);}
-    _ => {std::err("Invalid operation");}
-}.map(std::Num::to_string)?;
-```
-
-#### Map (iterator returns pairs)
-```s++
-let result = match data {
-    ("1", "a"), ("2", var) => {...}
-    ("3", var), ("4", "d") => {...}
-    _ => {ret "Invalid data";}
+match x {
+    .is_empty() => { std::io::println("empty"); }
+    .contains("a") => { std::io::println("contains a"); }
+    _ => { std::io::println("other"); }
 }
 ```
 
-### Iterable matching with variable grouping
+#### Bindings
 ```s++
-let result = match command {
-    ["add", ...args] => {std::ops::Add::__add__(...args)...;}
-    ["sub", ...args] => {std::ops::Sub::__sub__(...args)...;}
-    ["mul", ...args] => {std::ops::Mul::__mul__(...args)...;}
-    ["div", ...args] => {std::ops::Div::__div__(...args)...;}
-}.to_string();
+match x {
+    Point { x: 0, y: 0 } => { std::io::println("origin"); }
+    Point { x: 0, y } => { std::io::println("x-axis {}", y); }
+    Point { x, y: 0 } => { std::io::println("y-axis {}", x); }
+    Point { x, y } => { std::io::println("({}, {})", x, y); }
+};
 ```
-
-### Wildcard case
 ```s++
-let result = match command {
-    ["c1", ...rest] => {...}
-    ["c2", ...rest] => {...}
-    ["c3", ...rest] => {...}
-    _ => {"Invalid command".to_string();}
+match x {
+    (0, 0) => { std::io::println("origin"); }
+    (0, y) => { std::io::println("x-axis {}", y); }
+    (x, 0) => { std::io::println("y-axis {}", x); }
+    (x, y) => { std::io::println("({}, {})", x, y); }
+};
+```
+- This tuple works because it is the literal that maps to the `std::Tup` type.
+
+#### Skip multiple values
+```s++
+match x {
+    Point { x: 0, y: 0 } => { std::io::println("origin"); }
+    Point { x: 0, ... } => { std::io::println("x-axis {}", x); }
+    Point { y: 0, ... } => { std::io::println("y-axis {}", y); }
+    Point { x, y, ... } => { std::io::println("({}, {})", x, y); }
+```
+```s++
+let x = (0, 0, "pos_1");
+match x {
+    (0, 0, ...meta_data) => { std::io::println("origin"); }
+    (0, y, ...meta_data) => { std::io::println("x-axis {}", y); }
+    (x, 0, ...meta_data) => { std::io::println("y-axis {}", x); }
+    (x, y, ...meta_data) => { std::io::println("({}, {})", x, y); }
+};
+```
+- The `...` can be used to skip multiple values in a tuple.
+- The items in the `...` can be bound to by using something like `...other` => will be a tuple.
+- Cannot bind to the `...` extra members in an initialization match pattern.
+
+#### Combining patterns
+```s++
+match x {
+    1 | 2 => { std::io::println("one or two"); }
+    _ => { std::io::println("other"); }
 };
 ```
 
-### Or pattern composition
+#### Range matching
 ```s++
-let result = match command {
-    ["add", x, y] | ["sub", x, y] => {"Additive";}
-    ["mul", x, y] | ["div", x, y] => {"Multiplicative";}
-    _ => {"Invalid operation";}
-};
-```
-- The binding must be the same in each case (same name and type required)
-
-### Subpattern matching
-```s++
-let result = match command {
-    ["go", ("north" | "south" | "east" | "west")] => {...}
-    ["go", direction] => {"Invalid direction";}
-```
-
-### Subpattern matching with variable binding
-```s++
-let result = match command {
-    ["go", ("north" | "south" | "east" | "west") as direction] => {...}
-    ["go", direction] => {"Invalid direction";}
-```
-
-### Value guards
-```s++
-let result = match command {
-    ["go", direction] if ["north", "south", "east", "west"].contains(direction) => {...}
-    ["go", direction] => {"Invalid direction";}
-    _ => {"Invalid command";}
+match x {
+    1..5 => { std::io::println("one to five"); }
+    _ => { std::io::println("other"); }
 };
 ```
 
-### Attribute matching
+#### Value guards
 ```s++
-let result = match point {
-    Point {x: 100, y, z} if z < 0 {...}
-    Point {x, y, _} if z < 0 {...}
-    _ => {...}
+match x {
+    x if x > 0 => { std::io::println("one or two"); }
+    _ => { std::io::println("other"); }
 };
 ```
 
-### Enum matching
+### Composing multiple patterns
+- All patterns have a precedence, and can be combined into advanced patterns.
+- Example
+
 ```s++
-let result = match direction {
-    Direction::North => {...}
-    Direction::South => {...}
-    Direction::East => {...}
-    Direction::West => {...}
+let x = (1, 2, 3);
+match x {
+    (1 | 2, 3 | 4, 5 | 6) => { std::io::println("one or two, three or four, five or six"); }
+    (..., 8 | 9) => { std::io::println("last element is eight or nine"); }
+    _ => { std::io::println("other"); }
 };
 ```
-- Default case is not required if the enum cases are exhaustive
-
-
-### Range based matching
-```s++
-let result = match number {
-    ..0 => {...}
-    00..10 => {...}
-    10..20 => {...}
-    20..30 => {...}
-    _ => {...}
-};
-```
-}
-```
-
