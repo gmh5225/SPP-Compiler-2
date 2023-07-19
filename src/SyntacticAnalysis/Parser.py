@@ -203,14 +203,10 @@ class MultiBoundParser(BoundParser):
 class Parser:
     _tokens: list[Token]
     _current: int
-    _indent: int
-    _dedents_expected: int
 
     def __init__(self, tokens: list[Token]):
         self._tokens = tokens
         self._current = 0
-        self._indent = 0
-        self._dedents_expected = 0
 
     def parse(self) -> Ast.ProgramAst:
         try:
@@ -1882,9 +1878,6 @@ class Parser:
 
     def _parse_token(self, token: TokenType) -> BoundParser:
         def inner():
-            if self._dedents_expected > 0:
-                raise ParseSyntaxError("Expected a dedent")
-
             if token != TokenType.TkNewLine: self._skip(TokenType.TkNewLine)
             if token != TokenType.TkWhitespace: self._skip(TokenType.TkWhitespace)
 
