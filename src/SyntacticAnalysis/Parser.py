@@ -1098,9 +1098,15 @@ class Parser:
     def _parse_type_raw_identifier(self) -> BoundParser:
         def inner():
             p1 = self._parse_generic_identifier().delay_parse()
-            p2 = self._parse_numeric_integer().delay_parse()
+            p2 = self._parse_type_integer_identifier().delay_parse()
             p3 = (p1 | p2).parse_once()
             return p3
+        return BoundParser(self, inner)
+
+    def _parse_type_integer_identifier(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_numeric_integer().parse_once()
+            return Ast.GenericIdentifierAst(p1, [])
         return BoundParser(self, inner)
 
     def _parse_type_identifier(self) -> BoundParser:
