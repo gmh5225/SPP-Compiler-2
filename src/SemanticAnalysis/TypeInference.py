@@ -152,7 +152,7 @@ class TypeInference:
 
     @staticmethod
     def _infer_type_from_type_single(ast: Ast.TypeSingleAst, s) -> Ast.TypeAst:
-        raise Exception("Type singles should not be present in the AST at this stage")
+        return ast
 
     @staticmethod
     def _infer_type_from_if_statement(ast: Ast.IfStatementAst, s) -> Ast.TypeAst:
