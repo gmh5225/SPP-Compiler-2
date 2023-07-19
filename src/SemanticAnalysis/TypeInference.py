@@ -2,6 +2,7 @@ from __future__ import annotations
 from src.SyntacticAnalysis import Ast
 from src.LexicalAnalysis.Tokens import TokenType
 
+
 BINARY_FUNC_MAP = {
     # Mathematical operations
     TokenType.TkAdd: "std::ops::Add::__add__",
@@ -46,7 +47,7 @@ BINARY_FUNC_MAP = {
 class TypeInference:
     @staticmethod
     def infer_type(*args) -> Ast.TypeAst:
-        return [Ast.TypeSingleAst([Ast.GenericIdentifierAst("", [])])] * 20
+        return TypeInference._infer_type_from_expression(*args)
 
     @staticmethod
     def _infer_type_from_expression(ast: Ast.ExpressionAst, s) -> Ast.TypeAst:
@@ -68,4 +69,37 @@ class TypeInference:
         # function signatures in the scope, so we need to find the one that matches the LHS and RHS types and any
         # generic constraints.
 
+    @staticmethod
+    def _infer_type_from_postfix_expression(ast: Ast.PostfixExpressionAst, s) -> Ast.TypeAst:
+        match ast.op:
+            case Ast.PostfixFunctionCallAst(): return TypeInference._infer_type_from_function_call(ast, s)
+            case Ast.PostfixMemberAccessAst(): return TypeInference._infer_type_from_member_access(ast, s)
+            case Ast.PostfixStructInitializerAst(): return TypeInference._infer_type_from_struct_initializer(ast, s)
+            case _: raise NotImplementedError(f"Type inference for {type(ast)} is not implemented")
 
+    @staticmethod
+    def _infer_type_from_function_call(ast: Ast.PostfixExpressionAst, s) -> Ast.TypeAst:
+        # Set of operations to perform:
+        #   - Find all functions that match the identifier.
+        #   - Filter by the number of arguments (allowing for optional and variadics).
+        #   - Fill in the generic type identifiers, explicit and implicit.
+        #   - For each parameter, check if every "constraint" it met -- for parameters with 1 type, this just means check that this type is implemented on the actual argument type.
+        #   - If there are multiple functions that match, pick the most constrained ones.
+        #   - If there are still multiple functions that match, pick the first one (value guard are irrelevant as all have same return type).
+        ...
+
+    @staticmethod
+    def _infer_type_from_member_access(ast: Ast.PostfixExpressionAst, s) -> Ast.TypeAst:
+        # The type of an attribute is accessed by inspecting the attribute type of the class that the attribute belongs
+        # to. When this function is called, the struct may not have ben analysed yet, so to resolve this, this function
+        # is only called from a lambda (from the caller in the SymbolBuilder class). All lambda type-inference functions
+        # are called after the entire symbol table is built, so that all types are known.
+        lhs_type = TypeInference._infer_type_from_expression(ast.lhs, s)
+        stored_type = s.lookup_type(lhs_type)
+
+    @staticmethod
+    def _infer_type_from_struct_initializer(ast: Ast.PostfixExpressionAst, s) -> Ast.TypeAst:
+        # The type from a struct initializer is the type of the struct being initialized itself -- so for std::Num{},
+        # the type is std::Num. The LHS must be a type, but this check will happen later in the "type checking". This is
+        # because this stage is purely inferring what the type will be, not performing any checks.
+        return ast.lhs

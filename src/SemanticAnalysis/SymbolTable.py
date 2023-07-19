@@ -44,9 +44,17 @@ class SymbolName(Generic[T]):
 
 class SymbolType:
     _type: Ast.TypeAst
+    _deferred: bool = False
 
-    def __init__(self, type: Ast.TypeAst):
-        self._type = type
+    def __init__(self, type_: Ast.TypeAst):
+        self._type = type_
+
+    @staticmethod
+    def deferred(func: callable) -> SymbolType:
+        return SymbolType(func)
+
+    def load_deferred(self):
+        self._type = self._type()
 
     @property
     def type(self) -> Ast.TypeAst:
@@ -57,7 +65,7 @@ class SymbolType:
             case Ast.TypeSingleAst(): return f"{'::'.join([p.identifier for p in self._type.parts])}"
             case Ast.TypeTupleAst(): return f"({','.join([repr(p) for p in self._type.parts])})"
             case Ast.TypeGenericParameterAst(): return f"{self._type.identifier}"
-            case _: raise NotImplementedError(f"Type {type(self._type)} not implemented")
+            case _: raise NotImplementedError(f"Type {self._type} not implemented")
 
 
 class Symbol(Generic[T]):
@@ -230,6 +238,13 @@ class SymbolTableBuilder:
         # correct class anyway. Access modifiers are handled separately - this is just about verifying all the symbols
         # have been defined.
         for member in ast.module.body.members: SymbolTableBuilder._build_module_member(member, s)
+        SymbolTableBuilder._load_all_deferred_types(s)
+
+    @staticmethod
+    def _load_all_deferred_types(s: ScopeManager) -> None:
+        # Load all the deferred types. This is done after all the symbols have been defined, so that the types can be
+        # resolved correctly.
+        ...
 
     @staticmethod
     def _build_module_member(ast: Ast.ModuleMemberAst, s: ScopeManager) -> None:
@@ -348,7 +363,7 @@ class SymbolTableBuilder:
     @staticmethod
     def _build_with_statement(ast: Ast.WithStatementAst, s: ScopeManager) -> None:
         s.enter_scope()
-        if ast.alias: s.define_symbol(Symbol(SymbolName(ast.alias), SymbolType(lambda: TypeInference.infer_type(ast.value, s))))
+        if ast.alias: s.define_symbol(Symbol(SymbolName(ast.alias), SymbolType.deferred(lambda: TypeInference.infer_type(ast.value, s))))
         for statement in ast.body: SymbolTableBuilder._build_statement(statement, s)
         s.exit_scope()
 
@@ -362,26 +377,23 @@ class SymbolTableBuilder:
         if ast.type_annotation:
             for variable in ast.variables: s.define_symbol(Symbol(SymbolName(variable.identifier), SymbolType(ast.type_annotation)))
         else:
-            type_annotation = iter(lambda: TypeInference.infer_type(ast.value, s))
+            type_annotation = iter(TypeInference.infer_type(ast.value, s))
             for variable in ast.variables:
                 s.define_symbol(Symbol(SymbolName(variable.identifier), SymbolType(next(type_annotation))))
 
     @staticmethod
     def _build_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeManager) -> None:
-        s.define_type(Symbol(SymbolName(ast.identifier), SymbolType(ast)))
+        s.define_type(Symbol(SymbolName(ast.identifier), SymbolType(Utils.extract_class_type(ast))))
         s.enter_scope()
         for attr in ast.body.members:
-            if type(attr) == Ast.ClassAttributeAst:
-                s.define_symbol(Symbol(SymbolName(attr.identifier), SymbolType(attr.type_annotation)))
-            else:
-                s.define_symbol(Symbol(SymbolName(attr.identifier), lambda: TypeInference.infer_type(attr.value, s)))
+            s.define_symbol(Symbol(SymbolName(attr.identifier), SymbolType(attr.type_annotation)))
 
     @staticmethod
     def _build_enum_prototype(ast: Ast.EnumPrototypeAst, s: ScopeManager) -> None:
         s.define_type(Symbol(SymbolName(ast.identifier), SymbolType(ast)))
         s.enter_scope()
         for attr in ast.body.members:
-            s.define_symbol(Symbol(SymbolName(attr.identifier), lambda: TypeInference.infer_type(attr.value, s)))
+            s.define_symbol(Symbol(SymbolName(attr.identifier), SymbolType.deferred(lambda: TypeInference.infer_type(attr.value, s))))
         s.exit_scope()
 
     @staticmethod
@@ -406,3 +418,11 @@ class Utils:
         param_types = Ast.TypeTupleAst([param.type_annotation for param in ast.parameters])
         return_type = ast.return_type # if ast.return_type else Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", []), Ast.GenericIdentifierAst("None", [])])
         return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", []), Ast.GenericIdentifierAst("Fn", [return_type, param_types])])
+
+    @staticmethod
+    def extract_class_type(ast: Ast.ClassPrototypeAst) -> Ast.TypeAst:
+        t = Ast.TypeSingleAst([Ast.GenericIdentifierAst(ast.identifier.identifier, [Utils.generic_parameter_to_argument(p) for p in ast.generic_parameters])])
+
+    @staticmethod
+    def generic_parameter_to_argument(ast: Ast.TypeGenericParameterAst) -> Ast.TypeGenericArgumentAst:
+        return Ast.TypeGenericArgumentAst(ast.identifier, None)  # todo

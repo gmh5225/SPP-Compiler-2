@@ -20,5 +20,5 @@ class Compiler:
         d = dataclasses.asdict(self._ast)
         save_json(d, "_out/ast.json")
 
-        # Semantic(self._ast)
+        Semantic(self._ast)
 
