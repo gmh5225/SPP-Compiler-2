@@ -2,6 +2,9 @@ from __future__ import annotations
 from src.SyntacticAnalysis import Ast
 from src.LexicalAnalysis.Tokens import TokenType
 
+class SemanticUnknownSymbolError(Exception):
+    pass
+
 
 BINARY_FUNC_MAP = {
     # Mathematical operations
@@ -119,6 +122,7 @@ class TypeInference:
     def _infer_type_from_primary_expression(ast: Ast.PrimaryExpressionAst, s) -> Ast.TypeAst:
         match ast:
             case Ast.IdentifierAst(): return TypeInference._infer_type_from_identifier(ast, s)
+            case Ast.GenericIdentifierAst(): return TypeInference._infer_type_from_generic_identifier(ast, s)
             case Ast.LambdaAst(): return TypeInference._infer_type_from_lambda(ast, s)
             case Ast.PlaceholderAst(): return TypeInference._infer_type_from_placeholder(ast, s)
             case Ast.TypeSingleAst(): return TypeInference._infer_type_from_type_single(ast, s)
@@ -145,8 +149,17 @@ class TypeInference:
     def _infer_type_from_identifier(ast: Ast.IdentifierAst, s) -> Ast.TypeAst:
         # The type of an identifier is the type of the variable that it refers to. This is stored in the symbol table
         # under the variable's name.
-        from SymbolTable import SymbolName
-        return s.lookup_symbol(SymbolName(ast.identifier)).type
+        from .SymbolTable import SymbolName
+        try:
+            s.lookup_symbol(SymbolName(ast)).type
+        except AttributeError:
+            raise SemanticUnknownSymbolError(f"Unknown symbol {ast.identifier}")
+
+    @staticmethod
+    def _infer_type_from_generic_identifier(ast: Ast.GenericIdentifierAst, s) -> Ast.TypeAst:
+        identified_type = TypeInference._infer_type_from_identifier(Ast.IdentifierAst(ast.identifier), s)
+        # todo => send in generics
+        return identified_type
 
     @staticmethod
     def _infer_type_from_lambda(ast: Ast.LambdaAst, s) -> Ast.TypeAst:

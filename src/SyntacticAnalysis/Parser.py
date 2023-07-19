@@ -12,6 +12,12 @@ class ParseSyntaxError(Exception):
 class ParseSyntaxMultiError(Exception):
     ...
 
+class ParseNegativeLookaheadError(Exception):
+    ...
+
+class ParsePositiveLookaheadError(Exception):
+    ...
+
 class ParserError(Exception):
     ...
 
@@ -155,6 +161,24 @@ class BoundParser(Generic[T]):
             raise ParseSyntaxError("Expected at least one result")
         return results
 
+    def parse_negative_lookahead(self) -> None:
+        restore_index = self._parser.current
+        try:
+            result = self.parse_once()
+            raise ParseNegativeLookaheadError("Expected no result")
+        except (ParseSyntaxError, ParseSyntaxMultiError):
+            self._parser.current = restore_index
+            return
+
+    def parse_positive_lookahead(self) -> None:
+        restore_index = self._parser.current
+        try:
+            result = self.parse_once()
+            self._parser.current = restore_index
+            return
+        except (ParseSyntaxError, ParseSyntaxMultiError):
+            raise ParsePositiveLookaheadError("Expected a result")
+
     def delay_parse(self) -> BoundParser:
         self._delayed = True
         return self
@@ -212,13 +236,17 @@ class Parser:
         try:
             program = self._parse_program().parse_once()
             return program
-        except ParseSyntaxError as e:
-            # error = ""
-            # for err in ERRS:
-            #     if err.find("^ <-") > error.find("^ <-"):
-            #         error = err
-            # raise ParseSyntaxError(error)
-            raise ParseSyntaxError("\n".join(ERRS))
+        except ParseSyntaxError as e: # todo : experimenal
+            furthest_along_error = None
+            furthest_along_error_pos = -1
+            for error in ERRS:
+                where = error.find("^ <- ")
+                if where > furthest_along_error_pos:
+                    furthest_along_error_pos = where
+                    furthest_along_error = error
+
+            raise ParseSyntaxError(furthest_along_error) from None
+            # raise ParseSyntaxError("\n".join(ERRS))
 
 
     def _parse_program(self) -> BoundParser:
@@ -946,10 +974,11 @@ class Parser:
 
     def _parse_primary_expression(self) -> BoundParser:
         def inner():
+            p0 = self._parse_primary_generic_identifier_for_func_call().delay_parse()
             p1 = self._parse_identifier().delay_parse()
             p2 = self._parse_literal().delay_parse()
             p3 = self._parse_lambda().delay_parse()
-            p4 = self._parse_single_type_identifier().delay_parse()
+            p4 = self._parse_primary_type_identifier().delay_parse()  # can only come before a {}
             p5 = self._parse_operator_identifier_variadic().delay_parse()
             p6 = self._parse_expression_placeholder().delay_parse()
             p7 = self._parse_statement_if().delay_parse()
@@ -958,8 +987,22 @@ class Parser:
             p10 = self._parse_statement_for().delay_parse()
             p11 = self._parse_statement_do().delay_parse()
             p12 = self._parse_statement_new_scope().delay_parse()
-            p13 = (p7 | p8 | p9 | p10 | p11 | p12 | p4 | p3 | p1 | p2 | p5 | p6).parse_once()
+            p13 = (p7 | p8 | p9 | p10 | p11 | p12 | p4 | p0 | p3 | p1 | p2 | p5 | p6).parse_once()
             return p13
+        return BoundParser(self, inner)
+
+    def _parse_primary_generic_identifier_for_func_call(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_generic_identifier().parse_once()
+            p2 = self._parse_postfix_operator_function_call().parse_once()
+            return Ast.PostfixExpressionAst(p1, p2)
+        return BoundParser(self, inner)
+
+    def _parse_primary_type_identifier(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_single_type_identifier().parse_once()
+            p2 = self._parse_postfix_operator_struct_initializer().parse_once()
+            return Ast.PostfixExpressionAst(p1, p2)
         return BoundParser(self, inner)
 
     def _parse_binary_expression(self, __lhs, __op, __rhs) -> BoundParser:
@@ -1753,18 +1796,19 @@ class Parser:
 
     def _parse_operator_identifier_member_access(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.TkDynaRes).parse_once()
-            return p1
+            p1 = self._parse_token(TokenType.TkDynaRes).delay_parse()
+            p2 = self._parse_token(TokenType.TkStatRes).delay_parse()
+            p3 = (p1 | p2).parse_once()
+            return p3
         return BoundParser(self, inner)
 
     def _parse_operator_identifier_postfix(self) -> BoundParser:
         def inner():
             p1 = self._parse_postfix_operator_function_call().delay_parse()
             p2 = self._parse_postfix_operator_member_access().delay_parse()
-            # p3 = self._parse_postfix_operator_index_access().delay_parse()
-            p5 = self._parse_postfix_operator_struct_initializer().delay_parse()
+            # p5 = self._parse_postfix_operator_struct_initializer().delay_parse()
             p7 = self._parse_token(TokenType.TkQst).delay_parse()
-            p8 = (p1 | p2| p5 | p7).parse_once()
+            p8 = (p1 | p2 | p7).parse_once()
             return p8
         return BoundParser(self, inner)
 
