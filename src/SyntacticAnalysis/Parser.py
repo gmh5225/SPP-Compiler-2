@@ -226,6 +226,12 @@ class Parser:
 
 
     def _parse_program(self) -> BoundParser:
+        """
+        A Program consists of an Ast.ModulePrototype, followed by the EOF. The contents of the module, it its
+        implementation, is contained by the Ast.ModulePrototype. The EOF at the end ensures that there is no left-over
+        invalid code.
+        :return: The Ast.ProgramAst that is the root of the program.
+        """
         def inner():
             p1 = self._parse_module_prototype().parse_once()
             p2 = self._parse_eof().parse_once()
@@ -373,19 +379,11 @@ class Parser:
             p3 = self._parse_token(TokenType.KwCls).parse_once()
             p4 = self._parse_class_identifier().parse_once()
             p5 = self._parse_type_generic_parameters().parse_optional() or []
-            p6 = self._parse_classes_metaclass().parse_optional()
             p7 = self._parse_where_block().parse_optional()
             p8 = self._parse_token(TokenType.TkBraceL).parse_once()
             p9 = self._parse_class_implementation().parse_once()
             p10 = self._parse_token(TokenType.TkBraceR).parse_once()
-            return Ast.ClassPrototypeAst(p1, p4, p5, p6, p7, p9)
-        return BoundParser(self, inner)
-
-    def _parse_classes_metaclass(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.KwWith).parse_once()
-            p2 = self._parse_type_identifier().parse_once()
-            return p2
+            return Ast.ClassPrototypeAst(p1, p4, p5, p7, p9)
         return BoundParser(self, inner)
 
     def _parse_class_implementation(self) -> BoundParser:

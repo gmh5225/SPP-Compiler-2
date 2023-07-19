@@ -99,7 +99,6 @@ class ClassPrototypeAst:
     decorators: list[DecoratorAst]
     identifier: IdentifierAst
     generic_parameters: list[TypeGenericParameterAst]
-    metaclass: Optional[TypeAst]
     where_block: Optional[WhereBlockAst]
     body: ClassImplementationAst
 
@@ -379,17 +378,6 @@ class SupMethodPrototypeAst(FunctionPrototypeAst):
 @dataclass
 class SupTypedefAst(TypedefStatementAst):
     decorators: list[DecoratorAst]
-
-@dataclass
-class MetaImplementationAst(ClassImplementationAst):
-    pass
-
-@dataclass
-class MetaPrototypeAst:
-    identifier: IdentifierAst
-    generic_parameters: list[TypeGenericParameterAst]
-    where_block: Optional[WhereBlockAst]
-    body: MetaImplementationAst
 
 @dataclass
 class PostfixFunctionCallAst:

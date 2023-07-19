@@ -54,3 +54,4 @@ pub fn main() {
 - Note
   - There are no `yeild` statements, only a single return statement.
   - The `download_data` is a `gn`, because the `std::Fut[T]` has to be returned instantly.
+
