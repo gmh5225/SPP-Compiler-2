@@ -35,7 +35,10 @@ class SymbolName(Generic[T]):
 
     def __repr__(self):
         mod = f"{'::'.join([p.identifier for p in self._module_name.parts])}::"
-        var = f"{self._symbol_name.identifier if self._symbol_name else ''}"
+        if isinstance(self._symbol_name, Ast.TypeSingleAst):
+            var = f"{'::'.join([p.identifier for p in self._symbol_name.parts])}"
+        else:
+            var = f"{self._symbol_name.identifier if self._symbol_name else ''}"
         return f"{mod}{var}" if mod != "::" else f"{var}"
 
     def __hash__(self):
