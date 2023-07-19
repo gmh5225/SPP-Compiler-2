@@ -105,7 +105,7 @@ class ClassPrototypeAst:
 @dataclass
 class FunctionPrototypeAst:
     decorators: list[DecoratorAst]
-    id_generator: bool
+    is_coro: bool
     identifier: IdentifierAst
     generic_parameters: list[TypeGenericParameterAst]
     parameters: list[FunctionParameterAst]

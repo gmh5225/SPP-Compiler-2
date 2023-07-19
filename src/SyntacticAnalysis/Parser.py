@@ -488,7 +488,7 @@ class Parser:
     def _parse_sup_method_prototype(self) -> BoundParser:
         def inner():
             p1 = self._parse_function_prototype().parse_once()
-            return Ast.SupMethodPrototypeAst(p1.decorators, p1.identifier, p1.generic_parameters, p1.parameters, p1.return_type, p1.where_block, p1.value_guard, p1.body)
+            return Ast.SupMethodPrototypeAst(p1.decorators, p1.is_coro, p1.identifier, p1.generic_parameters, p1.parameters, p1.return_type, p1.where_block, p1.value_guard, p1.body)
         return BoundParser(self, inner)
 
     # Enums
