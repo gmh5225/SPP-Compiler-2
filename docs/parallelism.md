@@ -1,3 +1,0 @@
-# Parallelism
-## Threads & Mutexes
-## Channels
