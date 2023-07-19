@@ -95,6 +95,7 @@ class TokenType(Enum):
     # Don't change order of these (regex are matched in this order)
     # 0x12 must be HexDigits not DecDigits(0) then Identifier(x12)
     LxIdentifier = r"[_a-zA-Z][_a-zA-Z0-9]*"
+    # LxTypeIdentifier = r"[A-Z][_a-zA-Z0-9]*"
     LxBinDigits = r"0b[01]+"
     LxHexDigits = r"0x[0-9a-fA-F]+"
     LxDecDigits = r"[0-9]+"
