@@ -1061,32 +1061,38 @@ class Parser:
 
     # Type Identifiers
 
-    def _parse_type_self_prefix(self) -> BoundParser:
+    def _parse_type_raw_identifiers_self_prefixed(self) -> BoundParser:
+        """
+        <TypeRawIdentifiersSelfPrefixed> consist of a "::" joined list of <TypeRawIdentifiers>, after a "Self". This
+        mirrors the <TypeRawIdentifiers>, but with the check that the first identifier is "Self", not a
+        <GenericIdentifier>. Also, Self::0 is valid, so the "Self" check cant be an optional prefix check from the
+        parent rule.
+        :return: The raw identifiers making up the type, prefixed with "Self".
+        """
         def inner():
             p1 = self._parse_token(TokenType.KwSelf).parse_once()
-            p2 = self._parse_type_raw_identifiers_rest().parse_optional() or []
+            p2 = self._parse_type_raw_identifier_next().parse_zero_or_more()
             return Ast.TypeSingleAst([Ast.SelfTypeAst(), *p2])
         return BoundParser(self, inner)
 
-    def _parse_type_raw_identifiers_rest(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.TkStatRes).parse_once()
-            p2 = self._parse_type_raw_identifiers().parse_once()
-            return p2
-        return BoundParser(self, inner)
-
     def _parse_type_raw_identifiers(self) -> BoundParser:
+        """
+        <TypeRawIdentifiers> consist of a "::" joined list of <TypeRawIdentifiers>, after a <GenericIdentifier>. The
+        first identifier must be a <GenericIdentifier>, but because following parts could be numbers, for tuples, the
+        following parse rule has to be different, so that std::Class<T>::ValueType::1::2::X is a valid type.
+        :return: The raw identifiers making up the type.
+        """
         def inner():
             p1 = self._parse_generic_identifier().parse_once()
-            p2 = self._parse_type_raw_identifiers_next().parse_zero_or_more()
+            p2 = self._parse_type_raw_identifier_next().parse_zero_or_more()
             return [p1, *p2]
         return BoundParser(self, inner)
 
-    def _parse_type_raw_identifiers_next(self) -> BoundParser:
+    def _parse_type_raw_identifier_next(self) -> BoundParser:
         def inner():
-            p3 = self._parse_token(TokenType.TkStatRes).parse_once()
-            p4 = self._parse_type_raw_identifier().parse_once()
-            return p4
+            p1 = self._parse_token(TokenType.TkStatRes).parse_once()
+            p2 = self._parse_type_raw_identifier().parse_once()
+            return p2
         return BoundParser(self, inner)
 
     def _parse_type_raw_identifier(self) -> BoundParser:
@@ -1098,6 +1104,12 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_type_identifier(self) -> BoundParser:
+        """
+        A <TypeIdentifier> is either a <SingleTypeIdentifier> or a <TupleTypeIdentifier>. Type identifiers are
+        differentiated from regular variables, because type identifiers must start with a capital letter. This is
+        enforced from the lexing stage, where regex is used to determine what kind of identifier is being scanned.
+        :return: The type identifier -- either a single type, or a collection of other type identifiers.
+        """
         def inner():
             p1 = self._parse_single_type_identifier().delay_parse()
             p2 = self._parse_tuple_type_identifiers().delay_parse()
@@ -1106,8 +1118,14 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_single_type_identifier(self) -> BoundParser:
+        """
+        A <SingleTypeIdentifier> is either a <TypeSelfPrefix> or a <TypeRawIdentifiers>. Because "Self" is a keyword,
+        there needs to be a special parsing rule for types prefixed with "Self". The <TypeRawIdentifiers> rule gets a
+        "::" joined list of identifiers, which is then parsed into a <TypeSingleAst> node.
+        :return: The single type identifier, optionally prefixed with "Self".
+        """
         def inner():
-            p1 = self._parse_type_self_prefix().delay_parse()
+            p1 = self._parse_type_raw_identifiers_self_prefixed().delay_parse()
             p2 = self._parse_type_raw_identifiers().delay_parse()
             p3 = (p1 | p2).parse_once()
             return Ast.TypeSingleAst(p3)
