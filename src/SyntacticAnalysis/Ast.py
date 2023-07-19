@@ -203,10 +203,6 @@ class PostfixExpressionAst:
     op: PostfixOperationAst
 
 @dataclass
-class ParenthesizedExpressionAst:
-    expression: ExpressionAst
-
-@dataclass
 class PlaceholderAst:
     ...
 
@@ -430,23 +426,6 @@ class BoolLiteralAst:
     value: bool
 
 @dataclass
-class ListLiteralAst:
-    values: list[ExpressionAst]
-
-@dataclass
-class SetLiteralAst:
-    values: list[ExpressionAst]
-
-@dataclass
-class MapLiteralAst:
-    fields: list[MapEntryAst]
-
-@dataclass
-class MapEntryAst:
-    key: ExpressionAst
-    value: ExpressionAst
-
-@dataclass
 class RegexLiteralAst:
     value: str
 
@@ -462,9 +441,9 @@ class RangeLiteralAst:
 
 PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixStructInitializerAst | TokenAst
 NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiteralBase02Ast
-LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | ListLiteralAst | MapLiteralAst | SetLiteralAst | MapEntryAst | RegexLiteralAst | TupleLiteralAst
+LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | RegexLiteralAst | TupleLiteralAst
 TypeAst = TypeSingleAst | TypeTupleAst
-PrimaryExpressionAst = LiteralAst | IdentifierAst | ParenthesizedExpressionAst | LambdaAst | PlaceholderAst | TypeSingleAst | IfStatementAst | MatchStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst
+PrimaryExpressionAst = LiteralAst | IdentifierAst | LambdaAst | PlaceholderAst | TypeSingleAst | IfStatementAst | MatchStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst
 ExpressionAst = BinaryExpressionAst | PostfixExpressionAst | AssignmentExpressionAst | PrimaryExpressionAst
 StatementAst = IfStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst | MatchStatementAst | WithStatementAst | ReturnStatementAst | YieldStatementAst | TypedefStatementAst | LetStatementAst | ExpressionAst
 ModuleMemberAst = EnumPrototypeAst | ClassPrototypeAst | FunctionPrototypeAst | SupPrototypeNormalAst | SupPrototypeInheritanceAst

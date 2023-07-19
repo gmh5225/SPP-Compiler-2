@@ -52,10 +52,11 @@ class TypeInference:
     @staticmethod
     def _infer_type_from_expression(ast: Ast.ExpressionAst, s) -> Ast.TypeAst:
         match ast:
-            case Ast.BinaryExpressionAst: return TypeInference._infer_type_from_binary_expression(ast, s)
-            case Ast.PostfixExpressionAst: return TypeInference._infer_type_from_postfix_expression(ast, s)
-            case True if type(ast) in Ast.PrimaryExpressionAst.__args__: return TypeInference._infer_type_from_primary_expression(ast, s)
-            case _: raise NotImplementedError(f"Type inference for {type(ast)} is not implemented")
+            case Ast.BinaryExpressionAst(): return TypeInference._infer_type_from_binary_expression(ast, s)
+            case Ast.PostfixExpressionAst(): return TypeInference._infer_type_from_postfix_expression(ast, s)
+            case _:
+                if type(ast) in Ast.PrimaryExpressionAst.__args__: return TypeInference._infer_type_from_primary_expression(ast, s)
+                raise NotImplementedError(f"Type inference for {type(ast)} is not implemented")
 
     @staticmethod
     def _infer_type_from_binary_expression(ast: Ast.BinaryExpressionAst, s) -> Ast.TypeAst:
@@ -68,6 +69,10 @@ class TypeInference:
         # Locate the function in the scope, and get the return type of the function. There might be > 1 matching
         # function signatures in the scope, so we need to find the one that matches the LHS and RHS types and any
         # generic constraints.
+        from SymbolTable import SymbolName
+        method = SymbolName(Ast.IdentifierAst(method), None)
+        method = s.lookup_symbol(method)
+        return method.return_type
 
     @staticmethod
     def _infer_type_from_postfix_expression(ast: Ast.PostfixExpressionAst, s) -> Ast.TypeAst:
@@ -86,7 +91,7 @@ class TypeInference:
         #   - For each parameter, check if every "constraint" it met -- for parameters with 1 type, this just means check that this type is implemented on the actual argument type.
         #   - If there are multiple functions that match, pick the most constrained ones.
         #   - If there are still multiple functions that match, pick the first one (value guard are irrelevant as all have same return type).
-        ...
+        return Ast.TypeSingleAst([])
 
     @staticmethod
     def _infer_type_from_member_access(ast: Ast.PostfixExpressionAst, s) -> Ast.TypeAst:
@@ -103,3 +108,73 @@ class TypeInference:
         # the type is std::Num. The LHS must be a type, but this check will happen later in the "type checking". This is
         # because this stage is purely inferring what the type will be, not performing any checks.
         return ast.lhs
+
+    @staticmethod
+    def _infer_type_from_primary_expression(ast: Ast.PrimaryExpressionAst, s) -> Ast.TypeAst:
+        match ast:
+            case Ast.IdentifierAst(): return TypeInference._infer_type_from_identifier(ast, s)
+            case Ast.LambdaAst(): return TypeInference._infer_type_from_lambda(ast, s)
+            case Ast.PlaceholderAst(): return TypeInference._infer_type_from_placeholder(ast, s)
+            case Ast.TypeSingleAst(): return TypeInference._infer_type_from_type_single(ast, s)
+            case Ast.IfStatementAst(): return TypeInference._infer_type_from_if_statement(ast, s)
+            case Ast.MatchStatementAst(): return TypeInference._infer_type_from_match_statement(ast, s)
+            case Ast.WhileStatementAst() | Ast.ForStatementAst() | Ast.DoWhileStatementAst(): return TypeInference._infer_type_from_looping_statement(ast, s)
+            case _:
+                if type(ast) in Ast.LiteralAst.__args__: return TypeInference._infer_type_from_literal(ast, s)
+                raise NotImplementedError(f"Type inference for {type(ast)} is not implemented")
+
+    @staticmethod
+    def _infer_type_from_literal(ast: Ast.LiteralAst, s) -> Ast.TypeAst:
+        match ast:
+            case Ast.StringLiteralAst(): return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", []), Ast.GenericIdentifierAst("Str", [])])
+            case Ast.CharLiteralAst(): return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", []), Ast.GenericIdentifierAst("Char", [])])
+            case Ast.BoolLiteralAst(): return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", []), Ast.GenericIdentifierAst("Bool", [])])
+            case Ast.RegexLiteralAst(): return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", []), Ast.GenericIdentifierAst("Reg", [])])
+            case Ast.TupleLiteralAst(): return Ast.TypeTupleAst([TypeInference._infer_type_from_expression(e, s) for e in ast.values])
+            case _:
+                if type(ast) in Ast.NumberLiteralAst.__args__: return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", []), Ast.GenericIdentifierAst("Num", [])])
+                raise NotImplementedError(f"Type inference for {type(ast)} is not implemented")
+
+    @staticmethod
+    def _infer_type_from_identifier(ast: Ast.IdentifierAst, s) -> Ast.TypeAst:
+        # The type of an identifier is the type of the variable that it refers to. This is stored in the symbol table
+        # under the variable's name.
+        from SymbolTable import SymbolName
+        return s.lookup_symbol(SymbolName(ast.identifier)).type
+
+    @staticmethod
+    def _infer_type_from_lambda(ast: Ast.LambdaAst, s) -> Ast.TypeAst:
+        raise NotImplementedError(f"Type inference for {type(ast)} is not implemented")
+
+    @staticmethod
+    def _infer_type_from_placeholder(ast: Ast.PlaceholderAst, s) -> Ast.TypeAst:
+        raise Exception("Placeholders should not be present in the AST at this stage")
+
+    @staticmethod
+    def _infer_type_from_type_single(ast: Ast.TypeSingleAst, s) -> Ast.TypeAst:
+        raise Exception("Type singles should not be present in the AST at this stage")
+
+    @staticmethod
+    def _infer_type_from_if_statement(ast: Ast.IfStatementAst, s) -> Ast.TypeAst:
+        # The return type from an if statement is the return type of the final expression in the branches' statements
+        expression = ast.if_branch.body[-1]
+        return TypeInference._infer_type_from_expression(expression, s)
+
+    @staticmethod
+    def _infer_type_from_match_statement(ast: Ast.MatchStatementAst, s) -> Ast.TypeAst:
+        # The return type from a match statement is the return type of the final expression in the branches' statements
+        expression = ast.cases[0].body[-1]
+        return TypeInference._infer_type_from_expression(expression, s)
+
+    @staticmethod
+    def _infer_type_from_looping_statement(ast: Ast.WhileStatementAst | Ast.ForStatementAst | Ast.DoWhileStatementAst, s) -> Ast.TypeAst:
+        # The return type from a while statement is the return type of the break statement's expression
+        break_expressions = [statement for statement in ast.body if isinstance(statement, Ast.BreakStatementAst)]
+        if len(break_expressions) == 0:
+            raise Exception("While statement does not contain a break statement")
+        else:
+            expression = break_expressions[0].returning_expression
+            return TypeInference._infer_type_from_expression(expression, s)
+
+
+

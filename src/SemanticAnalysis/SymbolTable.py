@@ -65,6 +65,7 @@ class SymbolType:
             case Ast.TypeSingleAst(): return f"{'::'.join([p.identifier for p in self._type.parts])}"
             case Ast.TypeTupleAst(): return f"({','.join([repr(p) for p in self._type.parts])})"
             case Ast.TypeGenericParameterAst(): return f"{self._type.identifier}"
+            case None: return f"None [ERR]"
             case _: raise NotImplementedError(f"Type {self._type} not implemented")
 
 
@@ -377,7 +378,10 @@ class SymbolTableBuilder:
         if ast.type_annotation:
             for variable in ast.variables: s.define_symbol(Symbol(SymbolName(variable.identifier), SymbolType(ast.type_annotation)))
         else:
-            type_annotation = iter(TypeInference.infer_type(ast.value, s))
+            type_annotation = TypeInference.infer_type(ast.value, s)
+            if type(type_annotation) == Ast.TypeTupleAst: type_annotation = iter(type_annotation.types)
+            else: type_annotation = iter([type_annotation])
+
             for variable in ast.variables:
                 s.define_symbol(Symbol(SymbolName(variable.identifier), SymbolType(next(type_annotation))))
 
