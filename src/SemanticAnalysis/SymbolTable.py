@@ -104,6 +104,9 @@ class SymbolTable(Generic[T]):
     def lookup(self, name: SymbolName[T]) -> Optional[Symbol]:
         return self._symbols.get(name)
 
+    def lookup_multi(self, name: SymbolName[T]) -> list[Symbol]:
+        return [v for k, v in self._symbols.items() if k == name]
+
     def json(self):
         d = {}
         for k, v in self._symbols.items():
@@ -147,6 +150,14 @@ class Scope:
         if current_scope_only: return None
         if self._parent_scope is not None: return self._parent_scope.lookup_symbol(name)
         return None
+
+    def lookup_symbols(self, name: SymbolName) -> list[Symbol]:
+        symbols = []
+        scope = self
+        while scope is not None:
+            symbols.extend(scope._symbol_table.lookup_multi(name))
+            scope = scope._parent_scope
+        return symbols
 
     def lookup_type(self, name: SymbolName, current_scope_only=False) -> Optional[Symbol]:
         symbol = self._type_table.lookup(name)
@@ -207,6 +218,9 @@ class ScopeManager:
 
     def lookup_symbol(self, name: SymbolName, current_scope_only=False) -> Optional[Symbol]:
         return self._current_scope.lookup_symbol(name, current_scope_only)
+
+    def lookup_symbols(self, name: SymbolName) -> list[Symbol]:
+        return self._current_scope.lookup_symbols(name)
 
     def lookup_type(self, name: SymbolName, current_scope_only=False) -> Optional[Symbol]:
         return self._current_scope.lookup_type(name, current_scope_only)

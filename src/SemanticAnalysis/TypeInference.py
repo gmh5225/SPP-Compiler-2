@@ -91,6 +91,12 @@ class TypeInference:
         #   - For each parameter, check if every "constraint" it met -- for parameters with 1 type, this just means check that this type is implemented on the actual argument type.
         #   - If there are multiple functions that match, pick the most constrained ones.
         #   - If there are still multiple functions that match, pick the first one (value guard are irrelevant as all have same return type).
+        from .SymbolTable import SymbolName
+        function = TypeInference._infer_type_from_expression(ast.lhs, s)
+        matching_functions = s.lookup_symbols(SymbolName("::".join([p.identifier for p in function.parts])))
+        print(ast.lhs)
+        print("Found functions:", matching_functions)
+
         return Ast.TypeSingleAst([])
 
     @staticmethod
