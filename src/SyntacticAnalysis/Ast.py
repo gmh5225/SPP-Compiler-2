@@ -389,10 +389,6 @@ class PostfixMemberAccessAst:
     identifier: IdentifierAst | int
 
 @dataclass
-class PostfixIndexAccessAst:
-    index: ExpressionAst
-
-@dataclass
 class PostfixStructInitializerAst:
     fields: list[PostfixStructInitializerFieldAst]
 
@@ -464,7 +460,7 @@ class RangeLiteralAst:
     end: Optional[ExpressionAst]
 
 
-PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixIndexAccessAst | PostfixStructInitializerAst | TokenAst
+PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixStructInitializerAst | TokenAst
 NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiteralBase02Ast
 LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | ListLiteralAst | MapLiteralAst | SetLiteralAst | MapEntryAst | RegexLiteralAst | TupleLiteralAst
 TypeAst = TypeSingleAst | TypeTupleAst

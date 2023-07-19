@@ -1607,14 +1607,6 @@ class Parser:
             return Ast.PostfixMemberAccessAst(p1, p4)
         return BoundParser(self, inner)
 
-    def _parse_postfix_operator_index_access(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.TkBrackL).parse_once()
-            p2 = self._parse_non_assignment_expression().parse_once()
-            p3 = self._parse_token(TokenType.TkBrackR).parse_once()
-            return Ast.PostfixIndexAccessAst(p2)
-        return BoundParser(self, inner)
-
     def _parse_postfix_operator_struct_initializer(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkBraceL).parse_once()
