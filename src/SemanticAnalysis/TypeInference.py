@@ -108,8 +108,17 @@ class TypeInference:
         # to. When this function is called, the struct may not have ben analysed yet, so to resolve this, this function
         # is only called from a lambda (from the caller in the SymbolBuilder class). All lambda type-inference functions
         # are called after the entire symbol table is built, so that all types are known.
+        from .SymbolTable import SymbolName
         lhs_type = TypeInference._infer_type_from_expression(ast.lhs, s)
-        stored_type = s.lookup_type(lhs_type)
+        lhs_type = SymbolName(Ast.IdentifierAst(lhs_type.parts[-1].identifier))
+        t = s.lookup_type(lhs_type)._scope
+        stored_type_scope = [c for c in t._child_scopes if c._name == lhs_type][0]
+
+        rhs_identifier = ast.op.identifier
+        rhs_identifier = SymbolName(Ast.IdentifierAst(rhs_identifier.identifier))
+        rhs_identifier = s.lookup_symbol(rhs_identifier)
+        return rhs_identifier.type.type
+
 
     @staticmethod
     def _infer_type_from_struct_initializer(ast: Ast.PostfixExpressionAst, s) -> Ast.TypeAst:
@@ -151,7 +160,7 @@ class TypeInference:
         # under the variable's name.
         from .SymbolTable import SymbolName
         try:
-            s.lookup_symbol(SymbolName(ast)).type
+            return s.lookup_symbol(SymbolName(ast)).type.type
         except AttributeError:
             raise SemanticUnknownSymbolError(f"Unknown symbol {ast.identifier}")
 

@@ -25,6 +25,10 @@ class SymbolName(Generic[T]):
     def __eq__(self, that):
         return self._module_name == that.module_name and self._symbol_name == that.symbol_name
 
+    @staticmethod
+    def empty() -> SymbolName:
+        return SymbolName(None)
+
     @property
     def module_name(self) -> Ast.ModuleIdentifierAst:
         return self._module_name
@@ -63,6 +67,12 @@ class SymbolType:
     def type(self) -> Ast.TypeAst:
         return self._type
 
+    def __eq__(self, other):
+        for self_p, that_p in zip(self._type.parts, other._type.parts):
+            if self_p.identifier != that_p.identifier:
+                return False
+        return True
+
     def __repr__(self):
         match self._type:
             case Ast.TypeSingleAst(): return f"{'::'.join([p.identifier for p in self._type.parts])}"
@@ -75,6 +85,7 @@ class SymbolType:
 class Symbol(Generic[T]):
     _name: SymbolName[T]
     _type: SymbolType
+    _scope: Scope = None
 
     def __init__(self, name: SymbolName[T], type: Optional[SymbolType]):
         self._name = name
@@ -87,6 +98,14 @@ class Symbol(Generic[T]):
     @property
     def type(self) -> SymbolType:
         return self._type
+
+    @property
+    def scope(self) -> Scope:
+        return self._scope
+
+    @scope.setter
+    def scope(self, scope: Scope):
+        self._scope = scope
 
     def json(self):
         return {repr(self._name): repr(self._type)}
@@ -115,7 +134,7 @@ class SymbolTable(Generic[T]):
 
 
 class Scope:
-    _name: str
+    _name: SymbolName
 
     _symbol_table: SymbolTable[Ast.IdentifierAst]
     _type_table: SymbolTable[Ast.TypeAst]
@@ -124,8 +143,8 @@ class Scope:
     _parent_scope: Optional[Scope]
     _child_scopes: list[Scope]
 
-    def __init__(self, parent_scope: Optional[Scope] = None):
-        self._name = inflection.camelize(inspect.stack()[2].function[1:])
+    def __init__(self, name: SymbolName, parent_scope: Optional[Scope] = None):
+        self._name = name  # inflection.camelize(inspect.stack()[2].function[1:])
 
         self._symbol_table = SymbolTable()
         self._type_table = SymbolTable()
@@ -136,9 +155,11 @@ class Scope:
         self._parent_scope._child_scopes.append(self) if self._parent_scope is not None else None
 
     def define_symbol(self, symbol: Symbol):
+        symbol.scope = self
         self._symbol_table.define(symbol)
 
     def define_type(self, symbol: Symbol):
+        symbol.scope = self
         self._type_table.define(symbol)
 
     def define_tag(self, symbol: Symbol):
@@ -191,7 +212,7 @@ class GlobalScope(Scope):
     _module_name: Ast.ModuleIdentifierAst
 
     def __init__(self, module_name: Ast.ModuleIdentifierAst):
-        Scope.__init__(self)
+        Scope.__init__(self, SymbolName(Ast.IdentifierAst("Global")))
         self._module_name = module_name
 
     @property
@@ -228,8 +249,8 @@ class ScopeManager:
     def lookup_tag(self, name: SymbolName, current_scope_only=False) -> Optional[Symbol]:
         return self._current_scope.lookup_tag(name, current_scope_only)
 
-    def enter_scope(self):
-        self._current_scope = Scope(self._current_scope)
+    def enter_scope(self, name: SymbolName = SymbolName.empty()):
+        self._current_scope = Scope(name, self._current_scope)
 
     def exit_scope(self):
         self._current_scope = self._current_scope.parent_scope
@@ -280,13 +301,14 @@ class SymbolTableBuilder:
     def _build_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeManager) -> None:
         # Define the function as an object in the current scope, as it needs to be accessible from whatever scope it
         # was defined in.
-        s.define_symbol(Symbol(SymbolName(ast.identifier, s.global_scope.module_name), SymbolType(Utils.extract_function_type(ast))))
+        function_symbol_name = SymbolName(ast.identifier, s.global_scope.module_name)
+        s.define_symbol(Symbol(function_symbol_name, SymbolType(Utils.extract_function_type(ast))))
 
         # Enter a new scope for the function, and build the symbols for the parameters. Register the type parameters,
         # which can be different per function call. However, their tue type is irrelevant at this point, as this stage
         # only verifies that the type exists, ie register the generics as valid type names. Folllow with building'
         # symbols for each statement in the function body.
-        s.enter_scope()
+        s.enter_scope(function_symbol_name)
         for parameter in ast.parameters: SymbolTableBuilder._build_function_parameter(parameter, s)
         for generic_p in ast.generic_parameters: SymbolTableBuilder._build_generic_parameter(generic_p, s)
         for statement in ast.body.statements: SymbolTableBuilder._build_statement(statement, s)
@@ -404,10 +426,12 @@ class SymbolTableBuilder:
 
     @staticmethod
     def _build_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeManager) -> None:
-        s.define_type(Symbol(SymbolName(ast.identifier), SymbolType(Utils.extract_class_type(ast))))
-        s.enter_scope()
+        class_proto_name = SymbolName(ast.identifier)
+        s.define_type(Symbol(class_proto_name, SymbolType(Utils.extract_class_type(ast))))
+        s.enter_scope(class_proto_name)
         for attr in ast.body.members:
             s.define_symbol(Symbol(SymbolName(attr.identifier), SymbolType(attr.type_annotation)))
+        s.exit_scope()
 
     @staticmethod
     def _build_enum_prototype(ast: Ast.EnumPrototypeAst, s: ScopeManager) -> None:
