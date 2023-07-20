@@ -343,8 +343,9 @@ class SymbolTableBuilder:
             case Ast.YieldStatementAst(): pass
             case Ast.TypedefStatementAst(): SymbolTableBuilder._build_typedef_statement(ast, s)
             case Ast.LetStatementAst(): SymbolTableBuilder._build_let_statement(ast, s)
-            case True if type(ast) in Ast.ExpressionAst.__args__: pass
-            case _: raise NotImplementedError(f"Unknown statement type: {ast}")
+            case _:
+                if type(ast) in Ast.ExpressionAst.__args__: return
+                raise NotImplementedError(f"Unknown statement type: {ast}")
 
     @staticmethod
     def _build_if_statement(ast: Ast.IfStatementAst, s: ScopeManager) -> None:
