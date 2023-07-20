@@ -352,16 +352,15 @@ class SymbolTableBuilder:
         # new scope isn't needed from a symbol table perspective, but is easier to contain the cases in one scope for
         # future ideas like an all-branch scope sort of thing.
         s.enter_scope(SymbolName(Ast.IdentifierAst("if")))
-        SymbolTableBuilder._build_if_branch(ast.if_branch, s)
-        for elif_branch in ast.elif_branches: SymbolTableBuilder._build_if_branch(elif_branch, s)
-        if ast.else_branch is not None: SymbolTableBuilder._build_if_branch(ast.else_branch, s)
+        for branch in ast.branches:
+            SymbolTableBuilder._build_if_branch(branch, s)
         s.exit_scope()
 
     @staticmethod
-    def _build_if_branch(ast: Ast.IfStatementBranchAst, s: ScopeManager) -> None:
-        for inline_definition in ast.definitions: SymbolTableBuilder._build_let_statement(inline_definition, s)
-        s.enter_scope(SymbolName(Ast.IdentifierAst("if-branch")))
-        for statement in ast.body: SymbolTableBuilder._build_statement(statement, s)
+    def _build_if_branch(ast: Ast.PatternStatementAst, s: ScopeManager) -> None:
+        s.enter_scope(SymbolName(Ast.IdentifierAst("pattern")))
+        for statement in ast.body:
+            SymbolTableBuilder._build_statement(statement, s)
         s.exit_scope()
 
     @staticmethod

@@ -261,22 +261,21 @@ class TypeTupleAst:
     types: list[TypeAst]
 
 @dataclass
-class IfStatementBranchAst:
-    definitions: list[LetStatementAst]
-    condition: ExpressionAst
-    body: list[StatementAst]
-
-def ElifStatementBranchAst(definitions: list[LetStatementAst], condition: ExpressionAst, body: list[StatementAst]):
-    return IfStatementBranchAst(definitions, condition, body)
-
-def ElseStatementBranchAst(body: list[StatementAst]):
-    return IfStatementBranchAst([], BoolLiteralAst(True), body)
+class IfStatementAst:
+    expression: ExpressionAst
+    comparison_op: TokenAst
+    branches: list[PatternStatementAst]
 
 @dataclass
-class IfStatementAst:
-    if_branch: IfStatementBranchAst
-    elif_branches: list[IfStatementBranchAst]
-    else_branch: Optional[StatementAst]
+class PatternStatementAst:
+    comparison_op: Optional[TokenAst]
+    patterns: list[PatternAst]
+    guard: Optional[ValueGuardAst]
+    body: list[StatementAst]
+
+@dataclass
+class PatternAst:
+    value: ExpressionAst
 
 @dataclass
 class WhileStatementAst:
@@ -293,9 +292,9 @@ class ForStatementAst:
 
 @dataclass
 class DoWhileStatementAst:
+    condition: ExpressionAst
     tag: Optional[TagIdentifierAst]
     body: list[StatementAst]
-    condition: ExpressionAst
 
 @dataclass
 class MatchStatementAst:
@@ -341,7 +340,7 @@ class LetStatementAst:
     variables: list[LocalVariableAst]
     value: Optional[ExpressionAst]
     type_annotation: Optional[TypeAst]
-    if_null: Optional[IfStatementBranchAst]
+    if_null: Optional[InnerScopeAst]
 
 @dataclass
 class InnerScopeAst:

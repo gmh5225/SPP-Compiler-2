@@ -28,7 +28,7 @@ T = TypeVar("T")
 
 EXPECTED_TOKENS = []
 ERRS = []
-CUR_ERR_IND = None
+CUR_ERR_IND = 0
 
 # todo:
 #  - remove ">>" and ">>>" tokens and convert them to rules (generics ending in multiple ">" don't match the ">>" tok)
@@ -237,16 +237,16 @@ class Parser:
             program = self._parse_program().parse_once()
             return program
         except ParseSyntaxError as e: # todo : experimenal
-            furthest_along_error = None
-            furthest_along_error_pos = -1
-            for error in ERRS:
-                where = error.find("^ <- ")
-                if where > furthest_along_error_pos:
-                    furthest_along_error_pos = where
-                    furthest_along_error = error
-
-            raise ParseSyntaxError(furthest_along_error) from None
-            # raise ParseSyntaxError("\n".join(ERRS))
+            # furthest_along_error = None
+            # furthest_along_error_pos = -1
+            # for error in ERRS:
+            #     where = error.find("^ <- ")
+            #     if where > furthest_along_error_pos:
+            #         furthest_along_error_pos = where
+            #         furthest_along_error = error
+            #
+            # raise ParseSyntaxError(furthest_along_error)
+            raise ParseSyntaxError("\n".join(ERRS))
 
 
     def _parse_program(self) -> BoundParser:
@@ -439,12 +439,6 @@ class Parser:
             return p1
         return BoundParser(self, inner)
 
-    def _parse_class_attribute_static_identifier(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_identifier().parse_once()
-            return p1
-        return BoundParser(self, inner)
-
     def _parse_class_identifier(self) -> BoundParser:
         def inner():
             p1 = self._parse_identifier().parse_once()
@@ -576,12 +570,25 @@ class Parser:
 
     # Function Prototype & Implementation
 
+    def _parse_function_structure_type(self) -> BoundParser:
+        """
+        The <FunctionStructureType> determines the type of the underlying structure for the function. This will be
+        either a subroutine (fn), or a coroutine (gn). The keyword `fn` was chosen for its simplicity and common use,
+        and `gn` for "generate" and "g" follows "f", despite it being a coroutine not a generator (can send a value to
+        it) with std::Gen[T]::next(...).
+        :return: The type of the function structure.
+        """
+        def inner():
+            p1 = self._parse_token(TokenType.KwFn).delay_parse()
+            p2 = self._parse_token(TokenType.KwGn).delay_parse()
+            p3 = (p1 | p2).parse_once().tok.token_type == TokenType.KwGn
+            return p3
+        return BoundParser(self, inner)
+
     def _parse_function_prototype(self) -> BoundParser:
         def inner():
             p1 = self._parse_decorators().parse_optional() or []
-            p4_a = self._parse_token(TokenType.KwFn).delay_parse()
-            p4_b = self._parse_token(TokenType.KwGn).delay_parse()
-            p4 = (p4_a | p4_b).parse_once().tok.token_type == TokenType.KwGn
+            p4 = self._parse_function_structure_type().parse_once()
             p5 = self._parse_function_identifier().parse_once()
             p6 = self._parse_type_generic_parameters().parse_optional() or []
             p7 = self._parse_function_parameters().parse_once()
@@ -983,14 +990,13 @@ class Parser:
             p6 = self._parse_expression_placeholder().delay_parse()
 
             p7 = self._parse_statement_if().delay_parse()
-            p8 = self._parse_statement_match().delay_parse()
             p9 = self._parse_statement_while().delay_parse()
             p10 = self._parse_statement_for().delay_parse()
             p11 = self._parse_statement_do().delay_parse()
             p12 = self._parse_statement_new_scope().delay_parse()
             p13 = self._parse_statement_yield().delay_parse()
             p14 = self._parse_statement_with().delay_parse()
-            p15 = (p7 | p8 | p9 | p10 | p11 | p12 | p13 | p14 | p4 | p0 | p3 | p1 | p2 | p5 | p6).parse_once()
+            p15 = (p7 | p9 | p10 | p11 | p12 | p13 | p14 | p4 | p0 | p3 | p1 | p2 | p5 | p6).parse_once()
             return p15
         return BoundParser(self, inner)
 
@@ -1101,7 +1107,7 @@ class Parser:
 
     def _parse_lambda_implementation(self) -> BoundParser:
         def inner():
-            p1 = self._parse_statement_block().parse_once()
+            p1 = self._parse_non_assignment_expression().parse_once()
             return p1
         return BoundParser(self, inner)
 
@@ -1374,35 +1380,69 @@ class Parser:
 
     def _parse_statement_if(self) -> BoundParser:
         def inner():
-            p1 = self._parse_statement_if_branch().parse_once()
-            p5 = self._parse_statement_elif_branch().parse_zero_or_more()
-            p6 = self._parse_statement_else_branch().parse_optional()
-            return Ast.IfStatementAst(p1, p5, p6)
+            p0 = self._parse_token(TokenType.KwIf).parse_once()
+            p1 = self._parse_non_assignment_expression().parse_once()
+            p2 = self._parse_pattern_op().parse_optional()
+            p3 = self._parse_token(TokenType.TkBraceL).parse_once()
+            p4 = self._parse_statement_pattern().parse_zero_or_more()
+            p5 = self._parse_statement_pattern_default().parse_optional()
+            p6 = self._parse_token(TokenType.TkBraceR).parse_once()
+            return Ast.IfStatementAst(p1, p2, [*p4, p5] if p5 else p4)
         return BoundParser(self, inner)
 
-    def _parse_statement_if_branch(self) -> BoundParser:
+    def _parse_statement_pattern(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwIf).parse_once()
-            p2 = self._parse_statement_inline_definition().parse_zero_or_more()
-            p3 = self._parse_expression().parse_once()
-            p4 = self._parse_statement_block().parse_once()
-            return Ast.IfStatementBranchAst(p2, p3, p4)
+            p1 = self._parse_pattern_op().parse_optional()
+            p2 = self._parse_pattern_composite().parse_once()
+            p3 = self._parse_pattern_guard().parse_optional()
+            p4 = self._parse_token(TokenType.TkArrowRFat).parse_once()
+            p5 = self._parse_statement().parse_once()
+            return Ast.PatternStatementAst(p1, p2, p3, p5)
         return BoundParser(self, inner)
 
-    def _parse_statement_elif_branch(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.KwElif).parse_once()
-            p2 = self._parse_statement_inline_definition().parse_zero_or_more()
-            p3 = self._parse_expression().parse_once()
-            p4 = self._parse_statement_block().parse_once()
-            return Ast.ElifStatementBranchAst(p2, p3, p4)
-        return BoundParser(self, inner)
-
-    def _parse_statement_else_branch(self) -> BoundParser:
+    def _parse_statement_pattern_default(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwElse).parse_once()
-            p2 = self._parse_statement_block().parse_once()
-            return Ast.ElseStatementBranchAst(p2)
+            p2 = self._parse_token(TokenType.TkArrowRFat).parse_once()
+            p3 = self._parse_statement().parse_once()
+            return Ast.PatternStatementAst(None, [Ast.PatternAst(Ast.BoolLiteralAst(True))], None, p3)
+        return BoundParser(self, inner)
+
+    def _parse_pattern_op(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_operator_identifier_relation().delay_parse()
+            p2 = self._parse_operator_identifier_equality().delay_parse()
+            p3 = (p1 | p2).parse_once()
+            return p3
+        return BoundParser(self, inner)
+
+    def _parse_pattern_guard(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_token(TokenType.TkDoubleAmpersand).parse_once()
+            p2 = self._parse_non_assignment_expression().parse_once()
+            return Ast.ValueGuardAst(p2)
+        return BoundParser(self, inner)
+
+    def _parse_pattern_composite(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_pattern_val().parse_once()
+            p2 = self._parse_pattern_val_next().parse_zero_or_more()
+            return [p1, *p2]
+        return BoundParser(self, inner)
+
+    def _parse_pattern_val(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_primary_type_identifier().delay_parse()
+            p2 = self._parse_literal().delay_parse()
+            p3 = (p1 | p2).parse_once()
+            return Ast.PatternAst(p3)
+        return BoundParser(self, inner)
+
+    def _parse_pattern_val_next(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_token(TokenType.TkPipe).parse_once()
+            p2 = self._parse_pattern_val().parse_once()
+            return p2
         return BoundParser(self, inner)
 
     def _parse_statement_while(self) -> BoundParser:
@@ -1410,7 +1450,7 @@ class Parser:
             p1 = self._parse_token(TokenType.KwWhile).parse_once()
             p2 = self._parse_expression().parse_once()
             p3 = self._parse_statement_loop_tag().parse_optional()
-            p4 = self._parse_statement_block().parse_once()
+            p4 = self._parse_statement_new_scope().parse_once()
             return Ast.WhileStatementAst(p2, p3, p4)
         return BoundParser(self, inner)
 
@@ -1421,55 +1461,18 @@ class Parser:
             p3 = self._parse_token(TokenType.KwIn).parse_once()
             p4 = self._parse_expression().parse_once()
             p5 = self._parse_statement_loop_tag().parse_optional()
-            p6 = self._parse_statement_block().parse_once()
+            p6 = self._parse_statement_new_scope().parse_once()
             return Ast.ForStatementAst(p2, p4, p5, p6)
         return BoundParser(self, inner)
 
     def _parse_statement_do(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwDo).parse_once()
-            p2 = self._parse_statement_loop_tag().parse_optional()
-            p3 = self._parse_statement_block().parse_once()
-            p4 = self._parse_token(TokenType.KwWhile).parse_once()
-            p5 = self._parse_expression().parse_once()
-            return Ast.DoWhileStatementAst(p2, p3, p5)
-        return BoundParser(self, inner)
-
-    def _parse_statement_match(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.KwMatch).parse_once()
-            p2 = self._parse_expression().parse_once()
-            p3 = self._parse_statement_cases().parse_once()
-            return Ast.MatchStatementAst(p2, p3)
-        return BoundParser(self, inner)
-
-    def _parse_statement_case_expression(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_expression().parse_once()
-            return p1
-        return BoundParser(self, inner)
-
-    def _parse_statement_case_expression_next(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.TkComma).parse_once()
-            p2 = self._parse_statement_case_expression().parse_once()
-            return p2
-        return BoundParser(self, inner)
-
-    def _parse_statement_case_expressions(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_statement_case_expression().parse_once()
-            p2 = self._parse_statement_case_expression_next().parse_zero_or_more()
-            return [p1, *p2]
-        return BoundParser(self, inner)
-
-    def _parse_statement_case(self) -> BoundParser:
-        def inner():
-            p2 = self._parse_statement_case_expressions().parse_once()
-            p3 = self._parse_value_guard().parse_optional()
-            p4 = self._parse_token(TokenType.TkArrowRFat).parse_once()
-            p5 = self._parse_statement_block().parse_once()
-            return Ast.CaseStatementAst(p2, p3, p5)
+            p2 = self._parse_token(TokenType.KwWhile).parse_once()
+            p3 = self._parse_expression().parse_once()
+            p4 = self._parse_statement_loop_tag().parse_optional()
+            p5 = self._parse_statement_new_scope().parse_once()
+            return Ast.DoWhileStatementAst(p3, p4, p5)
         return BoundParser(self, inner)
 
     def _parse_statement_with(self) -> BoundParser:
@@ -1477,7 +1480,7 @@ class Parser:
             p1 = self._parse_token(TokenType.KwWith).parse_once()
             p2 = self._parse_expression().parse_once()
             p3 = self._parse_statement_alias_for_with_expression().parse_optional()
-            p4 = self._parse_statement_block().parse_once()
+            p4 = self._parse_statement_new_scope().parse_once()
             return Ast.WithStatementAst(p2, p3, p4)
         return BoundParser(self, inner)
 
@@ -1543,22 +1546,6 @@ class Parser:
             return Ast.TagIdentifierAst(p1[1:])
         return BoundParser(self, inner)
 
-    def _parse_statement_block(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.TkBraceL).parse_once()
-            p2 = self._parse_statement().parse_zero_or_more()
-            p3 = self._parse_token(TokenType.TkBraceR).parse_once()
-            return p2
-        return BoundParser(self, inner)
-
-    def _parse_statement_cases(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.TkBraceL).parse_once()
-            p2 = self._parse_statement_case().parse_zero_or_more()
-            p3 = self._parse_token(TokenType.TkBraceR).parse_once()
-            return p2
-        return BoundParser(self, inner)
-
     def _parse_statement_let(self) -> BoundParser:
         def inner():
             p1 = self._parse_statement_let_with_value().delay_parse()
@@ -1574,8 +1561,15 @@ class Parser:
             p2 = self._parse_local_variable_identifiers().parse_once()
             p3 = self._parse_token(TokenType.TkEqual).parse_once()
             p4 = self._parse_non_assignment_expression().parse_once()
-            p5 = self._parse_statement_else_branch().parse_optional()
+            p5 = self._parse_statement_let_with_value_residual_action().parse_optional()
             return Ast.LetStatementAst(p2, p4, None, p5)
+        return BoundParser(self, inner)
+
+    def _parse_statement_let_with_value_residual_action(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_token(TokenType.KwElse).parse_once()
+            p2 = self._parse_non_assignment_expression().parse_once()
+            return Ast.InnerScopeAst(p2)
         return BoundParser(self, inner)
 
     def _parse_statement_let_with_type(self) -> BoundParser:
@@ -1620,7 +1614,7 @@ class Parser:
             p1 = self._parse_token(TokenType.TkBraceL).parse_once()
             p2 = self._parse_statement().parse_zero_or_more()
             p3 = self._parse_token(TokenType.TkBraceR).parse_once()
-            return Ast.InnerScopeAst(p2)
+            return Ast.InnerScopeAst(p1)
         return BoundParser(self, inner)
 
     def _parse_statement(self) -> BoundParser:

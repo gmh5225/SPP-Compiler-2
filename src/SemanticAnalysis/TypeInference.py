@@ -72,7 +72,7 @@ class TypeInference:
         # Locate the function in the scope, and get the return type of the function. There might be > 1 matching
         # function signatures in the scope, so we need to find the one that matches the LHS and RHS types and any
         # generic constraints.
-        from SymbolTable import SymbolName
+        from .SymbolTable import SymbolName
         method = SymbolName(Ast.IdentifierAst(method), None)
         method = s.lookup_symbol(method)
         return method.return_type
@@ -186,7 +186,7 @@ class TypeInference:
     @staticmethod
     def _infer_type_from_if_statement(ast: Ast.IfStatementAst, s) -> Ast.TypeAst:
         # The return type from an if statement is the return type of the final expression in the branches' statements
-        expression = ast.if_branch.body[-1]
+        expression = ast.branches[0].body[-1]
         try: return TypeInference._infer_type_from_expression(expression, s)
         except NotImplementedError: Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", []), Ast.GenericIdentifierAst("Void", [])])
 

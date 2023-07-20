@@ -1,29 +1,19 @@
 import unittest
-from src.Lexer import Lexer
-from src.Parser import Parser
-
-
-def parse(code):
-    tok = Lexer(code).lex()
-    ast = Parser(tok).parse()
-    return ast
 
 
 class TestParsingExpressions(unittest.TestCase):
     def setUp(self):
-        self._boilerplate_module = "module main;"
-        self._boilerplate_function = "pub fun main():\n\t"
+        self._boilerplate_module = "mod main;"
+        self._boilerplate_function = "fn main(){}"
 
-    def parse_assignment(self):
-        code = self._boilerplate_module + self._boilerplate_function + "a = b;"
-        ast = parse(code)
-
-    def parse_null_coalescing(self):
-        code = self._boilerplate_module + self._boilerplate_function + "a ?? b;"
-        ast = parse(code)
-
-    def parse_elvis(self):
-        code = self._boilerplate_module + self._boilerplate_function + "a ?: b;"
-        ast = parse(code)
+    def parse_function_prototypes(self):
+        code = """
+        mod main;
+        fn main1() -> std::Void {}
+        fn main2[T](a: T) -> std::Void {}
+        fn main3[T, U=T](a: T, b: U) -> std::Void {}
+        fn main4[T, U=T, ...V](a: T, b: U, ...c: V) -> std::Void {}
+        
+        """
 
 

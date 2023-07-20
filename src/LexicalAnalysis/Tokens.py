@@ -73,23 +73,21 @@ class TokenType(Enum):
     KwMut = "mut"
     KwLet = "let"
     KwIf = "if"
-    KwElif = "elif"
-    KwElse = "else"
-    KwWhile = "while"
+    KwElse = "else" # -- change how `if` works
+    KwWhile = "while" # -- unify with `for`
     KwFor = "for"
-    KwDo = "do"
-    KwMatch = "match"
+    KwDo = "do" # -- unify with `for`
     KwReturn = "ret"
     KwYield = "yield"
     KwCls = "cls"
-    KwWhere = "where"
-    KwTrue = "true"
-    KwFalse = "false"
+    KwWhere = "where" # -- replace with `if`?
+    KwTrue = "true" # -- use std::Bool::True()
+    KwFalse = "false" # -- use std::Bool::False()
     KwAs = "as"
     KwSup = "sup"
     KwWith = "with"
-    KwBreak = "break"
-    KwContinue = "cont"
+    KwBreak = "break" # -- might be removing breaks => remove labels
+    KwContinue = "cont" # -- might be removing continues => remove labels
     KwSelf = "Self"
 
     # Don't change order of these (regex are matched in this order)
