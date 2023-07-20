@@ -1451,7 +1451,8 @@ class Parser:
             p2 = self._parse_expression().parse_once()
             p3 = self._parse_statement_loop_tag().parse_optional()
             p4 = self._parse_statement_new_scope().parse_once()
-            return Ast.WhileStatementAst(p2, p3, p4)
+            p5 = self._parse_statements_residual_action().parse_optional()
+            return Ast.WhileStatementAst(p2, p3, p4, p5)
         return BoundParser(self, inner)
 
     def _parse_statement_for(self) -> BoundParser:
@@ -1462,7 +1463,8 @@ class Parser:
             p4 = self._parse_expression().parse_once()
             p5 = self._parse_statement_loop_tag().parse_optional()
             p6 = self._parse_statement_new_scope().parse_once()
-            return Ast.ForStatementAst(p2, p4, p5, p6)
+            p7 = self._parse_statements_residual_action().parse_optional()
+            return Ast.ForStatementAst(p2, p4, p5, p6, p7)
         return BoundParser(self, inner)
 
     def _parse_statement_do(self) -> BoundParser:
@@ -1472,7 +1474,8 @@ class Parser:
             p3 = self._parse_expression().parse_once()
             p4 = self._parse_statement_loop_tag().parse_optional()
             p5 = self._parse_statement_new_scope().parse_once()
-            return Ast.DoWhileStatementAst(p3, p4, p5)
+            p6 = self._parse_statements_residual_action().parse_optional()
+            return Ast.DoWhileStatementAst(p3, p4, p5, p6)
         return BoundParser(self, inner)
 
     def _parse_statement_with(self) -> BoundParser:
@@ -1561,15 +1564,17 @@ class Parser:
             p2 = self._parse_local_variable_identifiers().parse_once()
             p3 = self._parse_token(TokenType.TkEqual).parse_once()
             p4 = self._parse_non_assignment_expression().parse_once()
-            p5 = self._parse_statement_let_with_value_residual_action().parse_optional()
+            p5 = self._parse_statements_residual_action().parse_optional()
             return Ast.LetStatementAst(p2, p4, None, p5)
         return BoundParser(self, inner)
 
-    def _parse_statement_let_with_value_residual_action(self) -> BoundParser:
+    def _parse_statements_residual_action(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwElse).parse_once()
-            p2 = self._parse_non_assignment_expression().parse_once()
-            return Ast.InnerScopeAst(p2)
+            # p2 = self._parse_token(TokenType.TkBraceL).parse_once()
+            p3 = self._parse_non_assignment_expression().parse_once()
+            # p4 = self._parse_token(TokenType.TkBraceR).parse_once()
+            return Ast.InnerScopeAst(p3)
         return BoundParser(self, inner)
 
     def _parse_statement_let_with_type(self) -> BoundParser:
