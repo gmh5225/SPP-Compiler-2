@@ -172,7 +172,8 @@ class TypeInference:
 
     @staticmethod
     def _infer_type_from_lambda(ast: Ast.LambdaAst, s) -> Ast.TypeAst:
-        raise NotImplementedError(f"Type inference for {type(ast)} is not implemented")
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Non-Inferrable (for now)", [])])
+        # raise NotImplementedError(f"Type inference for {type(ast)} is not implemented")
 
     @staticmethod
     def _infer_type_from_placeholder(ast: Ast.PlaceholderAst, s) -> Ast.TypeAst:

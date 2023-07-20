@@ -981,14 +981,17 @@ class Parser:
             p4 = self._parse_primary_type_identifier().delay_parse()  # can only come before a {}
             p5 = self._parse_operator_identifier_variadic().delay_parse()
             p6 = self._parse_expression_placeholder().delay_parse()
+
             p7 = self._parse_statement_if().delay_parse()
             p8 = self._parse_statement_match().delay_parse()
             p9 = self._parse_statement_while().delay_parse()
             p10 = self._parse_statement_for().delay_parse()
             p11 = self._parse_statement_do().delay_parse()
             p12 = self._parse_statement_new_scope().delay_parse()
-            p13 = (p7 | p8 | p9 | p10 | p11 | p12 | p4 | p0 | p3 | p1 | p2 | p5 | p6).parse_once()
-            return p13
+            p13 = self._parse_statement_yield().delay_parse()
+            p14 = self._parse_statement_with().delay_parse()
+            p15 = (p7 | p8 | p9 | p10 | p11 | p12 | p13 | p14 | p4 | p0 | p3 | p1 | p2 | p5 | p6).parse_once()
+            return p15
         return BoundParser(self, inner)
 
     def _parse_primary_generic_identifier_for_func_call(self) -> BoundParser:
@@ -1098,7 +1101,7 @@ class Parser:
 
     def _parse_lambda_implementation(self) -> BoundParser:
         def inner():
-            p1 = self._parse_non_assignment_expression().parse_once()
+            p1 = self._parse_statement_block().parse_once()
             return p1
         return BoundParser(self, inner)
 
@@ -1497,7 +1500,6 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.KwYield).parse_once()
             p2 = self._parse_expression().parse_optional()
-            p3 = self._parse_token(TokenType.TkSemicolon).parse_once()
             return Ast.YieldStatementAst(p2)
         return BoundParser(self, inner)
 
@@ -1623,22 +1625,14 @@ class Parser:
 
     def _parse_statement(self) -> BoundParser:
         def inner():
-            p1 = self._parse_statement_if().delay_parse()
-            p2 = self._parse_statement_while().delay_parse()
-            p3 = self._parse_statement_for().delay_parse()
-            p4 = self._parse_statement_do().delay_parse()
-            p5 = self._parse_statement_match().delay_parse()
-            p6 = self._parse_statement_with().delay_parse()
             p7 = self._parse_statement_typedef().delay_parse()
             p8 = self._parse_statement_return().delay_parse()
-            p9 = self._parse_statement_yield().delay_parse()
             p10 = self._parse_statement_let().delay_parse()
             p11 = self._parse_statement_break().delay_parse()
             p12 = self._parse_statement_continue().delay_parse()
             p13 = self._parse_statement_expression().delay_parse()
             p14 = self._parse_function_prototype().delay_parse()
-            p15 = self._parse_statement_new_scope().delay_parse()
-            p16 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12 | p13 | p14 | p15).parse_once()
+            p16 = (p13 | p7 | p8 | p10 | p11 | p12 | p14).parse_once()
             return p16
         return BoundParser(self, inner)
 

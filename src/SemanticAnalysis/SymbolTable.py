@@ -351,7 +351,7 @@ class SymbolTableBuilder:
     def _build_if_statement(ast: Ast.IfStatementAst, s: ScopeManager) -> None:
         # new scope isn't needed from a symbol table perspective, but is easier to contain the cases in one scope for
         # future ideas like an all-branch scope sort of thing.
-        s.enter_scope()
+        s.enter_scope(SymbolName(Ast.IdentifierAst("if")))
         SymbolTableBuilder._build_if_branch(ast.if_branch, s)
         for elif_branch in ast.elif_branches: SymbolTableBuilder._build_if_branch(elif_branch, s)
         if ast.else_branch is not None: SymbolTableBuilder._build_if_branch(ast.else_branch, s)
@@ -360,20 +360,20 @@ class SymbolTableBuilder:
     @staticmethod
     def _build_if_branch(ast: Ast.IfStatementBranchAst, s: ScopeManager) -> None:
         for inline_definition in ast.definitions: SymbolTableBuilder._build_let_statement(inline_definition, s)
-        s.enter_scope()
+        s.enter_scope(SymbolName(Ast.IdentifierAst("if-branch")))
         for statement in ast.body: SymbolTableBuilder._build_statement(statement, s)
         s.exit_scope()
 
     @staticmethod
     def _build_while_statement(ast: Ast.WhileStatementAst, s: ScopeManager) -> None:
-        s.enter_scope()
+        s.enter_scope(SymbolName(Ast.IdentifierAst("while")))
         s.define_tag(Symbol(SymbolName(ast.tag), None))
         for statement in ast.body: SymbolTableBuilder._build_statement(statement, s)
         s.exit_scope()
 
     @staticmethod
     def _build_for_statement(ast: Ast.ForStatementAst, s: ScopeManager) -> None:
-        s.enter_scope()
+        s.enter_scope(SymbolName(Ast.IdentifierAst("for")))
         s.define_tag(Symbol(SymbolName(ast.tag), None))
         iterable_type = iter([None] * 20) # TODO : iter(lambda: TypeInference.infer_type(ast.iterable, s)[0].types)
         for identifier in ast.identifiers: s.define_symbol(Symbol(SymbolName(identifier.identifier), next(iterable_type)))
@@ -382,7 +382,7 @@ class SymbolTableBuilder:
 
     @staticmethod
     def _build_do_while_statement(ast: Ast.DoWhileStatementAst, s: ScopeManager) -> None:
-        s.enter_scope()
+        s.enter_scope(SymbolName(Ast.IdentifierAst("do")))
         s.define_tag(Symbol(SymbolName(ast.tag), None))
         for statement in ast.body: SymbolTableBuilder._build_statement(statement, s)
         s.exit_scope()
@@ -391,19 +391,19 @@ class SymbolTableBuilder:
     def _build_match_statement(ast: Ast.MatchStatementAst, s: ScopeManager) -> None:
         # new scope isn't needed from a symbol table perspective, but is easier to contain the cases in one scope for
         # future ideas like an all-case scope sort of thing.
-        s.enter_scope()
+        s.enter_scope(SymbolName(Ast.IdentifierAst("match")))
         for case in ast.cases: SymbolTableBuilder._build_case_statement(case, s)
         s.exit_scope()
 
     @staticmethod
     def _build_case_statement(ast: Ast.CaseStatementAst, s: ScopeManager) -> None:
-        s.enter_scope()
+        s.enter_scope(SymbolName(Ast.IdentifierAst("case")))
         for statement in ast.body: SymbolTableBuilder._build_statement(statement, s)
         s.exit_scope()
 
     @staticmethod
     def _build_with_statement(ast: Ast.WithStatementAst, s: ScopeManager) -> None:
-        s.enter_scope()
+        s.enter_scope(SymbolName(Ast.IdentifierAst("with")))
         if ast.alias: s.define_symbol(Symbol(SymbolName(ast.alias), SymbolType.deferred(lambda: TypeInference.infer_type(ast.value, s))))
         for statement in ast.body: SymbolTableBuilder._build_statement(statement, s)
         s.exit_scope()
@@ -418,12 +418,31 @@ class SymbolTableBuilder:
         if ast.type_annotation:
             for variable in ast.variables: s.define_symbol(Symbol(SymbolName(variable.identifier), SymbolType(ast.type_annotation)))
         else:
+            SymbolTableBuilder._build_expression(ast.value, s)
             type_annotation = TypeInference.infer_type(ast.value, s)
-            if type(type_annotation) == Ast.TypeTupleAst: type_annotation = iter(type_annotation.types)
-            else: type_annotation = iter([type_annotation])
+            if type(type_annotation) == Ast.TypeTupleAst:
+                type_annotation = iter(type_annotation.types)
+                for variable in ast.variables:
+                    s.define_symbol(Symbol(SymbolName(variable.identifier), SymbolType(next(type_annotation))))
 
-            for variable in ast.variables:
-                s.define_symbol(Symbol(SymbolName(variable.identifier), SymbolType(next(type_annotation))))
+            else:
+                assert len(ast.variables) == 1
+                s.define_symbol(Symbol(SymbolName(ast.variables[0].identifier), SymbolType(type_annotation)))
+
+    @staticmethod
+    def _build_expression(ast: Ast.ExpressionAst, s: ScopeManager) -> None:
+        match ast:
+            case Ast.LambdaAst(): SymbolTableBuilder._build_lambda(ast, s)
+            case _:
+                if type(ast) in Ast.StatementAst.__args__: SymbolTableBuilder._build_statement(ast, s)
+                pass
+
+    @staticmethod
+    def _build_lambda(ast: Ast.LambdaAst, s: ScopeManager) -> None:
+        s.enter_scope(SymbolName(Ast.IdentifierAst("lambda")))
+        for param in ast.parameters: s.define_symbol(Symbol(SymbolName(param.identifier), SymbolType.deferred(lambda: 0)))
+        for statement in ast.body: SymbolTableBuilder._build_statement(statement, s)
+        s.exit_scope()
 
     @staticmethod
     def _build_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeManager) -> None:
@@ -436,8 +455,9 @@ class SymbolTableBuilder:
 
     @staticmethod
     def _build_enum_prototype(ast: Ast.EnumPrototypeAst, s: ScopeManager) -> None:
-        s.define_type(Symbol(SymbolName(ast.identifier), SymbolType(ast)))
-        s.enter_scope()
+        enum_proto_name = SymbolName(ast.identifier)
+        s.define_type(Symbol(enum_proto_name, SymbolType(ast)))
+        s.enter_scope(enum_proto_name)
         for attr in ast.body.members:
             s.define_symbol(Symbol(SymbolName(attr.identifier), SymbolType.deferred(lambda: TypeInference.infer_type(attr.value, s))))
         s.exit_scope()
