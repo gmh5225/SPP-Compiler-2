@@ -186,13 +186,15 @@ class TypeInference:
     def _infer_type_from_if_statement(ast: Ast.IfStatementAst, s) -> Ast.TypeAst:
         # The return type from an if statement is the return type of the final expression in the branches' statements
         expression = ast.if_branch.body[-1]
-        return TypeInference._infer_type_from_expression(expression, s)
+        try: return TypeInference._infer_type_from_expression(expression, s)
+        except NotImplementedError: Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", []), Ast.GenericIdentifierAst("Void", [])])
 
     @staticmethod
     def _infer_type_from_match_statement(ast: Ast.MatchStatementAst, s) -> Ast.TypeAst:
         # The return type from a match statement is the return type of the final expression in the branches' statements
         expression = ast.cases[0].body[-1]
-        return TypeInference._infer_type_from_expression(expression, s)
+        try: return TypeInference._infer_type_from_expression(expression, s)
+        except NotImplementedError: Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", []), Ast.GenericIdentifierAst("Void", [])])
 
     @staticmethod
     def _infer_type_from_looping_statement(ast: Ast.WhileStatementAst | Ast.ForStatementAst | Ast.DoWhileStatementAst, s) -> Ast.TypeAst:
@@ -202,7 +204,8 @@ class TypeInference:
             raise Exception("While statement does not contain a break statement")
         else:
             expression = break_expressions[0].returning_expression
-            return TypeInference._infer_type_from_expression(expression, s)
+            try: return TypeInference._infer_type_from_expression(expression, s)
+            except NotImplementedError: Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", []), Ast.GenericIdentifierAst("Void", [])])
 
 
 
