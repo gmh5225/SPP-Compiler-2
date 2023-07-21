@@ -1571,9 +1571,7 @@ class Parser:
     def _parse_statements_residual_action(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwElse).parse_once()
-            # p2 = self._parse_token(TokenType.TkBraceL).parse_once()
             p3 = self._parse_non_assignment_expression().parse_once()
-            # p4 = self._parse_token(TokenType.TkBraceR).parse_once()
             return Ast.InnerScopeAst(p3)
         return BoundParser(self, inner)
 
