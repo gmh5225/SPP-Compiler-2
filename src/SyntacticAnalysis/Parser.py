@@ -93,7 +93,7 @@ class BoundParser(Generic[T]):
     _delayed: bool
     _ast: Optional[Any]
 
-    def __init__(self, parser: Parser, rule: Callable[P, T]):
+    def __init__(self, parser: Parser, rule: Optional[Callable[P, T]]):
         self._rule = rule
         self._parser = parser
         self._delayed = False
@@ -164,7 +164,7 @@ class BoundParser(Generic[T]):
     def parse_negative_lookahead(self) -> None:
         restore_index = self._parser.current
         try:
-            result = self.parse_once()
+            _ = self.parse_once()
             raise ParseNegativeLookaheadError("Expected no result")
         except (ParseSyntaxError, ParseSyntaxMultiError):
             self._parser.current = restore_index
@@ -173,7 +173,7 @@ class BoundParser(Generic[T]):
     def parse_positive_lookahead(self) -> None:
         restore_index = self._parser.current
         try:
-            result = self.parse_once()
+            _ = self.parse_once()
             self._parser.current = restore_index
             return
         except (ParseSyntaxError, ParseSyntaxMultiError):
@@ -236,7 +236,7 @@ class Parser:
         try:
             program = self._parse_program().parse_once()
             return program
-        except ParseSyntaxError as e: # todo : experimenal
+        except ParseSyntaxError: # todo : experimental
             # furthest_along_error = None
             # furthest_along_error_pos = -1
             # for error in ERRS:
@@ -251,10 +251,15 @@ class Parser:
 
     def _parse_program(self) -> BoundParser:
         """
-        A Program consists of an Ast.ModulePrototype, followed by the EOF. The contents of the module, it its
-        implementation, is contained by the Ast.ModulePrototype. The EOF at the end ensures that there is no left-over
-        invalid code.
-        :return: The Ast.ProgramAst that is the root of the program.
+        [Program] => [ModulePrototype] [EOF]
+        - [ModulePrototype] => Contents of the current module.
+        - [EOF] => Ensure there is no invalid code after the module.
+
+        The [Program] is the root parser for the code being parsed. It parses for a [ModulePrototype], and then ensures
+        that there is no invalid code after the module, by checking for the [EOF]. This check is required because
+        otherwise any code would parse, as the parser would leave the rest of the code unparsed but be "complete".
+
+        @return: The [Program]'s Ast.ProgramAst, the root of the AST for the code being parsed.
         """
         def inner():
             p1 = self._parse_module_prototype().parse_once()
@@ -263,12 +268,35 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_eof(self) -> BoundParser:
+        """
+        [EOF] => [Token(EOF)]
+        - [Token(EOF)] => The end of the file token inserted by the Lexer post-lexing.
+
+        The [EOF] parser ensures that there is no invalid code after the module. It does this by parsing for the
+        [Token(EOF)] token, which is inserted by the Lexer post-lexing. If the [Token(EOF)] is not found, then the
+        parser has not reached the end of the file, and there is invalid code after the module.
+
+        @return: The [EOF]'s Ast.TokenAst, maintaining consistency with the other parser functions.
+        """
         def inner():
             p1 = self._parse_token(TokenType.TkEOF).parse_once()
             return p1
         return BoundParser(self, inner)
 
     def _parse_module_prototype(self) -> BoundParser:
+        """
+        [ModulePrototype] => [Decorators]? [Token(MOD)] [ModuleIdentifier] [Token(;)] [ModuleImplementation]
+        - [Decorators]? => Zero or more [Decorators] used to decorate the module.
+        - [Token(MOD)] => The [Token(MOD)] token, which is the keyword "mod", identifying that this is a module.
+        - [ModuleIdentifier] => The [ModuleIdentifier] of the module, which is the name of the module.
+        - [Token(;)] => The [Token(;)] token, which is the semicolon at the end of the module prototype.
+        - [ModuleImplementation] => The [ModuleImplementation] of the module, which is the contents of the module.
+
+        The [ModulePrototype] parser parses for the prototype of the module. It parses checks for decorators, and the
+        identifier of the module. The [ModuleImplementation] contains all the functions/class definitions etc of the
+        module.
+        @return:
+        """
         def inner():
             p1 = self._parse_decorators().parse_optional() or []
             p2 = self._parse_token(TokenType.KwMod).parse_once()
@@ -399,7 +427,7 @@ class Parser:
     # Classes
     def _parse_class_prototype(self) -> BoundParser:
         def inner():
-            p1 = self._parse_decorators().parse_optional()
+            p1 = self._parse_decorators().parse_optional() or []
             p3 = self._parse_token(TokenType.KwCls).parse_once()
             p4 = self._parse_class_identifier().parse_once()
             p5 = self._parse_type_generic_parameters().parse_optional() or []
@@ -496,7 +524,7 @@ class Parser:
 
     def _parse_sup_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_identifier().parse_once()
+            p1 = self._parse_single_type_identifier_no_self().parse_once()
             return p1
         return BoundParser(self, inner)
 
@@ -517,6 +545,7 @@ class Parser:
 
     def _parse_enum_prototype(self) -> BoundParser:
         def inner():
+            p1 = self._parse_decorators().parse_optional() or []
             p2 = self._parse_token(TokenType.KwEnum).parse_once()
             p3 = self._parse_enum_identifier().parse_once()
             p4 = self._parse_type_generic_parameters().parse_optional()
@@ -524,7 +553,7 @@ class Parser:
             p6 = self._parse_token(TokenType.TkBraceL).parse_once()
             p7 = self._parse_enum_implementation().parse_once()
             p8 = self._parse_token(TokenType.TkBraceR).parse_once()
-            return Ast.EnumPrototypeAst(p3, p4, p5, p7)
+            return Ast.EnumPrototypeAst(p1, p3, p4, p5, p7)
         return BoundParser(self, inner)
 
     def _parse_enum_implementation(self) -> BoundParser:
@@ -670,11 +699,17 @@ class Parser:
 
     def _parse_function_call_named_argument(self) -> BoundParser:
         def inner():
-            p1 = self._parse_identifier().parse_once()
+            p1 = self._parse_function_call_named_argument_identifier().parse_once()
             p2 = self._parse_token(TokenType.TkEqual).parse_once()
             p3 = self._parse_parameter_passing_convention().parse_optional()
             p4 = self._parse_non_assignment_expression().parse_once()
             return Ast.FunctionArgumentNamedAst(p1, p3, p4)
+        return BoundParser(self, inner)
+
+    def _parse_function_call_named_argument_identifier(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_identifier().parse_once()
+            return p1
         return BoundParser(self, inner)
 
     # Function Parameters
@@ -818,7 +853,7 @@ class Parser:
 
     def _parse_where_constraint_chain_element(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_identifier().parse_once()
+            p1 = self._parse_single_type_identifier().parse_once()
             return p1
         return BoundParser(self, inner)
 
@@ -848,7 +883,7 @@ class Parser:
 
     def _parse_decorator_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_identifier().parse_once()
+            p1 = self._parse_module_identifier().parse_once()
             return p1
         return BoundParser(self, inner)
 
@@ -981,7 +1016,7 @@ class Parser:
 
     def _parse_primary_expression(self) -> BoundParser:
         def inner():
-            p0 = self._parse_primary_generic_identifier_for_func_call().delay_parse()
+            # p0 = self._parse_primary_generic_identifier_for_func_call().delay_parse()
             p1 = self._parse_identifier().delay_parse()
             p2 = self._parse_literal().delay_parse()
             p3 = self._parse_lambda().delay_parse()
@@ -996,16 +1031,16 @@ class Parser:
             p12 = self._parse_statement_new_scope().delay_parse()
             p13 = self._parse_statement_yield().delay_parse()
             p14 = self._parse_statement_with().delay_parse()
-            p15 = (p7 | p9 | p10 | p11 | p12 | p13 | p14 | p4 | p0 | p3 | p1 | p2 | p5 | p6).parse_once()
+            p15 = (p7 | p9 | p10 | p11 | p12 | p13 | p14 | p4 | p3 | p1 | p2 | p5 | p6).parse_once()
             return p15
         return BoundParser(self, inner)
 
-    def _parse_primary_generic_identifier_for_func_call(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_generic_identifier().parse_once()
-            p2 = self._parse_postfix_operator_function_call().parse_once()
-            return Ast.PostfixExpressionAst(p1, p2)
-        return BoundParser(self, inner)
+    # def _parse_primary_generic_identifier_for_func_call(self) -> BoundParser:
+    #     def inner():
+    #         p1 = self._parse_generic_identifier().parse_once()
+    #         p2 = self._parse_postfix_operator_function_call().parse_once()
+    #         return Ast.PostfixExpressionAst(p1, p2)
+    #     return BoundParser(self, inner)
 
     def _parse_primary_type_identifier(self) -> BoundParser:
         def inner():
@@ -1113,7 +1148,7 @@ class Parser:
 
     # Type Identifiers
 
-    def _parse_type_raw_identifiers_self_prefixed(self) -> BoundParser:
+    def _parse_single_type_identifier_with_self(self) -> BoundParser:
         """
         <TypeRawIdentifiersSelfPrefixed> consist of a "::" joined list of <TypeRawIdentifiers>, after a "Self". This
         mirrors the <TypeRawIdentifiers>, but with the check that the first identifier is "Self", not a
@@ -1127,7 +1162,7 @@ class Parser:
             return Ast.TypeSingleAst([Ast.SelfTypeAst(), *p2])
         return BoundParser(self, inner)
 
-    def _parse_type_raw_identifiers(self) -> BoundParser:
+    def _parse_single_type_identifier_no_self(self) -> BoundParser:
         """
         <TypeRawIdentifiers> consist of a "::" joined list of <TypeRawIdentifiers>, after a <GenericIdentifier>. The
         first identifier must be a <GenericIdentifier>, but because following parts could be numbers, for tuples, the
@@ -1183,8 +1218,8 @@ class Parser:
         :return: The single type identifier, optionally prefixed with "Self".
         """
         def inner():
-            p1 = self._parse_type_raw_identifiers_self_prefixed().delay_parse()
-            p2 = self._parse_type_raw_identifiers().delay_parse()
+            p1 = self._parse_single_type_identifier_with_self().delay_parse()
+            p2 = self._parse_single_type_identifier_no_self().delay_parse()
             p3 = (p1 | p2).parse_once()
             return Ast.TypeSingleAst(p3)
         return BoundParser(self, inner)
@@ -1328,7 +1363,7 @@ class Parser:
 
     def _parse_type_generic_required_parameter(self) -> BoundParser:
         def inner():
-            p1 = self._parse_identifier().parse_once()
+            p1 = self._parse_type_generic_parameter_identifier().parse_once()
             p2 = self._parse_type_generic_parameter_inline_constraint().parse_optional()
             return Ast.TypeGenericParameterRequiredAst(p1, p2)
         return BoundParser(self, inner)
@@ -1362,21 +1397,19 @@ class Parser:
             return p2
         return BoundParser(self, inner)
 
+    def _parse_type_generic_parameter_identifier(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_identifier().parse_once()
+            return p1
+        return BoundParser(self, inner)
+
     def _parse_type_generic_parameter_inline_constraint(self) -> BoundParser:
         def inner():
             p3 = self._parse_token(TokenType.TkColon).parse_once()
             p4 = self._parse_where_constraint_chain().parse_once()
             return p4
         return BoundParser(self, inner)
-
-    # Statements
-
-    def _parse_statement_inline_definition(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_statement_let_with_value().parse_optional()
-            p2 = self._parse_token(TokenType.TkComma).parse_once()
-            return p1
-        return BoundParser(self, inner)
+# Statements
 
     def _parse_statement_if(self) -> BoundParser:
         def inner():
@@ -1891,11 +1924,20 @@ class Parser:
 
     def _parse_number(self) -> BoundParser:
         def inner():
+            p0 = self._parse_numeric_sign().parse_optional()
             p1 = self._parse_numeric_integer().parse_once()
             p2 = self._parse_numeric_decimal().parse_optional()
             p3 = self._parse_numeric_complex().parse_optional()
             p4 = self._parse_numeric_exponent().parse_optional() is not None
-            return Ast.NumberLiteralBase10Ast(p1, p2, p3, p4)
+            return Ast.NumberLiteralBase10Ast(p0, p1, p2, p3, p4)
+        return BoundParser(self, inner)
+
+    def _parse_numeric_sign(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_token(TokenType.TkAdd).delay_parse()
+            p2 = self._parse_token(TokenType.TkSub).delay_parse()
+            p3 = (p1 | p2).parse_once()
+            return p3
         return BoundParser(self, inner)
 
     def _parse_numeric_integer(self) -> BoundParser:

@@ -162,6 +162,7 @@ class EnumImplementationAst:
 
 @dataclass
 class EnumPrototypeAst:
+    decorators: list[DecoratorAst]
     identifier: IdentifierAst
     generic_parameters: list[TypeGenericParameterAst]
     where_block: Optional[WhereBlockAst]
@@ -386,6 +387,7 @@ class PostfixStructInitializerFieldAst:
 
 @dataclass
 class NumberLiteralBase10Ast:
+    sign: Optional[TokenAst]
     integer: str
     decimal: str
     exponent: Optional[NumberExponentAst]
