@@ -53,7 +53,7 @@ class TokenType(Enum):
     TkDynaRes = "."
     TkStatRes = "::"
     TkComma = ","
-    TkEqual = "="
+    TkAssign = "="
     TkArrowReturn = "->"
     TkArrowRFat = "=>"
     TkAt = "@"

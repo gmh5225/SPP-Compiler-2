@@ -581,7 +581,7 @@ class Parser:
 
     def _parse_enum_member_value_wrapper(self):
         def inner():
-            p3 = self._parse_token(TokenType.TkEqual).parse_once()
+            p3 = self._parse_token(TokenType.TkAssign).parse_once()
             p4 = self._parse_non_assignment_expression().parse_once()
             return p4
         return BoundParser(self, inner)
@@ -701,7 +701,7 @@ class Parser:
     def _parse_function_call_named_argument(self) -> BoundParser:
         def inner():
             p1 = self._parse_function_call_named_argument_identifier().parse_once()
-            p2 = self._parse_token(TokenType.TkEqual).parse_once()
+            p2 = self._parse_token(TokenType.TkAssign).parse_once()
             p3 = self._parse_parameter_passing_convention().parse_optional()
             p4 = self._parse_non_assignment_expression().parse_once()
             return Ast.FunctionArgumentNamedAst(p1, p3, p4)
@@ -787,7 +787,7 @@ class Parser:
     def _parse_function_optional_parameter(self) -> BoundParser:
         def inner():
             p1 = self._parse_function_required_parameter().parse_once()
-            p2 = self._parse_token(TokenType.TkEqual).parse_once()
+            p2 = self._parse_token(TokenType.TkAssign).parse_once()
             p3 = self._parse_non_assignment_expression().parse_once()
             return Ast.FunctionParameterOptionalAst(p1, p3)
         return BoundParser(self, inner)
@@ -934,7 +934,7 @@ class Parser:
         def inner():
             p4 = self._parse_non_assignment_expression().parse_once()
             p5 = self._parse_assignment_multiple_lhs().parse_zero_or_more()
-            p6 = self._parse_token(TokenType.TkEqual).parse_once()
+            p6 = self._parse_token(TokenType.TkAssign).parse_once()
             p7 = self._parse_non_assignment_expression().parse_once()
             return Ast.AssignmentExpressionAst([p4, *p5], p7)
         return BoundParser(self, inner)
@@ -1108,7 +1108,7 @@ class Parser:
     def _parse_lambda_capture_item_alias(self) -> BoundParser:
         def inner():
             p3 = self._parse_identifier().parse_once()
-            p4 = self._parse_token(TokenType.TkEqual).parse_once()
+            p4 = self._parse_token(TokenType.TkAssign).parse_once()
             return p3
         return BoundParser(self, inner)
 
@@ -1302,7 +1302,7 @@ class Parser:
     def _parse_type_generic_named_argument(self) -> BoundParser:
         def inner():
             p1 = self._parse_identifier().parse_once()
-            p2 = self._parse_token(TokenType.TkEqual).parse_once()
+            p2 = self._parse_token(TokenType.TkAssign).parse_once()
             p3 = self._parse_type_identifier().parse_once()
             return Ast.TypeGenericArgumentNamedAst(p1, p3)
         return BoundParser(self, inner)
@@ -1372,7 +1372,7 @@ class Parser:
     def _parse_type_generic_optional_parameter(self) -> BoundParser:
         def inner():
             p1 = self._parse_type_generic_required_parameter().parse_once()
-            p2 = self._parse_token(TokenType.TkEqual).parse_once()
+            p2 = self._parse_token(TokenType.TkAssign).parse_once()
             p3 = self._parse_type_identifier().parse_once()
             return Ast.TypeGenericParameterOptionalAst(p1, p3)
         return BoundParser(self, inner)
@@ -1598,7 +1598,7 @@ class Parser:
         def inner():
             p1 = self._parse_token(TokenType.KwLet).parse_once()
             p2 = self._parse_local_variable_identifiers().parse_once()
-            p3 = self._parse_token(TokenType.TkEqual).parse_once()
+            p3 = self._parse_token(TokenType.TkAssign).parse_once()
             p4 = self._parse_non_assignment_expression().parse_once()
             p5 = self._parse_statements_residual_action().parse_optional()
             return Ast.LetStatementAst(p2, p4, None, p5)
@@ -1732,7 +1732,7 @@ class Parser:
 
     def _parse_postfix_operator_struct_initializer_field_value_different_to_identifier(self) -> BoundParser:
         def inner():
-            p3 = self._parse_token(TokenType.TkColon).parse_once()
+            p3 = self._parse_token(TokenType.TkEq).parse_once()
             p4 = self._parse_non_assignment_expression().parse_once()
             return p4
         return BoundParser(self, inner)
