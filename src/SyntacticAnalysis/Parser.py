@@ -425,6 +425,7 @@ class Parser:
         return BoundParser(self, inner)
 
     # Classes
+
     def _parse_class_prototype(self) -> BoundParser:
         def inner():
             p1 = self._parse_decorators().parse_optional() or []
@@ -1409,7 +1410,8 @@ class Parser:
             p4 = self._parse_where_constraint_chain().parse_once()
             return p4
         return BoundParser(self, inner)
-# Statements
+
+    # Statements
 
     def _parse_statement_if(self) -> BoundParser:
         def inner():
@@ -1538,8 +1540,9 @@ class Parser:
     def _parse_statement_yield(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.KwYield).parse_once()
-            p2 = self._parse_expression().parse_optional()
-            return Ast.YieldStatementAst(p2)
+            p2 = self._parse_parameter_passing_convention().parse_optional()
+            p3 = self._parse_expression().parse_optional()
+            return Ast.YieldStatementAst(p2, p3)
         return BoundParser(self, inner)
 
     def _parse_statement_typedef(self) -> BoundParser:

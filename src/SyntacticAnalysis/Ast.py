@@ -312,6 +312,7 @@ class ReturnStatementAst:
 
 @dataclass
 class YieldStatementAst:
+    convention: Optional[ParameterPassingConventionReferenceAst]
     value: list[ExpressionAst]
 
 @dataclass
