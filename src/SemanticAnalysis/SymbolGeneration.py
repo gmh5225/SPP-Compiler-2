@@ -57,10 +57,7 @@ class SymbolTable:
         del self.symbols[name]
 
     def json(self) -> dict[str, any]:
-        d = {}
-        for k, v in self.symbols.items():
-            d[repr(k)] = repr(v.type)
-        return d
+        return {name: symbol.json() for name, symbol in self.symbols.items()}
 
 class Scope:
     name: str
