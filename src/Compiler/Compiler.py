@@ -1,6 +1,6 @@
 from src.LexicalAnalysis.Tokens import Token
 from src.LexicalAnalysis.Lexer import Lexer, Lexer
-from src.SemanticAnalysis.Semantics import Semantic
+from src.SemanticAnalysis.Semantics import Semantics
 from src.SyntacticAnalysis.Ast import ProgramAst
 from src.SyntacticAnalysis.Parser import Parser
 
@@ -20,5 +20,5 @@ class Compiler:
         d = dataclasses.asdict(self._ast)
         save_json(d, "_out/ast.json")
 
-        # Semantic(self._ast)
+        Semantics(self._ast)
 

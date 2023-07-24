@@ -22,10 +22,6 @@ class IdentifierAst:
     identifier: str
 
 @dataclass
-class TagIdentifierAst:
-    identifier: str
-
-@dataclass
 class ModuleIdentifierAst:
     parts: list[IdentifierAst]
 
@@ -222,7 +218,7 @@ class LambdaCaptureItemAst:
 class LambdaAst:
     captures: list[LambdaCaptureItemAst]
     parameters: list[LambdaParameterAst]
-    body: list[StatementAst]
+    body: ExpressionAst
 
 @dataclass
 class TypeGenericParameterAst:
@@ -272,7 +268,7 @@ class PatternStatementAst:
     comparison_op: Optional[TokenAst]
     patterns: list[PatternAst]
     guard: Optional[ValueGuardAst]
-    body: list[StatementAst]
+    body: ExpressionAst
 
 @dataclass
 class PatternAst:
@@ -281,23 +277,7 @@ class PatternAst:
 @dataclass
 class WhileStatementAst:
     condition: ExpressionAst
-    tag: Optional[TagIdentifierAst]
-    body: InnerScopeAst
-    else_: Optional[InnerScopeAst]
-
-@dataclass
-class ForStatementAst:
-    identifiers: list[LocalVariableAst]
-    iterable: ExpressionAst
-    tag: Optional[TagIdentifierAst]
-    body: InnerScopeAst
-    else_: Optional[InnerScopeAst]
-
-@dataclass
-class DoWhileStatementAst:
-    condition: ExpressionAst
-    tag: Optional[TagIdentifierAst]
-    body: InnerScopeAst
+    body: list[StatementAst]
     else_: Optional[InnerScopeAst]
 
 @dataclass
@@ -319,15 +299,6 @@ class YieldStatementAst:
 class TypedefStatementAst:
     new_type: TypeAst
     old_type: TypeAst
-
-@dataclass
-class BreakStatementAst:
-    loop_tag: Optional[TagIdentifierAst]
-    returning_expressions: list[ExpressionAst]
-
-@dataclass
-class ContinueStatementAst:
-    loop_tag: Optional[TagIdentifierAst]
 
 @dataclass
 class LetStatementAst:
@@ -437,8 +408,8 @@ PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixS
 NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiteralBase02Ast
 LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | RegexLiteralAst | TupleLiteralAst
 TypeAst = TypeSingleAst | TypeTupleAst
-PrimaryExpressionAst = LiteralAst | IdentifierAst | GenericIdentifierAst | LambdaAst | PlaceholderAst | TypeSingleAst | IfStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst | YieldStatementAst | InnerScopeAst | WithStatementAst
-ExpressionAst = BinaryExpressionAst | PostfixExpressionAst | AssignmentExpressionAst | PrimaryExpressionAst | TokenAst  # todo: separate AST for "..."?
-StatementAst = IfStatementAst | WhileStatementAst | ForStatementAst | DoWhileStatementAst | WithStatementAst | ReturnStatementAst | YieldStatementAst | TypedefStatementAst | LetStatementAst | ExpressionAst
+PrimaryExpressionAst = LiteralAst | IdentifierAst | LambdaAst | PlaceholderAst | TypeSingleAst | IfStatementAst | WhileStatementAst | YieldStatementAst | InnerScopeAst | WithStatementAst | TokenAst
+ExpressionAst = BinaryExpressionAst | PostfixExpressionAst | AssignmentExpressionAst | PrimaryExpressionAst | TokenAst
+StatementAst = TypedefStatementAst | ReturnStatementAst | LetStatementAst | ExpressionAst | FunctionPrototypeAst
 ModuleMemberAst = EnumPrototypeAst | ClassPrototypeAst | FunctionPrototypeAst | SupPrototypeNormalAst | SupPrototypeInheritanceAst
 SupMemberAst = SupMethodPrototypeAst | SupTypedefAst

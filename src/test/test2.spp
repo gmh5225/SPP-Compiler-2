@@ -1,40 +1,22 @@
-pub mod std::func;
+mod std::func;
 
 
-pub cls FnOnce[R, Args: std::Tup] {}
-
-pub cls FnMut[R, Args: std::Tup] {}
-
-pub cls Fn[R, Args: std::Tup] {
-    __virtual__: std::Bool;
-    __abstract__: std::Bool;
-    __static__: std::Bool;
+cls A {
+    a: Num;
+    b: Num;
 }
 
 
-sup[R, Args: std::Tup] FnOnce[R, Args] {
-    @std::abstract_method
-    pub fn __call_once__(self: Self, args: Args) -> R {}
-}
-
-sup[R, Args: std::Tup] FnMut[R, Args] {
-    @std::abstract_method
-    pub fn __call__mut__(self: &mut Self, args: Args) -> R {}
-}
-
-sup[R, Args: std::Tup] Fn[R, Args] {
-    @std::abstract_method
-    pub fn __call_ref__(self: &Self, args: Args) -> R {}
-}
-
-sup[R, Args: std::Tup] FnOnce[R, Args] for FnMut[R, Args] {
-    pub fn __call_once__(self: Self, args: Args) -> R {
-        ret self.__call_mut__(...args);
+sup B for A {
+    fn new(a: Num, b: Num) -> Self {
+        ret Self { a, b };
     }
 }
 
-sup[R, Args: std::Tup] FnMut[R, Args] for Fn[R, Args] {
-    pub fn __call_mut__(self: Self, args: Args) -> R {
-        ret self.__call_ref__(...arfs);
+
+sup C for A {
+    fn test(self: &Self) -> Num {
+        ret self.a + self.b;
     }
 }
+
