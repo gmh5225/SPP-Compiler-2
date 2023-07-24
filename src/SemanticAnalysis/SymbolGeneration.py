@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Optional
+import base64, pickle
 
 from src.SyntacticAnalysis import Ast
 
@@ -23,8 +24,8 @@ class Symbol:
     def json(self) -> dict[str, any]:
         d = {
             "Name": self.name,
-            "Type": repr(self.type),
-            "Value": repr(self.value),
+            "Type": base64.b64encode(pickle.dumps(self.type)).decode(),
+            "Value": base64.b64encode(pickle.dumps(self.value)).decode(),
             "Index": self.index,
         }
 
