@@ -67,28 +67,24 @@ class TokenType(Enum):
     KwMod = "mod"
     KwUse = "use"
     KwEnum = "enum"
-    KwIn = "in"
     KwFn = "fn"
     KwGn = "gn"
     KwMut = "mut"
     KwLet = "let"
     KwIf = "if"
-    KwElse = "else" # -- change how `if` works
-    KwWhile = "while" # -- unify with `for`
-    KwFor = "for"
-    KwDo = "do" # -- unify with `for`
+    KwElse = "else"
+    KwWhile = "while"
     KwReturn = "ret"
     KwYield = "yield"
     KwCls = "cls"
-    KwWhere = "where" # -- replace with `if`?
-    KwTrue = "true" # -- use std::Bool::True()
-    KwFalse = "false" # -- use std::Bool::False()
+    KwWhere = "where"
+    KwTrue = "true"
+    KwFalse = "false"
     KwAs = "as"
     KwSup = "sup"
     KwWith = "with"
-    KwBreak = "break" # -- might be removing breaks => remove labels
-    KwContinue = "cont" # -- might be removing continues => remove labels
     KwSelf = "Self"
+    KwFor = "for"
 
     # Don't change order of these (regex are matched in this order)
     # 0x12 must be HexDigits not DecDigits(0) then Identifier(x12)

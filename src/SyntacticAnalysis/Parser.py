@@ -1026,11 +1026,10 @@ class Parser:
             p6 = self._parse_expression_placeholder().delay_parse()
 
             p7 = self._parse_statement_if().delay_parse()
-            p9 = self._parse_statement_while().delay_parse()
             p12 = self._parse_statement_new_scope().delay_parse()
             p13 = self._parse_statement_yield().delay_parse()
             p14 = self._parse_statement_with().delay_parse()
-            p15 = (p7 | p9 | p12 | p13 | p14 | p4 | p3 | p1 | p2 | p5 | p6).parse_once()
+            p15 = (p7 | p12 | p13 | p14 | p4 | p3 | p1 | p2 | p5 | p6).parse_once()
             return p15
         return BoundParser(self, inner)
 
@@ -1604,10 +1603,11 @@ class Parser:
         def inner():
             p7 = self._parse_statement_typedef().delay_parse()
             p8 = self._parse_statement_return().delay_parse()
+            p9 = self._parse_statement_while().delay_parse()
             p10 = self._parse_statement_let().delay_parse()
             p13 = self._parse_statement_expression().delay_parse()
             p14 = self._parse_function_prototype().delay_parse()
-            p16 = (p13 | p7 | p8 | p10 | p14).parse_once()
+            p16 = (p13 | p7 | p8 | p9 | p10 | p14).parse_once()
             return p16
         return BoundParser(self, inner)
 

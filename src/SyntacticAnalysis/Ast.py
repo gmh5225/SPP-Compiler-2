@@ -28,7 +28,7 @@ class ModuleIdentifierAst:
 @dataclass
 class GenericIdentifierAst:
     identifier: str
-    generic: list[TypeGenericArgumentAst]
+    generic_arguments: list[TypeGenericArgumentAst]
 
 @dataclass
 class SelfTypeAst:
@@ -259,7 +259,7 @@ class TypeTupleAst:
 
 @dataclass
 class IfStatementAst:
-    expression: ExpressionAst
+    condition: ExpressionAst
     comparison_op: TokenAst
     branches: list[PatternStatementAst]
 
@@ -408,8 +408,8 @@ PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixS
 NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiteralBase02Ast
 LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | RegexLiteralAst | TupleLiteralAst
 TypeAst = TypeSingleAst | TypeTupleAst
-PrimaryExpressionAst = LiteralAst | IdentifierAst | LambdaAst | PlaceholderAst | TypeSingleAst | IfStatementAst | WhileStatementAst | YieldStatementAst | InnerScopeAst | WithStatementAst | TokenAst
+PrimaryExpressionAst = LiteralAst | IdentifierAst | LambdaAst | PlaceholderAst | TypeSingleAst | IfStatementAst | YieldStatementAst | InnerScopeAst | WithStatementAst | TokenAst
 ExpressionAst = BinaryExpressionAst | PostfixExpressionAst | AssignmentExpressionAst | PrimaryExpressionAst | TokenAst
-StatementAst = TypedefStatementAst | ReturnStatementAst | LetStatementAst | ExpressionAst | FunctionPrototypeAst
+StatementAst = TypedefStatementAst | ReturnStatementAst | LetStatementAst | ExpressionAst | WhileStatementAst | FunctionPrototypeAst
 ModuleMemberAst = EnumPrototypeAst | ClassPrototypeAst | FunctionPrototypeAst | SupPrototypeNormalAst | SupPrototypeInheritanceAst
 SupMemberAst = SupMethodPrototypeAst | SupTypedefAst
