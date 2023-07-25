@@ -2,9 +2,64 @@ from __future__ import annotations
 
 from src.SyntacticAnalysis import Ast
 from src.SemanticAnalysis.SymbolGeneration import ScopeHandler
+from src.SyntacticAnalysis.Parser import ErrorFormatter
 
 
 class TypeInference:
+    @staticmethod
+    def infer(ast: Ast.ProgramAst, s: ScopeHandler) -> None:
+        TypeInference.infer_type_of_program(ast, s)
+        s.switch_to_global_scope()
+
+    @staticmethod
+    def infer_type_of_program(ast: Ast.ProgramAst, s: ScopeHandler) -> None:
+        for module_member in ast.module.body.members:
+            match module_member:
+                case Ast.FunctionPrototypeAst(): TypeInference.infer_type_of_function_prototype(module_member, s)
+                case Ast.ClassPrototypeAst() | Ast.EnumPrototypeAst(): return
+                case Ast.SupPrototypeNormalAst(): TypeInference.infer_type_of_sup_prototype(module_member, s)
+                case Ast.SupPrototypeInheritanceAst(): TypeInference.infer_type_of_sup_prototype(module_member, s)
+
+    @staticmethod
+    def infer_type_of_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> None:
+        s.next_scope()
+        for statement in ast.body.statements:
+            TypeInference.infer_type_of_statement(statement, s)
+        s.prev_scope()
+
+    @staticmethod
+    def infer_type_of_statement(ast: Ast.StatementAst, s: ScopeHandler) -> None:
+        match ast:
+            case Ast.TypedefStatementAst(): return
+            case Ast.ReturnStatementAst(): return
+            case Ast.LetStatementAst(): TypeInference.infer_type_of_let_statement(ast, s)
+            case Ast.FunctionPrototypeAst(): TypeInference.infer_type_of_function_prototype(ast, s)
+            case _: TypeInference.infer_type_of_expression(ast, s)
+
+    @staticmethod
+    def infer_type_of_let_statement(ast: Ast.LetStatementAst, s: ScopeHandler) -> None:
+        if len(ast.variables) == 1:
+            s.current_scope.get_symbol(ast.variables[0].identifier.identifier).type = ast.type_annotation or TypeInference.infer_type_of_expression(ast.value, s)
+        else:
+            inferred_type = TypeInference.infer_type_of_expression(ast.value, s)
+            if not isinstance(inferred_type, Ast.TypeTupleAst):
+                exception = Exception(
+                    ErrorFormatter.error(ast._tok) +
+                    f"Expected a tuple type, but found {inferred_type}.")
+                raise SystemExit(exception) from None
+            if len(inferred_type.types) != len(ast.variables):
+                exception = Exception(
+                    ErrorFormatter.error(ast._tok) +
+                    f"Expected a tuple of length {len(ast.variables)}, but found {inferred_type}.")
+                raise SystemExit(exception) from None
+            for i in range(len(ast.variables)):
+                s.current_scope.get_symbol(ast.variables[i].identifier.identifier).type = inferred_type.types[i]
+
+    @staticmethod
+    def infer_type_of_sup_prototype(ast: Ast.SupPrototypeNormalAst | Ast.SupPrototypeInheritanceAst, s: ScopeHandler) -> None:
+        for statement in ast.body.members:
+            TypeInference.infer_type_of_statement(statement, s)
+
     @staticmethod
     def infer_type_of_expression(ast: Ast.ExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
         match ast:
@@ -18,9 +73,23 @@ class TypeInference:
             case Ast.BinaryExpressionAst: return TypeInference.infer_type_of_binary_expression(ast, s)
             case Ast.PostfixExpressionAst: return TypeInference.infer_type_of_postfix_expression(ast, s)
             case Ast.AssignmentExpressionAst: return TypeInference.infer_type_of_assignment_expression(ast, s)
-            case Ast.PlaceholderAst: return TypeInference.infer_type_of_placeholder(ast, s)
+            case Ast.PlaceholderAst:
+                error = Exception(
+                    ErrorFormatter.error(ast._tok) +
+                    f"Placeholder found in an incorrect position.")
+                raise SystemExit(error) from None
             case Ast.TypeSingleAst: return TypeInference.infer_type_of_type_single(ast, s)
             case Ast.WhileStatementAst: return TypeInference.infer_type_of_while_statement(ast, s)
+            case Ast.BoolLiteralAst: return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Bool", [], -1)], -1)
+            case Ast.StringLiteralAst: return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("String", [], -1)], -1)
+            case Ast.CharLiteralAst: return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Char", [], -1)], -1)
+            case Ast.RegexLiteralAst: return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Rgx", [], -1)], -1)
+            case Ast.TupleLiteralAst: return TypeInference.infer_type_of_tuple_literal(ast, s)
+            case Ast.NumberLiteralBase10Ast | Ast.NumberLiteralBase16Ast | Ast.NumberLiteralBase02Ast: return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Num", [], -1)], -1)
+
+    @staticmethod
+    def infer_type_of_tuple_literal(ast: Ast.TupleLiteralAst, s: ScopeHandler) -> Ast.TypeAst:
+        return Ast.TypeTupleAst([TypeInference.infer_type_of_expression(e, s) for e in ast.values], -1)
 
     @staticmethod
     def infer_type_of_identifier(ast: Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
@@ -28,17 +97,64 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_if_statement(ast: Ast.IfStatementAst, s: ScopeHandler) -> Ast.TypeAst:
-        return TypeInference.infer_type_of_expression(ast.branches[0].body, s)
+        s.next_scope()
+        t = Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Void", [], -1)], -1)
+        for branch in ast.branches:
+            t = TypeInference.infer_type_of_if_branch(branch, s)
+        s.prev_scope()
+        return t
+
+    @staticmethod
+    def infer_type_of_if_branch(ast: Ast.PatternStatementAst, s: ScopeHandler) -> Ast.TypeAst:
+        s.next_scope()
+        for statement in ast.body.statements:
+            TypeInference.infer_type_of_statement(statement, s)
+        t = TypeInference.infer_type_of_expression(ast.body.statements[-1], s)
+        s.prev_scope()
+        return t
 
     @staticmethod
     def infer_type_of_inner_scope(ast: Ast.InnerScopeAst, s: ScopeHandler) -> Ast.TypeAst:
-        return TypeInference.infer_type_of_expression(ast.body[-1], s)
+        s.next_scope()
+        t = TypeInference.infer_type_of_expression(ast.body[-1], s)
+        s.prev_scope()
 
     @staticmethod
     def infer_type_of_with_statement(ast: Ast.WithStatementAst, s: ScopeHandler) -> Ast.TypeAst:
-        return TypeInference.infer_type_of_expression(ast.body[-1], s)
+        s.next_scope()
+        for statement in ast.body:
+            TypeInference.infer_type_of_statement(statement, s)
+        t = TypeInference.infer_type_of_expression(ast.body[-1], s)
+        s.prev_scope()
+        return t
 
     @staticmethod
     def infer_type_of_binary_expression(ast: Ast.BinaryExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        mapped_function = BIN_FUNCTIONS[ast.op.tok.token_type]
+        return Ast.TypeAst([Ast.GenericIdentifierAst("Unknown", [], -1)])
 
+    @staticmethod
+    def infer_type_of_postfix_expression(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+        return Ast.TypeAst([Ast.GenericIdentifierAst("Unknown", [], -1)])
+
+    @staticmethod
+    def infer_type_of_assignment_expression(ast: Ast.AssignmentExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+        return Ast.TypeAst([Ast.GenericIdentifierAst("Unknown", [], -1)])
+
+    @staticmethod
+    def infer_type_of_type_single(ast: Ast.TypeSingleAst, s: ScopeHandler) -> Ast.TypeAst:
+        return ast
+
+    @staticmethod
+    def infer_type_of_while_statement(ast: Ast.WhileStatementAst, s: ScopeHandler) -> Ast.TypeAst:
+        s.next_scope()
+        for statement in ast.body:
+            TypeInference.infer_type_of_statement(statement, s)
+        s.prev_scope()
+        return Ast.TypeAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Void", [], -1)])
+
+    @staticmethod
+    def infer_type_of_lambda(ast: Ast.LambdaAst, s: ScopeHandler) -> Ast.TypeAst:
+        s.next_scope()
+        t = Ast.TypeAst([Ast.GenericIdentifierAst("Unknown", [], -1)])
+        s.prev_scope()
+        return t

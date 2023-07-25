@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Callable, Optional
 import base64, pickle
 
 from src.SyntacticAnalysis import Ast
@@ -24,8 +24,8 @@ class Symbol:
     def json(self) -> dict[str, any]:
         d = {
             "Name": self.name,
-            "Type": base64.b64encode(pickle.dumps(self.type)).decode(),
-            "Value": base64.b64encode(pickle.dumps(self.value)).decode(),
+            "Type": convert_type_to_string(self.type),  # base64.b64encode(pickle.dumps(self.type)).decode(),
+            # "Value": 1,  # base64.b64encode(pickle.dumps(self.value)).decode(),
             "Index": self.index,
         }
 
@@ -180,47 +180,20 @@ class ScopeHandler:
     def prev_scope(self) -> None:
         self.current_scope = self.current_scope.parent
 
-    """"
-    def next_scope(self) -> None:
-        # If the current scope has children, move to the first child.
-        if self.current_scope.children:
-            self.current_scope = self.current_scope.children[0]
-            
-        # Otherwise, if the current scope has a sibling, move to the next sibling.
-        elif self.current_scope.parent.children[-1] is not self.current_scope:
-            self.current_scope = self.current_scope.parent.children[self.current_scope.parent.children.index(self.current_scope) + 1]
-            
-        # Otherwise, if the current scope has a parent, move to the parent's next sibling. This has to be done
-        # iteratively so that we can move up multiple levels of the tree. Temporary hold the current scope's children
-        # so they are not recursively visited.
-        elif self.current_scope.parent is not None:
-            temp_hold_children = self.current_scope.parent.children
-            self.current_scope = self.current_scope.parent
-            self.current_scope.children = []
-            self.next_scope()
-            self.current_scope.children = temp_hold_children
-            
-        # Can't move past the last scope.
-        else:
-            raise Exception("No next scope")
-        
-    def prev_scope(self) -> None:
-        # If the current scope has a previous sibling, move to the previous sibling.
-        if self.current_scope.parent.children[0] is not self.current_scope:
-            self.current_scope = self.current_scope.parent.children[self.current_scope.parent.children.index(self.current_scope) - 1]
-            
-            # If the previous sibling has children, move to the last child.
-            while self.current_scope.children:
-                self.current_scope = self.current_scope.children[-1]
-                
-        # Otherwise, if the current scope has a parent, move to the parent.
-        elif self.current_scope.parent is not None:
-            self.current_scope = self.current_scope.parent
-            
-        # Can't move past the first scope.
-        else:
-            raise Exception("No previous scope")
-    """
+    def switch_to_global_scope(self) -> None:
+        # switch to global and "un-visit" every scope
+        self.current_scope = self.global_scope
+        self.visit_every_scope(lambda scope: setattr(scope, "visited", False))
+
+    def visit_every_scope(self, func: Callable) -> None:
+        # Apply some function to every scope, starting from the current scope and recursively visiting children
+        def visit_every_scope_helper(scope: Scope, func: Callable) -> None:
+            func(scope)
+            for child in scope.children:
+                visit_every_scope_helper(child, func)
+
+        current_scope = self.current_scope
+        visit_every_scope_helper(current_scope, func)
 
     def json(self) -> dict[str, any]:
         return self.global_scope.json()
@@ -231,6 +204,7 @@ class SymbolTableBuilder:
     def build(ast: Ast.ProgramAst) -> ScopeHandler:
         s = ScopeHandler()
         SymbolTableBuilder.build_program_symbols(ast, s)
+        s.switch_to_global_scope()
         return s
 
     @staticmethod
@@ -368,11 +342,33 @@ class SymbolTableBuilder:
             s.global_scope.add_symbol(Symbol(convert_identifier_to_string(method.identifier), get_function_type(method), None))
         s.exit_scope()
 
+
 def convert_identifier_to_string(ast: Ast.IdentifierAst | Ast.GenericIdentifierAst) -> str:
     x = ast.identifier
     if type(ast) == Ast.GenericIdentifierAst:
         return x + f"[{', '.join(map(lambda y: convert_identifier_to_string(y.identifier), ast.generic_arguments))}]"
     return x
+
+def convert_type_to_string(ast: Ast.TypeAst) -> str:
+    if isinstance(ast, Ast.TypeSingleAst):
+        s = ""
+        for p in ast.parts:
+            s += p.identifier
+            if p.generic_arguments:
+                p += f"[{', '.join(map(lambda y: convert_type_to_string(y), p.generic_arguments))}]"
+            s += "::"
+        return s[:-2]
+    elif isinstance(ast, Ast.TypeTupleAst):
+        s = "("
+        for p in ast.types:
+            s += convert_type_to_string(p) + ", "
+        return s[:-2] + ")"
+    elif isinstance(ast, str):
+        return ast # temp (for type: "TODO") etc
+    elif ast is None:
+        return ""
+    else:
+        raise NotImplementedError(f"TypeAst {ast} not implemented")
 
 def convert_identifier_to_string_no_generics(ast: Ast.IdentifierAst | Ast.GenericIdentifierAst) -> str:
     return ast.identifier

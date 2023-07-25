@@ -11,6 +11,7 @@ class SymbolChecker:
     @staticmethod
     def check(ast: Ast.ProgramAst, s: ScopeHandler) -> None:
         SymbolChecker.check_program_symbols(ast, s)
+        s.switch_to_global_scope()
 
     @staticmethod
     def check_program_symbols(ast: Ast.ProgramAst, s: ScopeHandler) -> None:
