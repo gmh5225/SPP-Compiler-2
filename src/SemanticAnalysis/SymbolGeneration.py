@@ -378,4 +378,14 @@ def convert_identifier_to_string_no_generics(ast: Ast.IdentifierAst | Ast.Generi
     return ast.identifier
 
 def get_function_type(ast: Ast.FunctionPrototypeAst) -> Ast.TypeAst:
+    """
+    Determine the type of a function. The function types are either std::FnRef, std::FnMut, or std::Fn. The generics of
+    the function type are the return type, followed by the arguments as a tuple. For example, a function accepting two
+    numbers and returning a string would have the type std::FnRef[String, (Num, Num)]. Steps:
+    1. Determine the type of the function => free functions are FnRef, methods are determined by the Self type
+    2. Determine the generics of the function => return type, followed by the arguments as a tuple
+
+    @param ast:
+    @return:
+    """
     return "TODO"
