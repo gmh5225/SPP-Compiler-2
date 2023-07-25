@@ -133,6 +133,14 @@ class Scope:
     def rem_type(self, name: str):
         self.types.rem(name)
 
+    def all_symbols(self) -> list[str]:
+        current = self
+        symbols = []
+        while current is not None:
+            symbols += current.symbols.symbols.keys()
+            current = current.parent
+        return symbols
+
     def json(self) -> dict[str, any]:
         return {
             "Name": self.name,
@@ -238,7 +246,7 @@ class SymbolTableBuilder:
     @staticmethod
     def build_function_prototype_symbols(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> None:
         s.current_scope.add_symbol(Symbol(convert_identifier_to_string(ast.identifier), get_function_type(ast), None))
-        s.enter_scope("FnPrototype")
+        s.enter_scope(f"FnPrototype__{convert_identifier_to_string(ast.identifier)}")
 
         for param in ast.parameters:
             s.current_scope.add_symbol(Symbol(convert_identifier_to_string(param.identifier), param.type_annotation, None))
@@ -266,6 +274,7 @@ class SymbolTableBuilder:
     def build_let_statement_symbols(ast: Ast.LetStatementAst, s: ScopeHandler) -> None:
         for i, variable in enumerate(ast.variables):
             s.current_scope.add_symbol(Symbol(convert_identifier_to_string(variable.identifier), ast.type_annotation, ast.value, i))
+            SymbolTableBuilder.build_expression_symbols(ast.value, s)
 
     @staticmethod
     def build_expression_symbols(ast: Ast.ExpressionAst, s: ScopeHandler) -> None:

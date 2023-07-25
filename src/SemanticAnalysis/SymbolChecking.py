@@ -4,6 +4,8 @@ from src.SyntacticAnalysis import Ast
 from src.SemanticAnalysis.SymbolGeneration import ScopeHandler
 from src.SyntacticAnalysis.Parser import ErrorFormatter
 
+import difflib
+
 
 class SymbolChecker:
     @staticmethod
@@ -92,9 +94,21 @@ class SymbolChecker:
     @staticmethod
     def check_identifier_symbols(ast: Ast.IdentifierAst, s: ScopeHandler) -> None:
         if not s.current_scope.has_symbol(ast.identifier):
+            looking_for = ast.identifier
+            possible = s.current_scope.all_symbols()
+            most_likely = (-1, "")
+            for p in possible:
+                ratio = difflib.SequenceMatcher(None, looking_for, p).ratio()
+                if ratio > most_likely[0]:
+                    most_likely = (ratio, p)
+                elif ratio == most_likely[0]:
+                    # Choose the option closest to the length of the identifier
+                    if abs(len(looking_for) - len(p)) < abs(len(looking_for) - len(most_likely[1])):
+                        most_likely = (ratio, p)
+
             error = Exception(
                 ErrorFormatter.error(ast._tok) +
-                f"Identifier '{ast.identifier}' not found in scope")
+                f"Identifier '{ast.identifier}' not found in scope. Did you mean '{most_likely[1]}'?")
             raise SystemExit(error) from None
 
     @staticmethod
