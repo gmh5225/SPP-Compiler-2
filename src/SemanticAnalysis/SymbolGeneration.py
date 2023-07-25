@@ -184,15 +184,16 @@ class SymbolTableBuilder:
         for generic in ast.generic_parameters:
             s.current_scope.add_type(Symbol(convert_identifier_to_string(generic.identifier), None, None))
         for statement in ast.body.statements:
-            SymbolTableBuilder.build_statement_symbol(statement, s)
+            SymbolTableBuilder.build_statement_symbols(statement, s)
 
         s.exit_scope()
 
     @staticmethod
-    def build_statement_symbol(ast: Ast.StatementAst, s: ScopeHandler) -> None:
+    def build_statement_symbols(ast: Ast.StatementAst, s: ScopeHandler) -> None:
         match ast:
             case Ast.TypedefStatementAst(): SymbolTableBuilder.build_typedef_statement_symbols(ast, s)
             case Ast.ReturnStatementAst(): pass
+            case Ast.WhileStatementAst(): SymbolTableBuilder.build_while_statement_symbols(ast, s)
             case Ast.LetStatementAst(): SymbolTableBuilder.build_let_statement_symbols(ast, s)
             case Ast.FunctionPrototypeAst(): SymbolTableBuilder.build_function_prototype_symbols(ast, s)
             case _: SymbolTableBuilder.build_expression_symbols(ast, s)
@@ -217,7 +218,6 @@ class SymbolTableBuilder:
             case Ast.PlaceholderAst(): pass
             case Ast.TypeSingleAst(): pass
             case Ast.IfStatementAst(): SymbolTableBuilder.build_if_statement_symbols(ast, s)
-            case Ast.WhileStatementAst(): SymbolTableBuilder.build_while_statement_symbols(ast, s)
             case Ast.YieldStatementAst(): pass
             case Ast.InnerScopeAst(): SymbolTableBuilder.build_inner_scope_symbols(ast, s)
             case Ast.WithStatementAst(): SymbolTableBuilder.build_with_statement_symbols(ast, s)
@@ -252,14 +252,14 @@ class SymbolTableBuilder:
     def build_while_statement_symbols(ast: Ast.WhileStatementAst, s: ScopeHandler) -> None:
         s.enter_scope("WhileStatement")
         for statement in ast.body:
-            SymbolTableBuilder.build_statement_symbol(statement, s)
+            SymbolTableBuilder.build_statement_symbols(statement, s)
         s.exit_scope()
 
     @staticmethod
     def build_inner_scope_symbols(ast: Ast.InnerScopeAst, s: ScopeHandler) -> None:
         s.enter_scope("InnerScope")
         for statement in ast.body:
-            SymbolTableBuilder.build_statement_symbol(statement, s)
+            SymbolTableBuilder.build_statement_symbols(statement, s)
         s.exit_scope()
 
     @staticmethod
@@ -267,7 +267,7 @@ class SymbolTableBuilder:
         s.enter_scope("WithStatement")
         s.current_scope.add_symbol(Symbol(convert_identifier_to_string(ast.alias.identifier), None, None))
         for statement in ast.body:
-            SymbolTableBuilder.build_statement_symbol(statement, s)
+            SymbolTableBuilder.build_statement_symbols(statement, s)
         s.exit_scope()
 
     @staticmethod
@@ -289,7 +289,7 @@ class SymbolTableBuilder:
     @staticmethod
     def build_sup_prototype_symbols(ast: Ast.SupPrototypeNormalAst | Ast.SupPrototypeInheritanceAst, s: ScopeHandler) -> None:
         if isinstance(ast, Ast.SupPrototypeInheritanceAst):
-            s.global_scope.get_type(convert_identifier_to_string(ast.identifier)).bases.append(ast.super_class)
+            s.global_scope.get_type(convert_identifier_to_string_no_generics(ast.identifier)).bases.append(convert_identifier_to_string(ast.super_class))
 
         s.enter_scope("SupPrototype")
         for typedef in filter(lambda member: isinstance(member, Ast.SupTypedefAst), ast.body.members):
@@ -298,8 +298,13 @@ class SymbolTableBuilder:
             s.global_scope.add_symbol(Symbol(convert_identifier_to_string(method.identifier), get_function_type(method), None))
         s.exit_scope()
 
+def convert_identifier_to_string(ast: Ast.IdentifierAst | Ast.GenericIdentifierAst) -> str:
+    x = ast.identifier
+    if type(ast) == Ast.GenericIdentifierAst:
+        return x + f"[{', '.join(map(lambda y: convert_identifier_to_string(y.identifier), ast.generic_arguments))}]"
+    return x
 
-def convert_identifier_to_string(ast: Ast.IdentifierAst) -> str:
+def convert_identifier_to_string_no_generics(ast: Ast.IdentifierAst | Ast.GenericIdentifierAst) -> str:
     return ast.identifier
 
 def get_function_type(ast: Ast.FunctionPrototypeAst) -> Ast.TypeAst:
