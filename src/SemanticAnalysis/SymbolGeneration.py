@@ -65,6 +65,7 @@ class Scope:
     types: SymbolTable
     parent: Optional[Scope]
     children: list[Scope]
+    visited: bool
 
     def __init__(self, name: str, parent: Optional[Scope] = None):
         self.name = name
@@ -75,6 +76,8 @@ class Scope:
         self.children = []
         if self.parent is not None:
             self.parent.children.append(self)
+
+        self.visited = False
 
     def add_symbol(self, symbol: Symbol):
         self.symbols.add(symbol)
@@ -153,6 +156,64 @@ class ScopeHandler:
     def exit_scope(self) -> None:
         self.current_scope = self.current_scope.parent
 
+    def next_scope(self) -> None:
+        # Use the Scope.visited flag to keep track of which scopes have been visited.
+
+        # First check if any children are unvisited, and visit the first one
+        if any([not scope.visited for scope in self.current_scope.children]):
+            unvisited_scopes = [scope for scope in self.current_scope.children if not scope.visited]
+            next_scope = unvisited_scopes[0]
+            next_scope.visited = True
+            self.current_scope = next_scope
+
+        else:
+            raise Exception("No unvisited scopes")
+
+    def prev_scope(self) -> None:
+        self.current_scope = self.current_scope.parent
+
+    """"
+    def next_scope(self) -> None:
+        # If the current scope has children, move to the first child.
+        if self.current_scope.children:
+            self.current_scope = self.current_scope.children[0]
+            
+        # Otherwise, if the current scope has a sibling, move to the next sibling.
+        elif self.current_scope.parent.children[-1] is not self.current_scope:
+            self.current_scope = self.current_scope.parent.children[self.current_scope.parent.children.index(self.current_scope) + 1]
+            
+        # Otherwise, if the current scope has a parent, move to the parent's next sibling. This has to be done
+        # iteratively so that we can move up multiple levels of the tree. Temporary hold the current scope's children
+        # so they are not recursively visited.
+        elif self.current_scope.parent is not None:
+            temp_hold_children = self.current_scope.parent.children
+            self.current_scope = self.current_scope.parent
+            self.current_scope.children = []
+            self.next_scope()
+            self.current_scope.children = temp_hold_children
+            
+        # Can't move past the last scope.
+        else:
+            raise Exception("No next scope")
+        
+    def prev_scope(self) -> None:
+        # If the current scope has a previous sibling, move to the previous sibling.
+        if self.current_scope.parent.children[0] is not self.current_scope:
+            self.current_scope = self.current_scope.parent.children[self.current_scope.parent.children.index(self.current_scope) - 1]
+            
+            # If the previous sibling has children, move to the last child.
+            while self.current_scope.children:
+                self.current_scope = self.current_scope.children[-1]
+                
+        # Otherwise, if the current scope has a parent, move to the parent.
+        elif self.current_scope.parent is not None:
+            self.current_scope = self.current_scope.parent
+            
+        # Can't move past the first scope.
+        else:
+            raise Exception("No previous scope")
+    """
+
     def json(self) -> dict[str, any]:
         return self.global_scope.json()
 
@@ -193,7 +254,6 @@ class SymbolTableBuilder:
         match ast:
             case Ast.TypedefStatementAst(): SymbolTableBuilder.build_typedef_statement_symbols(ast, s)
             case Ast.ReturnStatementAst(): pass
-            case Ast.WhileStatementAst(): SymbolTableBuilder.build_while_statement_symbols(ast, s)
             case Ast.LetStatementAst(): SymbolTableBuilder.build_let_statement_symbols(ast, s)
             case Ast.FunctionPrototypeAst(): SymbolTableBuilder.build_function_prototype_symbols(ast, s)
             case _: SymbolTableBuilder.build_expression_symbols(ast, s)
@@ -218,6 +278,7 @@ class SymbolTableBuilder:
             case Ast.PlaceholderAst(): pass
             case Ast.TypeSingleAst(): pass
             case Ast.IfStatementAst(): SymbolTableBuilder.build_if_statement_symbols(ast, s)
+            case Ast.WhileStatementAst(): SymbolTableBuilder.build_while_statement_symbols(ast, s)
             case Ast.YieldStatementAst(): pass
             case Ast.InnerScopeAst(): SymbolTableBuilder.build_inner_scope_symbols(ast, s)
             case Ast.WithStatementAst(): SymbolTableBuilder.build_with_statement_symbols(ast, s)

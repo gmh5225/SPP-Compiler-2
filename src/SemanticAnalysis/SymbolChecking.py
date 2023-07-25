@@ -21,15 +21,16 @@ class SymbolChecker:
 
     @staticmethod
     def check_function_prototype_symbols(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> None:
+        s.next_scope()
         for statement in ast.body.statements:
             SymbolChecker.check_statement_symbols(statement, s)
+        s.prev_scope()
 
     @staticmethod
     def check_statement_symbols(ast: Ast.StatementAst, s: ScopeHandler) -> None:
         match ast:
             case Ast.TypedefStatementAst(): return
             case Ast.ReturnStatementAst(): SymbolChecker.check_return_statement_symbols(ast, s)
-            case Ast.WhileStatementAst(): SymbolChecker.check_while_statement_symbols(ast, s)
             case Ast.LetStatementAst(): SymbolChecker.check_let_statement_symbols(ast, s)
             case Ast.FunctionPrototypeAst(): SymbolChecker.check_function_prototype_symbols(ast, s)
             case _: SymbolChecker.check_expression_symbols(ast, s)
@@ -49,6 +50,7 @@ class SymbolChecker:
             case Ast.PlaceholderAst(): return
             case Ast.TypeSingleAst(): return
             case Ast.IfStatementAst(): SymbolChecker.check_if_statement_symbols(ast, s)
+            case Ast.WhileStatementAst(): SymbolChecker.check_while_statement_symbols(ast, s)
             case Ast.YieldStatementAst(): SymbolChecker.check_yield_statement_symbols(ast, s)
             case Ast.InnerScopeAst(): SymbolChecker.check_inner_scope_symbols(ast, s)
             case Ast.WithStatementAst(): SymbolChecker.check_with_statement_symbols(ast, s)
@@ -74,7 +76,7 @@ class SymbolChecker:
     @staticmethod
     def check_postfix_function_call_symbols(ast: Ast.PostfixFunctionCallAst, s: ScopeHandler) -> None:
         for argument in ast.arguments:
-            SymbolChecker.check_expression_symbols(argument, s)
+            SymbolChecker.check_expression_symbols(argument.value, s)
 
     @staticmethod
     def check_postfix_struct_initializer_symbols(ast: Ast.PostfixStructInitializerAst, s: ScopeHandler) -> None:
@@ -93,7 +95,7 @@ class SymbolChecker:
             error = Exception(
                 ErrorFormatter.error(ast._tok) +
                 f"Identifier '{ast.identifier}' not found in scope")
-            raise error
+            raise SystemExit(error) from None
 
     @staticmethod
     def check_return_statement_symbols(ast: Ast.ReturnStatementAst, s: ScopeHandler) -> None:
@@ -105,19 +107,25 @@ class SymbolChecker:
 
     @staticmethod
     def check_lambda_symbols(ast: Ast.LambdaAst, s: ScopeHandler) -> None:
+        s.next_scope()
         SymbolChecker.check_expression_symbols(ast.body, s)
+        s.prev_scope()
 
     @staticmethod
     def check_if_statement_symbols(ast: Ast.IfStatementAst, s: ScopeHandler) -> None:
+        s.next_scope()
         SymbolChecker.check_expression_symbols(ast.condition, s)
         for branch in ast.branches:
             SymbolChecker.check_if_branch_symbols(branch, s)
+        s.prev_scope()
 
     @staticmethod
     def check_if_branch_symbols(ast: Ast.PatternStatementAst, s: ScopeHandler) -> None:
+        s.next_scope()
         for pattern in ast.patterns:
             SymbolChecker.check_patterns_symbols(pattern, s)
         SymbolChecker.check_expression_symbols(ast.body, s)
+        s.prev_scope()
 
     @staticmethod
     def check_patterns_symbols(ast: Ast.PatternAst, s: ScopeHandler) -> None:
@@ -125,20 +133,26 @@ class SymbolChecker:
 
     @staticmethod
     def check_while_statement_symbols(ast: Ast.WhileStatementAst, s: ScopeHandler) -> None:
+        s.next_scope()
         SymbolChecker.check_expression_symbols(ast.condition, s)
         for statement in ast.body:
             SymbolChecker.check_statement_symbols(statement, s)
+        s.prev_scope()
 
     @staticmethod
     def check_inner_scope_symbols(ast: Ast.InnerScopeAst, s: ScopeHandler) -> None:
+        s.next_scope()
         for statement in ast.body:
             SymbolChecker.check_statement_symbols(statement, s)
+        s.prev_scope()
 
     @staticmethod
     def check_with_statement_symbols(ast: Ast.WithStatementAst, s: ScopeHandler) -> None:
+        s.next_scope()
         SymbolChecker.check_expression_symbols(ast.value, s)
         for statement in ast.body:
             SymbolChecker.check_statement_symbols(statement, s)
+        s.prev_scope()
 
     @staticmethod
     def check_sup_prototype_symbols(ast: Ast.SupPrototypeNormalAst | Ast.SupPrototypeInheritanceAst, s: ScopeHandler) -> None:
