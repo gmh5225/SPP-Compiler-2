@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from src.SyntacticAnalysis import Ast
 from src.SemanticAnalysis.SymbolGeneration import ScopeHandler
+from src.SyntacticAnalysis.Parser import ErrorFormatter
 
 
 class SymbolChecker:
@@ -89,7 +90,10 @@ class SymbolChecker:
     @staticmethod
     def check_identifier_symbols(ast: Ast.IdentifierAst, s: ScopeHandler) -> None:
         if not s.current_scope.has_symbol(ast.identifier):
-            raise Exception(f"IdentifierAst {ast} not implemented")
+            error = Exception(
+                ErrorFormatter.error(ast._tok) +
+                f"Identifier '{ast.identifier}' not found in scope")
+            raise error
 
     @staticmethod
     def check_return_statement_symbols(ast: Ast.ReturnStatementAst, s: ScopeHandler) -> None:
