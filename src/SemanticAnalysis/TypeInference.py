@@ -63,29 +63,35 @@ class TypeInference:
     @staticmethod
     def infer_type_of_expression(ast: Ast.ExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
         match ast:
-            case Ast.IdentifierAst: return TypeInference.infer_type_of_identifier(ast, s)
-            case Ast.LambdaAst: return TypeInference.infer_type_of_lambda(ast, s)
-            case Ast.IfStatementAst: return TypeInference.infer_type_of_if_statement(ast, s)
-            case Ast.YieldStatementAst: return
-            case Ast.InnerScopeAst: TypeInference.infer_type_of_inner_scope(ast, s)
-            case Ast.WithStatementAst: return TypeInference.infer_type_of_with_statement(ast, s)
-            case Ast.TokenAst: return
-            case Ast.BinaryExpressionAst: return TypeInference.infer_type_of_binary_expression(ast, s)
-            case Ast.PostfixExpressionAst: return TypeInference.infer_type_of_postfix_expression(ast, s)
-            case Ast.AssignmentExpressionAst: return TypeInference.infer_type_of_assignment_expression(ast, s)
-            case Ast.PlaceholderAst:
+            case Ast.IdentifierAst(): return TypeInference.infer_type_of_identifier(ast, s)
+            case Ast.LambdaAst(): return TypeInference.infer_type_of_lambda(ast, s)
+            case Ast.IfStatementAst(): return TypeInference.infer_type_of_if_statement(ast, s)
+            case Ast.YieldStatementAst(): return
+            case Ast.InnerScopeAst(): TypeInference.infer_type_of_inner_scope(ast, s)
+            case Ast.WithStatementAst(): return TypeInference.infer_type_of_with_statement(ast, s)
+            case Ast.TokenAst(): return
+            case Ast.BinaryExpressionAst(): return TypeInference.infer_type_of_binary_expression(ast, s)
+            case Ast.PostfixExpressionAst(): return TypeInference.infer_type_of_postfix_expression(ast, s)
+            case Ast.AssignmentExpressionAst(): return TypeInference.infer_type_of_assignment_expression(ast, s)
+            case Ast.PlaceholderAst():
                 error = Exception(
                     ErrorFormatter.error(ast._tok) +
                     f"Placeholder found in an incorrect position.")
                 raise SystemExit(error) from None
-            case Ast.TypeSingleAst: return TypeInference.infer_type_of_type_single(ast, s)
-            case Ast.WhileStatementAst: return TypeInference.infer_type_of_while_statement(ast, s)
-            case Ast.BoolLiteralAst: return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Bool", [], -1)], -1)
-            case Ast.StringLiteralAst: return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("String", [], -1)], -1)
-            case Ast.CharLiteralAst: return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Char", [], -1)], -1)
-            case Ast.RegexLiteralAst: return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Rgx", [], -1)], -1)
-            case Ast.TupleLiteralAst: return TypeInference.infer_type_of_tuple_literal(ast, s)
-            case Ast.NumberLiteralBase10Ast | Ast.NumberLiteralBase16Ast | Ast.NumberLiteralBase02Ast: return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Num", [], -1)], -1)
+            case Ast.TypeSingleAst(): return TypeInference.infer_type_of_type_single(ast, s)
+            case Ast.WhileStatementAst(): return TypeInference.infer_type_of_while_statement(ast, s)
+            case Ast.BoolLiteralAst(): return CommonTypes.bool()
+            case Ast.StringLiteralAst(): return CommonTypes.string()
+            case Ast.CharLiteralAst(): return CommonTypes.char()
+            case Ast.RegexLiteralAst(): return CommonTypes.regex()
+            case Ast.TupleLiteralAst(): return TypeInference.infer_type_of_tuple_literal(ast, s)
+            case Ast.NumberLiteralBase10Ast() | Ast.NumberLiteralBase16Ast() | Ast.NumberLiteralBase02Ast(): CommonTypes.num()
+            case _:
+                error = Exception(
+                    ErrorFormatter.error(ast._tok) +
+                    f"Expression {type(ast)} not yet supported.")
+                raise SystemExit(error) from None
+
 
     @staticmethod
     def infer_type_of_tuple_literal(ast: Ast.TupleLiteralAst, s: ScopeHandler) -> Ast.TypeAst:
@@ -98,7 +104,7 @@ class TypeInference:
     @staticmethod
     def infer_type_of_if_statement(ast: Ast.IfStatementAst, s: ScopeHandler) -> Ast.TypeAst:
         s.next_scope()
-        t = Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Void", [], -1)], -1)
+        t = CommonTypes.void()
         for branch in ast.branches:
             t = TypeInference.infer_type_of_if_branch(branch, s)
         s.prev_scope()
@@ -107,9 +113,7 @@ class TypeInference:
     @staticmethod
     def infer_type_of_if_branch(ast: Ast.PatternStatementAst, s: ScopeHandler) -> Ast.TypeAst:
         s.next_scope()
-        for statement in ast.body.statements:
-            TypeInference.infer_type_of_statement(statement, s)
-        t = TypeInference.infer_type_of_expression(ast.body.statements[-1], s)
+        t = TypeInference.infer_type_of_expression(ast.body, s)
         s.prev_scope()
         return t
 
@@ -130,15 +134,15 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_binary_expression(ast: Ast.BinaryExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        return Ast.TypeAst([Ast.GenericIdentifierAst("Unknown", [], -1)])
+        return CommonTypes.unknown()
 
     @staticmethod
     def infer_type_of_postfix_expression(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        return Ast.TypeAst([Ast.GenericIdentifierAst("Unknown", [], -1)])
+        return CommonTypes.unknown()
 
     @staticmethod
     def infer_type_of_assignment_expression(ast: Ast.AssignmentExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        return Ast.TypeAst([Ast.GenericIdentifierAst("Unknown", [], -1)])
+        return CommonTypes.unknown()
 
     @staticmethod
     def infer_type_of_type_single(ast: Ast.TypeSingleAst, s: ScopeHandler) -> Ast.TypeAst:
@@ -150,11 +154,41 @@ class TypeInference:
         for statement in ast.body:
             TypeInference.infer_type_of_statement(statement, s)
         s.prev_scope()
-        return Ast.TypeAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Void", [], -1)])
+        return CommonTypes.void()
 
     @staticmethod
     def infer_type_of_lambda(ast: Ast.LambdaAst, s: ScopeHandler) -> Ast.TypeAst:
         s.next_scope()
-        t = Ast.TypeAst([Ast.GenericIdentifierAst("Unknown", [], -1)])
+        t = CommonTypes.unknown()
         s.prev_scope()
         return t
+
+
+class CommonTypes:
+    @staticmethod
+    def void() -> Ast.TypeAst:
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Void", [], -1)], -1)
+    
+    @staticmethod
+    def bool() -> Ast.TypeAst:
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Bool", [], -1)], -1)
+    
+    @staticmethod
+    def string() -> Ast.TypeAst:
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Str", [], -1)], -1)
+    
+    @staticmethod
+    def char() -> Ast.TypeAst:
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Char", [], -1)], -1)
+    
+    @staticmethod
+    def regex() -> Ast.TypeAst:
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Rgx", [], -1)], -1)
+    
+    @staticmethod
+    def num() -> Ast.TypeAst:
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Num", [], -1)], -1)
+    
+    @staticmethod
+    def unknown() -> Ast.TypeAst:
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Unknown", [], -1)], -1)

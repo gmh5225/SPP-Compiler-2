@@ -271,7 +271,7 @@
                                                                                                                "_tok": 318},
                                                                                                        "_tok": 314},
                                                                                              "_tok": 312},
-                                                                                   "body": {"value": "foo",
+                                                                                   "body": {"value": ""foo"",
                                                                                             "_tok": 322},
                                                                                    "_tok": 300},
                                                                                   {"comparison_op": {"tok": {"token_metadata": ">",
@@ -297,7 +297,7 @@
                                                                                                                "_tok": 343},
                                                                                                        "_tok": 339},
                                                                                              "_tok": 337},
-                                                                                   "body": {"value": "bar",
+                                                                                   "body": {"value": ""bar"",
                                                                                             "_tok": 347},
                                                                                    "_tok": 325},
                                                                                   {"comparison_op": null,
@@ -305,7 +305,7 @@
                                                                                                            "_tok": 350},
                                                                                                  "_tok": 350}],
                                                                                    "guard": null,
-                                                                                   "body": {"value": "baz",
+                                                                                   "body": {"value": ""baz"",
                                                                                             "_tok": 362},
                                                                                    "_tok": 350}],
                                                                      "_tok": 294},
@@ -467,7 +467,7 @@
                                                                          "body": {"lhs": {"identifier": "println",
                                                                                           "_tok": 566},
                                                                                   "op": {"arguments": [{"identifier": null,
-                                                                                                        "value": {"value": "123",
+                                                                                                        "value": {"value": ""123"",
                                                                                                                   "_tok": 569},
                                                                                                         "calling_convention": null,
                                                                                                         "unpack": false,
@@ -487,7 +487,7 @@
                                                                          "body": {"lhs": {"identifier": "println",
                                                                                           "_tok": 584},
                                                                                   "op": {"arguments": [{"identifier": null,
-                                                                                                        "value": {"value": "234",
+                                                                                                        "value": {"value": ""234"",
                                                                                                                   "_tok": 587},
                                                                                                         "calling_convention": null,
                                                                                                         "unpack": false,
@@ -513,8 +513,8 @@
                                                                          "body": {"lhs": {"identifier": "println",
                                                                                           "_tok": 622},
                                                                                   "op": {"arguments": [{"identifier": null,
-                                                                                                        "value": {"value": "> "
-                                                                                                                           "234",
+                                                                                                        "value": {"value": ""> "
+                                                                                                                           "234"",
                                                                                                                   "_tok": 625},
                                                                                                         "calling_convention": null,
                                                                                                         "unpack": false,
@@ -536,8 +536,8 @@
                                                                          "body": {"lhs": {"identifier": "println",
                                                                                           "_tok": 642},
                                                                                   "op": {"arguments": [{"identifier": null,
-                                                                                                        "value": {"value": "> "
-                                                                                                                           "123",
+                                                                                                        "value": {"value": ""> "
+                                                                                                                           "123"",
                                                                                                                   "_tok": 645},
                                                                                                         "calling_convention": null,
                                                                                                         "unpack": false,
@@ -585,14 +585,14 @@
                                                                          "body": {"lhs": {"identifier": "println",
                                                                                           "_tok": 692},
                                                                                   "op": {"arguments": [{"identifier": null,
-                                                                                                        "value": {"value": "< "
+                                                                                                        "value": {"value": ""< "
                                                                                                                            "123 "
                                                                                                                            "&& "
                                                                                                                            "a "
                                                                                                                            "% "
                                                                                                                            "2 "
                                                                                                                            "== "
-                                                                                                                           "0",
+                                                                                                                           "0"",
                                                                                                                   "_tok": 695},
                                                                                                         "calling_convention": null,
                                                                                                         "unpack": false,
@@ -636,14 +636,14 @@
                                                                          "body": {"lhs": {"identifier": "println",
                                                                                           "_tok": 724},
                                                                                   "op": {"arguments": [{"identifier": null,
-                                                                                                        "value": {"value": "< "
+                                                                                                        "value": {"value": ""< "
                                                                                                                            "000 "
                                                                                                                            "&& "
                                                                                                                            "a "
                                                                                                                            "% "
                                                                                                                            "2 "
                                                                                                                            "== "
-                                                                                                                           "0",
+                                                                                                                           "0"",
                                                                                                                   "_tok": 727},
                                                                                                         "calling_convention": null,
                                                                                                         "unpack": false,
@@ -687,7 +687,7 @@
                                                                          "body": {"lhs": {"identifier": "println",
                                                                                           "_tok": 774},
                                                                                   "op": {"arguments": [{"identifier": null,
-                                                                                                        "value": {"value": "Origin",
+                                                                                                        "value": {"value": ""Origin"",
                                                                                                                   "_tok": 777},
                                                                                                         "calling_convention": null,
                                                                                                         "unpack": false,
@@ -721,10 +721,10 @@
                                                                          "body": {"lhs": {"identifier": "println",
                                                                                           "_tok": 804},
                                                                                   "op": {"arguments": [{"identifier": null,
-                                                                                                        "value": {"value": "On "
+                                                                                                        "value": {"value": ""On "
                                                                                                                            "the "
                                                                                                                            "x "
-                                                                                                                           "axis",
+                                                                                                                           "axis"",
                                                                                                                   "_tok": 807},
                                                                                                         "calling_convention": null,
                                                                                                         "unpack": false,
@@ -758,10 +758,10 @@
                                                                          "body": {"lhs": {"identifier": "println",
                                                                                           "_tok": 834},
                                                                                   "op": {"arguments": [{"identifier": null,
-                                                                                                        "value": {"value": "On "
+                                                                                                        "value": {"value": ""On "
                                                                                                                            "the "
                                                                                                                            "y "
-                                                                                                                           "axis",
+                                                                                                                           "axis"",
                                                                                                                   "_tok": 837},
                                                                                                         "calling_convention": null,
                                                                                                         "unpack": false,
@@ -791,9 +791,9 @@
                                                                          "body": {"lhs": {"identifier": "println",
                                                                                           "_tok": 864},
                                                                                   "op": {"arguments": [{"identifier": null,
-                                                                                                        "value": {"value": "On "
+                                                                                                        "value": {"value": ""On "
                                                                                                                            "neither "
-                                                                                                                           "axis",
+                                                                                                                           "axis"",
                                                                                                                   "_tok": 867},
                                                                                                         "calling_convention": null,
                                                                                                         "unpack": false,
@@ -832,9 +832,9 @@
                                                                          "body": {"lhs": {"identifier": "println",
                                                                                           "_tok": 910},
                                                                                   "op": {"arguments": [{"identifier": null,
-                                                                                                        "value": {"value": "0, "
+                                                                                                        "value": {"value": ""0, "
                                                                                                                            "1, "
-                                                                                                                           "2",
+                                                                                                                           "2"",
                                                                                                                   "_tok": 913},
                                                                                                         "calling_convention": null,
                                                                                                         "unpack": false,
@@ -863,9 +863,9 @@
                                                                          "body": {"lhs": {"identifier": "println",
                                                                                           "_tok": 936},
                                                                                   "op": {"arguments": [{"identifier": null,
-                                                                                                        "value": {"value": "0, "
+                                                                                                        "value": {"value": ""0, "
                                                                                                                            "1, "
-                                                                                                                           "_",
+                                                                                                                           "_"",
                                                                                                                   "_tok": 939},
                                                                                                         "calling_convention": null,
                                                                                                         "unpack": false,
@@ -890,9 +890,9 @@
                                                                          "body": {"lhs": {"identifier": "println",
                                                                                           "_tok": 962},
                                                                                   "op": {"arguments": [{"identifier": null,
-                                                                                                        "value": {"value": "0, "
+                                                                                                        "value": {"value": ""0, "
                                                                                                                            "_, "
-                                                                                                                           "_",
+                                                                                                                           "_"",
                                                                                                                   "_tok": 965},
                                                                                                         "calling_convention": null,
                                                                                                         "unpack": false,
@@ -918,7 +918,7 @@
                                                                                            {"lhs": {"identifier": "println",
                                                                                                     "_tok": 1016},
                                                                                             "op": {"arguments": [{"identifier": null,
-                                                                                                                  "value": {"value": "else",
+                                                                                                                  "value": {"value": ""else"",
                                                                                                                             "_tok": 1031},
                                                                                                                   "calling_convention": null,
                                                                                                                   "unpack": false,
@@ -949,7 +949,7 @@
                                                                                    "body": {"lhs": {"identifier": "println",
                                                                                                     "_tok": 1083},
                                                                                             "op": {"arguments": [{"identifier": null,
-                                                                                                                  "value": {"value": "123",
+                                                                                                                  "value": {"value": ""123"",
                                                                                                                             "_tok": 1086},
                                                                                                                   "calling_convention": null,
                                                                                                                   "unpack": false,
@@ -971,7 +971,7 @@
                                                                                    "body": {"lhs": {"identifier": "println",
                                                                                                     "_tok": 1103},
                                                                                             "op": {"arguments": [{"identifier": null,
-                                                                                                                  "value": {"value": "234",
+                                                                                                                  "value": {"value": ""234"",
                                                                                                                             "_tok": 1106},
                                                                                                                   "calling_convention": null,
                                                                                                                   "unpack": false,
@@ -987,7 +987,7 @@
                                                                                    "body": {"lhs": {"identifier": "println",
                                                                                                     "_tok": 1121},
                                                                                             "op": {"arguments": [{"identifier": null,
-                                                                                                                  "value": {"value": "else",
+                                                                                                                  "value": {"value": ""else"",
                                                                                                                             "_tok": 1124},
                                                                                                                   "calling_convention": null,
                                                                                                                   "unpack": false,
@@ -1043,7 +1043,7 @@
                                                                                          {"lhs": {"identifier": "println",
                                                                                                   "_tok": 1190},
                                                                                           "op": {"arguments": [{"identifier": null,
-                                                                                                                "value": {"value": "123",
+                                                                                                                "value": {"value": ""123"",
                                                                                                                           "_tok": 1201},
                                                                                                                 "calling_convention": null,
                                                                                                                 "unpack": false,
@@ -1081,7 +1081,7 @@
                                                                                          {"lhs": {"identifier": "println",
                                                                                                   "_tok": 1258},
                                                                                           "op": {"arguments": [{"identifier": null,
-                                                                                                                "value": {"value": "123",
+                                                                                                                "value": {"value": ""123"",
                                                                                                                           "_tok": 1269},
                                                                                                                 "calling_convention": null,
                                                                                                                 "unpack": false,
@@ -1213,7 +1213,7 @@
                                                                                                               "_tok": 1412},
                                                                                                              {"identifier": {"identifier": "b",
                                                                                                                              "_tok": 1414},
-                                                                                                              "value": {"value": "foo",
+                                                                                                              "value": {"value": ""foo"",
                                                                                                                         "_tok": 1417},
                                                                                                               "_tok": 1414}],
                                                                                                   "_tok": 1411},
