@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import functools
+import colorama
+import re
+
 from typing import Callable, Any, Optional, ParamSpec, TypeVar, Generic
 from src.SyntacticAnalysis import Ast
 from src.LexicalAnalysis.Tokens import TokenType, Token
@@ -22,6 +25,8 @@ class ParserError(Exception):
     ...
 
 
+colorama.init()
+
 P = ParamSpec("P")
 T = TypeVar("T")
 
@@ -33,9 +38,14 @@ CUR_ERR_IND = 0
 
 class ErrorFormatter:
     TOKENS: list[Token] = []
+
+    @staticmethod
+    def escape_ansi(line):
+        ansi_escape = re.compile(r'(?:\x1B[@-_]|[\x80-\x9F])[0-?]*[ -/]*[@-~]')
+        return ansi_escape.sub('', line)
     
     @staticmethod
-    def error(start_token_index: int) -> str:
+    def error(start_token_index: int, *metadata: str) -> str:
         while ErrorFormatter.TOKENS[start_token_index].token_type in [TokenType.TkNewLine, TokenType.TkWhitespace]:
             start_token_index += 1
 
@@ -68,7 +78,6 @@ class ErrorFormatter:
         # Get the tokens on the current line by slicing the tokens between the start and end indexes just found from
         # backwards and forward newline-scanning
         tokens = ErrorFormatter.TOKENS[start_token_index:end_token_index]
-        current_line_string = "".join([token.token_metadata for token in tokens])
 
         # The number of spaces before the "^" characters is the error message position variable from the start - this
         # hasn't been altered
@@ -77,14 +86,46 @@ class ErrorFormatter:
             spaces += len(token.token_metadata)
 
         # Format the line number into the error message string
-        line_number = str([t.token_type for t in ErrorFormatter.TOKENS[:end_token_index]].count(TokenType.TkNewLine) + 1) + " | "
-        current_line_string = line_number + current_line_string.lstrip("\n")
+        line_number = "".join([
+            f"{colorama.Fore.WHITE}{colorama.Style.BRIGHT}",
+            str([t.token_type for t in ErrorFormatter.TOKENS[:end_token_index]].count(TokenType.TkNewLine) + 1),
+            f" | {colorama.Style.RESET_ALL}"])
+
+        line_containing_error_string = "".join([
+            line_number,
+            f"{colorama.Fore.GREEN}"
+            "".join([token.token_metadata for token in tokens]).lstrip("\n"),
+            f"{colorama.Style.RESET_ALL}"
+        ])
 
         # The number of "^" characters is the length of the current tokens metadata (ie the symbol or length of keyword
         # / lexeme). Append the repeated "^" characters to the spaces, and then add the error message to the string.
         error_length = max(1, len(ErrorFormatter.TOKENS[error_position].token_metadata))
-        error_line_string = " " * (len(line_number) - 2) + "| " + "".join([" " * spaces, "^" * error_length]) + " <- "
-        final_string = "\n".join(["", " " * (len(line_number) - 2) + "| ", current_line_string, error_line_string])
+        number_margin_len = len(ErrorFormatter.escape_ansi(line_number)) - 2
+
+        top_line_padding_string = "".join([
+            " " * number_margin_len,
+            f"{colorama.Fore.WHITE}{colorama.Style.BRIGHT}| {colorama.Style.RESET_ALL}"])
+
+        error_description_string = "".join([
+            " " * number_margin_len,
+            f"{colorama.Fore.WHITE}{colorama.Style.BRIGHT}| {colorama.Style.RESET_ALL}",
+            f"{colorama.Fore.RED}{colorama.Style.BRIGHT}",
+            "".join([" " * spaces, "^" * error_length]),
+            f"{colorama.Style.RESET_ALL}",
+            " <- "])
+
+        # metadata_strings = []
+        # for metadata_string in metadata:
+        #     metadata_strings.append(" " * number_margin_len)
+        #     metadata_strings.append(f"{colorama.Fore.WHITE}{colorama.Style.BRIGHT}| {colorama.Style.RESET_ALL} {metadata_string}\n")
+
+        final_string = "\n".join([
+            "",
+            top_line_padding_string,
+            line_containing_error_string,
+            error_description_string])
+            # *metadata_strings])
         return final_string
 
 
