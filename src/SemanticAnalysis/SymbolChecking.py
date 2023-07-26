@@ -18,7 +18,7 @@ class SymbolChecker:
         for module_member in ast.module.body.members:
             match module_member:
                 case Ast.FunctionPrototypeAst(): SymbolChecker.check_function_prototype_symbols(module_member, s)
-                case Ast.ClassPrototypeAst() | Ast.EnumPrototypeAst(): return
+                case Ast.ClassPrototypeAst() | Ast.EnumPrototypeAst(): s.skip_scope()
                 case Ast.SupPrototypeNormalAst(): SymbolChecker.check_sup_prototype_symbols(module_member, s)
                 case Ast.SupPrototypeInheritanceAst(): SymbolChecker.check_sup_prototype_symbols(module_member, s)
 
@@ -85,7 +85,7 @@ class SymbolChecker:
     def check_postfix_struct_initializer_symbols(ast: Ast.PostfixStructInitializerAst, s: ScopeHandler) -> None:
         for argument in ast.fields:
             # check identifiers exist: type-checking phase?
-            SymbolChecker.check_expression_symbols(argument.value, s)
+            SymbolChecker.check_expression_symbols(argument.value or argument.identifier, s)
 
     @staticmethod
     def check_assignment_expression_symbols(ast: Ast.AssignmentExpressionAst, s: ScopeHandler) -> None:

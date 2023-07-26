@@ -44,9 +44,15 @@ class TypeInference:
         for module_member in ast.module.body.members:
             match module_member:
                 case Ast.FunctionPrototypeAst(): TypeInference.infer_type_of_function_prototype(module_member, s)
-                case Ast.ClassPrototypeAst() | Ast.EnumPrototypeAst(): return
+                case Ast.ClassPrototypeAst(): s.skip_scope()
+                case Ast.EnumPrototypeAst(): s.skip_scope()
                 case Ast.SupPrototypeNormalAst(): TypeInference.infer_type_of_sup_prototype(module_member, s)
                 case Ast.SupPrototypeInheritanceAst(): TypeInference.infer_type_of_sup_prototype(module_member, s)
+                # case _:
+                #     error = Exception(
+                #         ErrorFormatter.error(module_member._tok) +
+                #         f"Unknown module member {module_member}.")
+                #     raise SystemExit(error) from None
 
     @staticmethod
     def infer_type_of_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> None:
@@ -196,11 +202,16 @@ class TypeInference:
     @staticmethod
     def infer_type_of_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
         class_symbol = TypeInference.infer_type_of_expression(ast.lhs, s)
-        class_symbol = s.global_scope.get_symbol(class_symbol.types[-1].identifier)
+        class_symbol = s.global_scope.get_type(class_symbol.parts[-1].identifier).name
+        type_ = Ast.TypeSingleAst([Ast.GenericIdentifierAst(class_symbol, [], -1)], -1)
+        return type_
 
     @staticmethod
     def infer_type_of_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        return TypeInference.infer_type_of_identifier(ast.lhs, s)
+        lhs_type = TypeInference.infer_type_of_expression(ast.lhs, s)
+        # lhs_type = s.current_scope.get_type(lhs_type.parts[-1].identifier).type
+        lhs_type = lhs_type.parts[-1].generic_arguments[0].value
+        return lhs_type
 
     @staticmethod
     def infer_type_of_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:

@@ -180,6 +180,10 @@ class ScopeHandler:
     def prev_scope(self) -> None:
         self.current_scope = self.current_scope.parent
 
+    def skip_scope(self) -> None:
+        self.next_scope()
+        self.prev_scope()
+
     def switch_to_global_scope(self) -> None:
         # switch to global and "un-visit" every scope
         self.current_scope = self.global_scope
@@ -317,7 +321,7 @@ class SymbolTableBuilder:
     @staticmethod
     def build_class_prototype_symbols(ast: Ast.ClassPrototypeAst, s: ScopeHandler) -> None:
         s.current_scope.add_type(Symbol(convert_identifier_to_string(ast.identifier), None, None))
-        s.enter_scope("ClassPrototype")
+        s.enter_scope(f"ClassPrototype{convert_identifier_to_string(ast.identifier)}")
         for member in ast.body.members:
             s.current_scope.add_symbol(Symbol(convert_identifier_to_string(member.identifier), member.type_annotation, None))
         s.exit_scope()
@@ -386,8 +390,8 @@ def get_function_type(ast: Ast.FunctionPrototypeAst) -> Ast.TypeAst:
     @param ast:
     @return:
     """
-    return_type = ast.return_type
-    param_types = Ast.TypeTupleAst([a.type_annotation for a in ast.parameters], -1)
+    return_type = Ast.TypeGenericArgumentAst(None, ast.return_type, -1)
+    param_types = Ast.TypeGenericArgumentAst(None, Ast.TypeTupleAst([a.type_annotation for a in ast.parameters], -1), -1)
 
     return Ast.TypeSingleAst([
         Ast.GenericIdentifierAst("std", [], -1),
