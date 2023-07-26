@@ -457,12 +457,6 @@ class TupleLiteralAst:
     values: list[ExpressionAst]
     _tok: int
 
-@dataclass
-class RangeLiteralAst:
-    start: Optional[ExpressionAst]
-    end: Optional[ExpressionAst]
-    _tok: int
-
 
 PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixStructInitializerAst | TokenAst
 NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiteralBase02Ast

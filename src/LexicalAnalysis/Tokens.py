@@ -46,7 +46,6 @@ class TokenType(Enum):
 
     TkPipeArrowR = "|>"
     TkPipeArrowL = "<|"
-    TkDoubleDot = ".."
     TkTripleDot = "..."
     TkColon = ":"
 
@@ -96,7 +95,6 @@ class TokenType(Enum):
     LxDoubleQuoteStr = r"\".*\""
     LxSingleQuoteChr = r"'.?'"
     LxRegex = r"r\".*\""
-    LxTag = r"\'[a-zA-Z0-9_]+"
     LxSingleLineComment = r"#.*"
     LxMultiLineComment = r"/\*.*\*/"
 

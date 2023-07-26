@@ -1902,9 +1902,8 @@ class Parser:
             p4 = self._parse_literal_boolean().delay_parse()
             p5 = self._parse_literal_tuple().delay_parse()
             p6 = self._parse_literal_regex().delay_parse()
-            p7 = self._parse_literal_range().delay_parse()
-            p8 = (p1 | p2 | p3 | p4 | p5 | p6).parse_once()
-            return p8
+            p7 = (p1 | p2 | p3 | p4 | p5 | p6).parse_once()
+            return p7
         return BoundParser(self, inner)
 
     def _parse_literal_number(self) -> BoundParser:
@@ -1953,15 +1952,6 @@ class Parser:
             p2 = self._parse_expressions().parse_optional() or []
             p3 = self._parse_token(TokenType.TkParenR).parse_once()
             return Ast.TupleLiteralAst(p2, c1) if len(p2) != 1 else p2[0]
-        return BoundParser(self, inner)
-
-    def _parse_literal_range(self) -> BoundParser:
-        def inner():
-            c1 = self._current
-            p1 = self._parse_expression().parse_once()
-            p2 = self._parse_token(TokenType.TkDoubleDot).parse_once()
-            p3 = self._parse_expression().parse_optional()
-            return Ast.RangeLiteralAst(p1, p3, c1)
         return BoundParser(self, inner)
 
     def _parse_literal_number_base_02(self) -> BoundParser:
