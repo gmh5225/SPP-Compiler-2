@@ -41,12 +41,6 @@ class SelfTypeAst:
     _tok: int
 
 @dataclass
-class MemberAccessAst:
-    separator: TokenAst
-    member: GenericIdentifierAst
-    _tok: int
-
-@dataclass
 class ImportTypeAst:
     imported_type: IdentifierAst
     alias: Optional[IdentifierAst]

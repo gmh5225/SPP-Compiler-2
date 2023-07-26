@@ -2,9 +2,35 @@ from __future__ import annotations
 
 from typing import Optional
 
+from src.LexicalAnalysis.Tokens import Token, TokenType
 from src.SyntacticAnalysis import Ast
 from src.SemanticAnalysis.SymbolGeneration import ScopeHandler
 from src.SyntacticAnalysis.Parser import ErrorFormatter
+
+
+BIN_FUNCTION_NAMES = {
+    TokenType.TkAdd: "__add__",
+    TokenType.TkSub: "__sub__",
+    TokenType.TkMul: "__mul__",
+    TokenType.TkDiv: "__div__",
+    TokenType.TkRem: "__mod__",
+
+    TokenType.TkDoubleAmpersand: "__and__",
+    TokenType.TkDoublePipe: "__or__",
+    TokenType.TkAmpersand: "__bit_and__",
+    TokenType.TkPipe: "__bit_or__",
+    TokenType.TkCaret: "__bit_xor__",
+
+    TokenType.TkEq : "__eq__",
+    TokenType.TkNe: "__ne__",
+    TokenType.TkLt: "__lt__",
+    TokenType.TkLe: "__le__",
+    TokenType.TkGt: "__gt__",
+    TokenType.TkGe: "__ge__",
+    TokenType.TkSs : "__cmp__",
+    TokenType.TkPipeArrowR: "__rpip__",
+    TokenType.TkPipeArrowL: "__lpip__",
+}
 
 
 class TypeInference:
@@ -139,18 +165,60 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_binary_expression(ast: Ast.BinaryExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        return CommonTypes.unknown()
+        # translate the operator to a function
+        # a + b => a.__add__(b)
+        # 1. get the correct function name for the operator
+        # 2. form a member access expression
+        # 3. form a function call expression
+        # 4. find the function symbol
+        # 5. get the return type of the function (first generic argument)
+        # 6. return the type
+        function_name = Ast.IdentifierAst(BIN_FUNCTION_NAMES[ast.op.tok.token_type], -1)
+        member_access = Ast.PostfixMemberAccessAst(Ast.TokenAst(Token(".", TokenType.TkDynaRes), -1), function_name, -1)
+        member_access = Ast.PostfixExpressionAst(ast.lhs, member_access, -1)
+        function_call = Ast.PostfixFunctionCallAst([Ast.FunctionArgumentAst(None, ast.rhs, None, False, -1)], -1) # todo : convention
+        function_call = Ast.PostfixExpressionAst(member_access, function_call, -1)
+        return TypeInference.infer_type_of_expression(function_call, s)
+
 
     @staticmethod
     def infer_type_of_postfix_expression(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        return CommonTypes.unknown()
+        match ast.op:
+            case Ast.PostfixMemberAccessAst(): return TypeInference.infer_type_of_postfix_member_access(ast, s)
+            case Ast.PostfixFunctionCallAst(): return TypeInference.infer_type_of_postfix_function_call(ast, s)
+            case Ast.PostfixStructInitializerAst(): return TypeInference.infer_type_of_postfix_struct_initializer(ast, s)
+            case _:
+                error = Exception(
+                    ErrorFormatter.error(ast._tok) +
+                    f"Postfix expression {type(ast)} not yet supported.")
+                raise SystemExit(error) from None
+
+    @staticmethod
+    def infer_type_of_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+        class_symbol = TypeInference.infer_type_of_expression(ast.lhs, s)
+        class_symbol = s.global_scope.get_symbol(class_symbol.types[-1].identifier)
+
+    @staticmethod
+    def infer_type_of_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+        return TypeInference.infer_type_of_identifier(ast.lhs, s)
+
+    @staticmethod
+    def infer_type_of_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+        return TypeInference.infer_type_of_type_single(ast.lhs, s)
 
     @staticmethod
     def infer_type_of_assignment_expression(ast: Ast.AssignmentExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
         return CommonTypes.unknown()
 
     @staticmethod
-    def infer_type_of_type_single(ast: Ast.TypeSingleAst, s: ScopeHandler) -> Ast.TypeAst:
+    def infer_type_of_type_single(ast: Ast.TypeSingleAst | Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
+        # check type exists
+        identifier = ast.identifier if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1].identifier
+        if not s.global_scope.has_type(identifier):
+            error = Exception(
+                ErrorFormatter.error(ast._tok) +
+                f"Type {identifier} not found.")
+            raise SystemExit(error) from None
         return ast
 
     @staticmethod

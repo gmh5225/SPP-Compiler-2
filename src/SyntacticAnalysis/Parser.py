@@ -1755,7 +1755,7 @@ class Parser:
         def inner():
             c1 = self._current
             p1 = self._parse_token(TokenType.TkBraceL).parse_once()
-            p2 = self._parse_postfix_operator_struct_initializer_fields().parse_optional()
+            p2 = self._parse_postfix_operator_struct_initializer_fields().parse_optional() or []
             p3 = self._parse_token(TokenType.TkBraceR).parse_once()
             return Ast.PostfixStructInitializerAst(p2, c1)
         return BoundParser(self, inner)
