@@ -355,14 +355,16 @@ def convert_type_to_string(ast: Ast.TypeAst) -> str:
         for p in ast.parts:
             s += p.identifier
             if p.generic_arguments:
-                p += f"[{', '.join(map(lambda y: convert_type_to_string(y), p.generic_arguments))}]"
+                generics = list(map(lambda y: convert_type_to_string(y), p.generic_arguments))
+                joined_generics = ", ".join(generics)
+                s += f"[{joined_generics}]"
             s += "::"
         return s[:-2]
     elif isinstance(ast, Ast.TypeTupleAst):
         s = "("
         for p in ast.types:
             s += convert_type_to_string(p) + ", "
-        return s[:-2] + ")"
+        return (s[:-2] if len(s) > 1 else s) + ")"
     elif isinstance(ast, str):
         return ast # temp (for type: "TODO") etc
     elif ast is None:
@@ -384,4 +386,9 @@ def get_function_type(ast: Ast.FunctionPrototypeAst) -> Ast.TypeAst:
     @param ast:
     @return:
     """
-    return "TODO"
+    return_type = ast.return_type
+    param_types = Ast.TypeTupleAst([a.type_annotation for a in ast.parameters], -1)
+
+    return Ast.TypeSingleAst([
+        Ast.GenericIdentifierAst("std", [], -1),
+        Ast.GenericIdentifierAst("FnRef", [return_type, param_types], -1)], -1)

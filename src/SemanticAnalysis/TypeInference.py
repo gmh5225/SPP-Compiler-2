@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from src.SyntacticAnalysis import Ast
 from src.SemanticAnalysis.SymbolGeneration import ScopeHandler
 from src.SyntacticAnalysis.Parser import ErrorFormatter
@@ -28,13 +30,13 @@ class TypeInference:
         s.prev_scope()
 
     @staticmethod
-    def infer_type_of_statement(ast: Ast.StatementAst, s: ScopeHandler) -> None:
+    def infer_type_of_statement(ast: Ast.StatementAst, s: ScopeHandler) -> Optional[Ast.TypeAst]:
         match ast:
             case Ast.TypedefStatementAst(): return
             case Ast.ReturnStatementAst(): return
             case Ast.LetStatementAst(): TypeInference.infer_type_of_let_statement(ast, s)
             case Ast.FunctionPrototypeAst(): TypeInference.infer_type_of_function_prototype(ast, s)
-            case _: TypeInference.infer_type_of_expression(ast, s)
+            case _: return TypeInference.infer_type_of_expression(ast, s)
 
     @staticmethod
     def infer_type_of_let_statement(ast: Ast.LetStatementAst, s: ScopeHandler) -> None:
@@ -85,7 +87,7 @@ class TypeInference:
             case Ast.CharLiteralAst(): return CommonTypes.char()
             case Ast.RegexLiteralAst(): return CommonTypes.regex()
             case Ast.TupleLiteralAst(): return TypeInference.infer_type_of_tuple_literal(ast, s)
-            case Ast.NumberLiteralBase10Ast() | Ast.NumberLiteralBase16Ast() | Ast.NumberLiteralBase02Ast(): CommonTypes.num()
+            case Ast.NumberLiteralBase10Ast() | Ast.NumberLiteralBase16Ast() | Ast.NumberLiteralBase02Ast(): return CommonTypes.num()
             case _:
                 error = Exception(
                     ErrorFormatter.error(ast._tok) +
@@ -120,8 +122,11 @@ class TypeInference:
     @staticmethod
     def infer_type_of_inner_scope(ast: Ast.InnerScopeAst, s: ScopeHandler) -> Ast.TypeAst:
         s.next_scope()
-        t = TypeInference.infer_type_of_expression(ast.body[-1], s)
+        t = CommonTypes.void()
+        for statement in ast.body:
+            t = TypeInference.infer_type_of_statement(statement, s)
         s.prev_scope()
+        return t
 
     @staticmethod
     def infer_type_of_with_statement(ast: Ast.WithStatementAst, s: ScopeHandler) -> Ast.TypeAst:
