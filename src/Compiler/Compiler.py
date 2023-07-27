@@ -4,7 +4,7 @@ from src.SemanticAnalysis.Semantics import Semantics
 from src.SyntacticAnalysis.Ast import ProgramAst
 from src.SyntacticAnalysis.Parser import Parser
 
-import pprint, dataclasses
+import dataclasses
 from src.Compiler.Printer import save_json
 
 class Compiler:

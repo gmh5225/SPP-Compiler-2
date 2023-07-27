@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 import functools
-import pprint
-
 import colorama
 import re
-import inspect
 
 from typing import Callable, Any, Optional, ParamSpec, TypeVar, Generic
 from src.SyntacticAnalysis import Ast
@@ -289,6 +286,9 @@ class Parser:
             final_error_where_on_line = -1
 
             for error in ERRS:
+                error_where, error = error.split(" ", 1)
+                error = ErrorFormatter.error(int(error_where)) + error
+
                 current_error = ErrorFormatter.escape_ansi(error.split("\n")[2])
                 current_error_line_number = int(current_error[:current_error.index(" ")])
                 current_error_where_on_line = ErrorFormatter.escape_ansi(error.split("\n")[-1]).index("^") + 1
@@ -2068,8 +2068,7 @@ class Parser:
                 exp_token = token.value if not token.name.startswith("Lx") else token.name[2:]
 
                 error = ParseSyntaxError(
-                    ErrorFormatter.error(self._current) +
-                    f"Expected one of ¬, got: '{got_token}'")
+                    f"{self._current} Expected one of ¬, got: '{got_token}'")
 
                 global CUR_ERR_IND
                 if CUR_ERR_IND == self._current:

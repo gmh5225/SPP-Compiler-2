@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import Callable, Optional
-import base64, pickle
 
 from src.SyntacticAnalysis import Ast
 
