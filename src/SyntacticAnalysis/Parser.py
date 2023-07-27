@@ -1254,7 +1254,7 @@ class Parser:
             p1 = self._parse_single_type_identifier_with_self().delay_parse()
             p2 = self._parse_single_type_identifier_no_self().delay_parse()
             p3 = (p1 | p2).parse_once()
-            return Ast.TypeSingleAst(p3, c1)
+            return p3
         return BoundParser(self, inner)
 
     def _parse_tuple_type_identifiers(self) -> BoundParser:
