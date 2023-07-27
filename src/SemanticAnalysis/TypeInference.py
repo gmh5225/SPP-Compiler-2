@@ -179,11 +179,12 @@ class TypeInference:
         # 4. find the function symbol
         # 5. get the return type of the function (first generic argument)
         # 6. return the type
+        idx = ast.op._tok # todo : where to use "idx"
         function_name = Ast.IdentifierAst(BIN_FUNCTION_NAMES[ast.op.tok.token_type], -1)
-        member_access = Ast.PostfixMemberAccessAst(Ast.TokenAst(Token(".", TokenType.TkDot), -1), function_name, -1)
-        member_access = Ast.PostfixExpressionAst(ast.lhs, member_access, -1)
-        function_call = Ast.PostfixFunctionCallAst([Ast.FunctionArgumentAst(None, ast.rhs, None, False, -1)], -1) # todo : convention
-        function_call = Ast.PostfixExpressionAst(member_access, function_call, -1)
+        member_access = Ast.PostfixMemberAccessAst(Ast.TokenAst(Token(".", TokenType.TkDot), idx), function_name, idx)
+        member_access = Ast.PostfixExpressionAst(ast.lhs, member_access, idx)
+        function_call = Ast.PostfixFunctionCallAst([Ast.FunctionArgumentAst(None, ast.rhs, None, False, idx)], idx) # todo : convention
+        function_call = Ast.PostfixExpressionAst(member_access, function_call, idx)
         return TypeInference.infer_type_of_expression(function_call, s)
 
 
@@ -202,9 +203,16 @@ class TypeInference:
     @staticmethod
     def infer_type_of_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
         class_symbol = TypeInference.infer_type_of_expression(ast.lhs, s)
-        class_symbol = s.global_scope.get_type(class_symbol.parts[-1].identifier).name
-        type_ = Ast.TypeSingleAst([Ast.GenericIdentifierAst(class_symbol, [], -1)], -1)
-        return type_
+        class_scope = s.global_scope.get_child_scope_for_cls(class_symbol.parts[-1].identifier)
+        if class_scope is None:
+            error = Exception(
+                ErrorFormatter.error(ast._tok) +
+                f"Member {ast.op.identifier.identifier} not found on class {class_symbol.parts[-1].identifier}.")
+            raise SystemExit(error) from None
+
+        member_symbol = class_scope.get_symbol(ast.op.identifier)
+        return member_symbol.type
+
 
     @staticmethod
     def infer_type_of_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:

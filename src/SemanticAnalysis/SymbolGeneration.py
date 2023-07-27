@@ -141,6 +141,18 @@ class Scope:
             current = current.parent
         return symbols
 
+    def get_child_scope_for_fn(self, fn_name: str) -> Optional[Scope]:
+        for child in self.children:
+            if child.name == f"FnPrototype__{fn_name}":
+                return child
+        return None
+
+    def get_child_scope_for_cls(self, cls_name: str) -> Optional[Scope]:
+        for child in self.children:
+            if child.name == f"ClsPrototype__{cls_name}":
+                return child
+        return None
+
     def json(self) -> dict[str, any]:
         return {
             "Name": self.name,
@@ -374,7 +386,7 @@ class SymbolTableBuilder:
     @staticmethod
     def build_class_prototype_symbols(ast: Ast.ClassPrototypeAst, s: ScopeHandler) -> None:
         s.current_scope.add_type(Symbol(convert_identifier_to_string(ast.identifier), None, None))
-        s.enter_scope(f"ClassPrototype{convert_identifier_to_string(ast.identifier)}")
+        s.enter_scope(f"ClsPrototype{convert_identifier_to_string(ast.identifier)}")
         for member in ast.body.members:
             s.current_scope.add_symbol(Symbol(convert_identifier_to_string(member.identifier), member.type_annotation, None))
         s.exit_scope()
@@ -396,7 +408,7 @@ class SymbolTableBuilder:
         for typedef in filter(lambda member: isinstance(member, Ast.SupTypedefAst), ast.body.members):
             s.current_scope.add_type(Symbol(convert_identifier_to_string(typedef.identifier), typedef.type_annotation, None))
         for method in filter(lambda member: isinstance(member, Ast.SupMethodPrototypeAst), ast.body.members):
-            s.global_scope.add_symbol(Symbol(convert_identifier_to_string(method.identifier), get_function_type(method), None))
+            SymbolTableBuilder.build_function_prototype_symbols(method, s)
         s.exit_scope()
 
 
