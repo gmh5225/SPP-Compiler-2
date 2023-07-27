@@ -16,8 +16,8 @@ cls ClassA {
 
 sup ClassA {
     fn new() -> ClassA {
-        let x = function()
-        let y = a.function()
+        let x = function(a)
+        let y = a.b.c
 
         ret ClassA {
             a=vec.new(),
@@ -38,9 +38,9 @@ sup std.ops.Add for ClassA {
 }
 
 enum EnumType {
-    VariantA,
-    VariantB,
-    VariantC
+    variantA,
+    variantB,
+    variantC
 }
 
 @meta.public

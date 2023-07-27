@@ -1627,6 +1627,7 @@ class Parser:
             p1 = self._parse_statement_let_with_value().delay_parse()
             p2 = self._parse_statement_let_with_type().delay_parse()
             p3 = (p1 | p2).parse_once()
+            p4 = self._parse_token(TokenType.TkNewLine).parse_once()
             return p3
         return BoundParser(self, inner)
 
@@ -1645,8 +1646,8 @@ class Parser:
         def inner():
             c1 = self._current
             p1 = self._parse_token(TokenType.KwElse).parse_once()
-            p2 = self._parse_non_assignment_expression().parse_once()
-            return Ast.InnerScopeAst(p2, c1)
+            p2 = self._parse_statement_new_scope().parse_once()
+            return Ast.InnerScopeAst(p2.body, c1)
         return BoundParser(self, inner)
 
     def _parse_statement_let_with_type(self) -> BoundParser:
@@ -1737,7 +1738,7 @@ class Parser:
     def _parse_postfix_operator_member_access(self) -> BoundParser:
         def inner():
             c1 = self._current
-            p1 = self._parse_operator_identifier_member_access().parse_once()
+            p1 = self._parse_token(TokenType.TkDot).parse_once()
             p2 = self._parse_identifier().delay_parse()
             p3 = self._parse_number().delay_parse()
             p4 = (p2 | p3).parse_once()
@@ -1867,16 +1868,10 @@ class Parser:
             return p1
         return BoundParser(self, inner)
 
-    def _parse_operator_identifier_member_access(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.TkDot).delay_parse()
-            return p1
-        return BoundParser(self, inner)
-
     def _parse_operator_identifier_postfix(self) -> BoundParser:
         def inner():
-            p1 = self._parse_postfix_operator_function_call().delay_parse()
-            p2 = self._parse_postfix_operator_member_access().delay_parse()
+            p1 = self._parse_postfix_operator_member_access().delay_parse()
+            p2 = self._parse_postfix_operator_function_call().delay_parse()
             p3 = self._parse_postfix_operator_struct_initializer().delay_parse()
             p4 = self._parse_token(TokenType.TkQst).delay_parse()
             p8 = (p1 | p2 | p3 | p4).parse_once()
@@ -2018,7 +2013,7 @@ class Parser:
 
     def _parse_token(self, token: TokenType) -> BoundParser:
         def inner():
-            self._skip(TokenType.TkNewLine)
+            if token != TokenType.TkNewLine: self._skip(TokenType.TkNewLine)
             self._skip(TokenType.TkWhitespace)
             c1 = self._current
 

@@ -15,5 +15,3 @@ class TestParsingExpressions(unittest.TestCase):
         fn main4[T, U=T, ...V](a: T, b: U, ...c: V) -> std::Void {}
         
         """
-
-
