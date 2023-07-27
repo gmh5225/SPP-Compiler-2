@@ -80,6 +80,9 @@ fn function_test_3(mut a: &mut Self.Output, mut b: std.ns.detail.Type[T].Inner[U
         let y = 2
         x + y
     }
+    else {
+        io.out("hello")
+    }
 
     with x.generate() as y {
         let z = y
@@ -105,8 +108,13 @@ fn function_test_3(mut a: &mut Self.Output, mut b: std.ns.detail.Type[T].Inner[U
     let c = a.b.c.d.e.f
     let d = OtherType{a=10, b=20, else=OtherType.def(), sup=(Num.new())}
 
-
     yield 1
     yield 2
     ret 3
+
+    let x = (1, 2, 3)
+    let y = x.0
+
+    use t = (Num, Str, Bool)
+    use u = t.0
 }

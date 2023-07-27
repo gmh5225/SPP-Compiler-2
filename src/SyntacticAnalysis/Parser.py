@@ -284,16 +284,22 @@ class Parser:
             program = self._parse_program().parse_once()
             return program
         except ParseSyntaxError: # todo : experimental
-            # furthest_along_error = None
-            # furthest_along_error_pos = -1
-            # for error in ERRS:
-            #     where = error.find("<- ")
-            #     if where > furthest_along_error_pos:
-            #         furthest_along_error_pos = where
-            #         furthest_along_error = error
-            #
-            # e = ParseSyntaxError(furthest_along_error)
-            e = ParseSyntaxError("\n".join(ERRS))
+            final_error = None
+            final_error_line_number = -1
+            final_error_where_on_line = -1
+
+            for error in ERRS:
+                current_error = ErrorFormatter.escape_ansi(error.split("\n")[2])
+                current_error_line_number = int(current_error[:current_error.index(" ")])
+                current_error_where_on_line = ErrorFormatter.escape_ansi(error.split("\n")[-1]).index("^") + 1
+
+                if (current_error_line_number > final_error_line_number) or (current_error_line_number == final_error_line_number and current_error_where_on_line > final_error_where_on_line):
+                    final_error = error
+                    final_error_line_number = current_error_line_number
+                    final_error_where_on_line = current_error_where_on_line
+
+            e = ParseSyntaxError(final_error)
+            # e = ParseSyntaxError("\n".join(ERRS))
             raise SystemExit(e) from None
 
 
