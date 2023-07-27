@@ -301,7 +301,7 @@ class PatternStatementAst:
     comparison_op: Optional[TokenAst]
     patterns: list[PatternAst]
     guard: Optional[ValueGuardAst]
-    body: ExpressionAst
+    body: list[StatementAst]
     _tok: int
 
 @dataclass
