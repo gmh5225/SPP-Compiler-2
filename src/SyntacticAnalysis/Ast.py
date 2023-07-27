@@ -387,6 +387,7 @@ class SupTypedefAst(TypedefStatementAst):
 
 @dataclass
 class PostfixFunctionCallAst:
+    type_arguments: list[TypeGenericArgumentAst]
     arguments: list[FunctionArgumentAst]
     _tok: int
 

@@ -71,7 +71,7 @@ class TokenType(Enum):
     KwIf = "if"
     KwElse = "else"
     KwWhile = "while"
-    KwReturn = "ret"
+    KwRet = "ret"
     KwYield = "yield"
     KwCls = "cls"
     KwWhere = "where"

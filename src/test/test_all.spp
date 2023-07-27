@@ -48,9 +48,11 @@ fn function_test_1(a: Num, b: Num, c: Num = 0, ...d: Num) -> Num {
     let x = function_test_1(400, 500, c=200)
 }
 
-@meta.private[T](900), @meta.other_decorator(100, "test")
+
+@meta.private[T](900)
+@meta.other_decorator(100, "test")
 fn function_test_2[T, U=T, ...V](a: Num, ...args: V) -> Num where [T, U: Default, T: Vec, T.Item: Copy, V: Num] if a > 0 {
-    let x = function_test_2[Num, Num](400, 500)
+    let x = function_test_2(400, 500)
     let y = 1 + 2 * 3 - 4 / 5 % 6 ^ 7 & 8 | 9 || 10 && 11 == 12 != 13 < 14 > 15 <= 16 >= 17 |> 18 <| 19
 
     let a = y
@@ -71,7 +73,7 @@ fn function_test_2[T, U=T, ...V](a: Num, ...args: V) -> Num where [T, U: Default
 }
 
 fn function_test_3(mut a: &mut Self.Output, mut b: std.ns.detail.Type[T].Inner[U, T=Num], c: (T, std.Other.Inner[T].Output, U)) -> Self.Item {
-    let x = function_test_3[Num, Num](400, 500)
+    let x = function_test_3[T](400, 500)
 
     while true {
         let x = 1
