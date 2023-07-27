@@ -1273,7 +1273,7 @@ class Parser:
     def _parse_type_identifier_upper_types_following_self(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkDot).parse_once()
-            p2 = self._parse_type_identifier_upper_types().parse_zero_or_more()
+            p2 = self._parse_type_identifier_upper_types().parse_optional() or []
             return p2
         return BoundParser(self, inner)
 
@@ -1488,7 +1488,7 @@ class Parser:
         def inner():
             p1 = self._parse_type_generic_variadic_parameter().parse_once()
             p2 = self._parse_type_generic_rest_of_variadic_parameters().parse_optional() or []
-            return [p1, p2]
+            return [p1, *p2]
         return BoundParser(self, inner)
 
     def _parse_type_generic_variadic_parameter(self) -> BoundParser:
