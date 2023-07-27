@@ -11,8 +11,10 @@ class Semantics:
     def __init__(self, ast: Ast.ProgramAst):
         self._ast = ast
         self._scope_handler = SymbolTableBuilder.build(ast)
-        SymbolChecker.check(ast, self._scope_handler)
         save_json(self._scope_handler.json(), "_out/symbol_table.json")
+
+        SymbolChecker.check(ast, self._scope_handler)
+        save_json(self._scope_handler.json(), "_out/symbol_table_checked.json")
 
         TypeInference.infer(ast, self._scope_handler)
         save_json(self._scope_handler.json(), "_out/type_inferred.json")

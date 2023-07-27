@@ -1,12 +1,5 @@
 mod my_module_root.some_folder.inner_folder.module_name
 
-use std.vec.Vec
-use std.str.Str
-use std.num.Num
-
-use std.collections.{Map, Set}
-use std.memory.*
-
 
 cls ClassA {
     a: Vec[Num]
@@ -16,13 +9,14 @@ cls ClassA {
 
 sup ClassA {
     fn new() -> ClassA {
-        let x = function(a)
+        let a = 1
+        let x = function_test_1(a)
         let y = a.b.c
 
         ret ClassA {
-            a=vec.new(),
+            a=Vec.new(),
             b="",
-            c=map.new()
+            c=Map.new()
         }
     }
 }
@@ -52,6 +46,8 @@ fn function_test_1(a: Num, b: Num, c: Num = 0, ...d: Num) -> Num {
 @meta.private[T](900)
 @meta.other_decorator(100, "test")
 fn function_test_2[T, U=T, ...V](a: Num, ...args: V) -> Num where [T, U: Default, T: Vec, T.Item: Copy, V: Num] if a > 0 {
+    fn some_value() -> Num {}
+
     let x = function_test_2(400, 500)
     let y = 1 + 2 * 3 - 4 / 5 % 6 ^ 7 & 8 | 9 || 10 && 11 == 12 != 13 < 14 > 15 <= 16 >= 17 |> 18 <| 19
 
@@ -60,7 +56,7 @@ fn function_test_2[T, U=T, ...V](a: Num, ...args: V) -> Num where [T, U: Default
     let c = [&x](x, y) => { x + y }
     let d = SomeType{a, b}
     let e = 0 + ... + args
-    let f = function_call(_, 2, 3, _, 5)
+    let f = function_test_1(_, 2, 3, _, 5)
     let g = if some_value() == {
         0 => { 1 }
         1 => { 2 }
@@ -90,7 +86,7 @@ fn function_test_3(mut a: &mut Self.Output, mut b: std.ns.detail.Type[T].Inner[U
 
     use InnerType as OtherType
 
-    let mut variable = some_function_call() else {
+    let mut variable = function_test_1() else {
         let x = 1
         let y = 2
         x + y
@@ -115,6 +111,6 @@ fn function_test_3(mut a: &mut Self.Output, mut b: std.ns.detail.Type[T].Inner[U
     let x = (1, 2, 3)
     let y = x.0
 
-    use t = (Num, Str, Bool)
-    use u = t.0
+    use T as (Num, Str, Bool)
+    use U as T.0
 }

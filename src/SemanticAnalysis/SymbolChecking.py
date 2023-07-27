@@ -172,5 +172,7 @@ class SymbolChecker:
 
     @staticmethod
     def check_sup_prototype_symbols(ast: Ast.SupPrototypeNormalAst | Ast.SupPrototypeInheritanceAst, s: ScopeHandler) -> None:
+        s.next_scope()
         for method in filter(lambda member: isinstance(member, Ast.SupMethodPrototypeAst), ast.body.members):
             SymbolChecker.check_function_prototype_symbols(method, s)
+        s.prev_scope()

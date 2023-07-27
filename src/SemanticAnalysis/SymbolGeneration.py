@@ -316,7 +316,7 @@ class SymbolTableBuilder:
     def build_let_statement_symbols(ast: Ast.LetStatementAst, s: ScopeHandler) -> None:
         for i, variable in enumerate(ast.variables):
             s.current_scope.add_symbol(Symbol(convert_identifier_to_string(variable.identifier), ast.type_annotation, ast.value, i))
-            SymbolTableBuilder.build_expression_symbols(ast.value, s)
+            if ast.value: SymbolTableBuilder.build_expression_symbols(ast.value, s)
 
     @staticmethod
     def build_expression_symbols(ast: Ast.ExpressionAst, s: ScopeHandler) -> None:
@@ -402,7 +402,7 @@ class SymbolTableBuilder:
     @staticmethod
     def build_sup_prototype_symbols(ast: Ast.SupPrototypeNormalAst | Ast.SupPrototypeInheritanceAst, s: ScopeHandler) -> None:
         if isinstance(ast, Ast.SupPrototypeInheritanceAst):
-            s.global_scope.get_type(convert_identifier_to_string_no_generics(ast.identifier)).bases.append(convert_identifier_to_string(ast.super_class))
+            s.global_scope.get_type(convert_type_to_string(ast.identifier)).bases.append(convert_identifier_to_string(ast.super_class))
 
         s.enter_scope("SupPrototype")
         for typedef in filter(lambda member: isinstance(member, Ast.SupTypedefAst), ast.body.members):
@@ -413,6 +413,7 @@ class SymbolTableBuilder:
 
 
 def convert_identifier_to_string(ast: Ast.IdentifierAst | Ast.GenericIdentifierAst) -> str:
+    if isinstance(ast, int): return str(ast)
     x = ast.identifier
     if type(ast) == Ast.GenericIdentifierAst:
         return x + f"[{', '.join(map(lambda y: convert_identifier_to_string(y.identifier), ast.generic_arguments))}]"
@@ -424,6 +425,9 @@ def convert_type_to_string(ast: Ast.TypeAst) -> str:
         for p in ast.parts:
             if isinstance(p, Ast.SelfTypeAst):
                 s += "Self."
+                continue
+            if isinstance(p, int):
+                s += str(p) + "."
                 continue
             s += p.identifier
             if isinstance(p, Ast.GenericIdentifierAst) and p.generic_arguments:
