@@ -40,7 +40,8 @@ class SymbolChecker:
 
     @staticmethod
     def check_let_statement_symbols(ast: Ast.LetStatementAst, s: ScopeHandler) -> None:
-        SymbolChecker.check_expression_symbols(ast.value, s)
+        if ast.value:
+            SymbolChecker.check_expression_symbols(ast.value, s)
 
     @staticmethod
     def check_expression_symbols(ast: Ast.ExpressionAst, s: ScopeHandler) -> None:

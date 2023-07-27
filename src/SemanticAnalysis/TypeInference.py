@@ -10,26 +10,26 @@ from src.SyntacticAnalysis.Parser import ErrorFormatter
 
 BIN_FUNCTION_NAMES = {
     TokenType.TkAdd: "add",
-    TokenType.TkSub: "__sub__",
-    TokenType.TkMul: "__mul__",
-    TokenType.TkDiv: "__div__",
-    TokenType.TkRem: "__mod__",
+    TokenType.TkSub: "sub",
+    TokenType.TkMul: "mul",
+    TokenType.TkDiv: "div",
+    TokenType.TkRem: "mod",
 
-    TokenType.TkDoubleAmpersand: "__and__",
-    TokenType.TkDoublePipe: "__or__",
-    TokenType.TkAmpersand: "__bit_and__",
-    TokenType.TkPipe: "__bit_or__",
-    TokenType.TkCaret: "__bit_xor__",
+    TokenType.TkDoubleAmpersand: "and",
+    TokenType.TkDoublePipe: "or",
+    TokenType.TkAmpersand: "bit_and",
+    TokenType.TkPipe: "bit_or",
+    TokenType.TkCaret: "bit_xor",
 
-    TokenType.TkEq : "__eq__",
-    TokenType.TkNe: "__ne__",
-    TokenType.TkLt: "__lt__",
-    TokenType.TkLe: "__le__",
-    TokenType.TkGt: "__gt__",
-    TokenType.TkGe: "__ge__",
-    TokenType.TkSs : "__cmp__",
-    TokenType.TkPipeArrowR: "__rpip__",
-    TokenType.TkPipeArrowL: "__lpip__",
+    TokenType.TkEq : "eq",
+    TokenType.TkNe: "ne",
+    TokenType.TkLt: "lt",
+    TokenType.TkLe: "le",
+    TokenType.TkGt: "gt",
+    TokenType.TkGe: "ge",
+    TokenType.TkSs : "cmp",
+    TokenType.TkPipeArrowR: "rpip",
+    TokenType.TkPipeArrowL: "lpip",
 }
 
 
@@ -73,7 +73,8 @@ class TypeInference:
     @staticmethod
     def infer_type_of_let_statement(ast: Ast.LetStatementAst, s: ScopeHandler) -> None:
         if len(ast.variables) == 1:
-            s.current_scope.get_symbol(ast.variables[0].identifier.identifier).type = ast.type_annotation or TypeInference.infer_type_of_expression(ast.value, s)
+            inferred_type = ast.type_annotation or TypeInference.infer_type_of_expression(ast.value, s)
+            s.current_scope.get_symbol(ast.variables[0].identifier.identifier).type = inferred_type
         else:
             inferred_type = TypeInference.infer_type_of_expression(ast.value, s)
             if not isinstance(inferred_type, Ast.TypeTupleAst):
@@ -91,8 +92,10 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_sup_prototype(ast: Ast.SupPrototypeNormalAst | Ast.SupPrototypeInheritanceAst, s: ScopeHandler) -> None:
+        s.next_scope()
         for statement in ast.body.members:
             TypeInference.infer_type_of_statement(statement, s)
+        s.prev_scope()
 
     @staticmethod
     def infer_type_of_expression(ast: Ast.ExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
@@ -112,7 +115,7 @@ class TypeInference:
                     ErrorFormatter.error(ast._tok) +
                     f"Placeholder found in an incorrect position.")
                 raise SystemExit(error) from None
-            case Ast.TypeSingleAst(): return TypeInference.infer_type_of_type_single(ast, s)
+            case Ast.TypeSingleAst(): return TypeInference.infer_type_of_type(ast, s)
             case Ast.WhileStatementAst(): return TypeInference.infer_type_of_while_statement(ast, s)
             case Ast.BoolLiteralAst(): return CommonTypes.bool()
             case Ast.StringLiteralAst(): return CommonTypes.string()
@@ -123,7 +126,7 @@ class TypeInference:
             case _:
                 error = Exception(
                     ErrorFormatter.error(ast._tok) +
-                    f"Expression {type(ast)} not yet supported.")
+                    f"{ast.__class__.__name__} is trying to be analysed as an expression: Report.")
                 raise SystemExit(error) from None
 
 
@@ -147,7 +150,9 @@ class TypeInference:
     @staticmethod
     def infer_type_of_if_branch(ast: Ast.PatternStatementAst, s: ScopeHandler) -> Ast.TypeAst:
         s.next_scope()
-        t = TypeInference.infer_type_of_expression(ast.body, s)
+        t = CommonTypes.void()
+        for statement in ast.body:
+            t = TypeInference.infer_type_of_statement(statement, s)
         s.prev_scope()
         return t
 
@@ -163,16 +168,16 @@ class TypeInference:
     @staticmethod
     def infer_type_of_with_statement(ast: Ast.WithStatementAst, s: ScopeHandler) -> Ast.TypeAst:
         s.next_scope()
+        t = CommonTypes.void()
         for statement in ast.body:
-            TypeInference.infer_type_of_statement(statement, s)
-        t = TypeInference.infer_type_of_expression(ast.body[-1], s)
+            t = TypeInference.infer_type_of_statement(statement, s)
         s.prev_scope()
         return t
 
     @staticmethod
     def infer_type_of_binary_expression(ast: Ast.BinaryExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
         # translate the operator to a function
-        # a + b => a.__add__(b)
+        # a + b => a.add(b)
         # 1. get the correct function name for the operator
         # 2. form a member access expression
         # 3. form a function call expression
@@ -183,10 +188,9 @@ class TypeInference:
         function_name = Ast.IdentifierAst(BIN_FUNCTION_NAMES[ast.op.tok.token_type], -1)
         member_access = Ast.PostfixMemberAccessAst(Ast.TokenAst(Token(".", TokenType.TkDot), idx), function_name, idx)
         member_access = Ast.PostfixExpressionAst(ast.lhs, member_access, idx)
-        function_call = Ast.PostfixFunctionCallAst([Ast.FunctionArgumentAst(None, ast.rhs, None, False, idx)], idx) # todo : convention
+        function_call = Ast.PostfixFunctionCallAst([], [Ast.FunctionArgumentAst(None, ast.rhs, None, False, idx)], idx) # todo : convention
         function_call = Ast.PostfixExpressionAst(member_access, function_call, idx)
         return TypeInference.infer_type_of_expression(function_call, s)
-
 
     @staticmethod
     def infer_type_of_postfix_expression(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
@@ -203,14 +207,38 @@ class TypeInference:
     @staticmethod
     def infer_type_of_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
         class_symbol = TypeInference.infer_type_of_expression(ast.lhs, s)
+        class_symbol = TypeInference.infer_type_of_type(class_symbol, s)
+        restore_tuple = class_symbol
+        if isinstance(class_symbol, Ast.TypeTupleAst):
+            class_symbol = CommonTypes.tuple(class_symbol.types)
+
         class_scope = s.global_scope.get_child_scope_for_cls(class_symbol.parts[-1].identifier)
         if class_scope is None:
             error = Exception(
                 ErrorFormatter.error(ast._tok) +
-                f"Member '{ast.op.identifier.identifier}' not found on class '{class_symbol.parts[-1].identifier}'.")
+                f"Class {class_symbol.parts[-1].identifier} not found.")
             raise SystemExit(error) from None
 
-        member_symbol = class_scope.get_symbol(ast.op.identifier)
+        if isinstance(ast.op.identifier, Ast.NumberLiteralBase10Ast):
+            if not isinstance(restore_tuple, Ast.TypeTupleAst):
+                error = Exception(
+                    ErrorFormatter.error(ast._tok) +
+                    f"Class {class_symbol.parts[-1].identifier} is not a tuple.")
+                raise SystemExit(error) from None
+            if int(ast.op.identifier.integer) >= len(restore_tuple.types):
+                error = Exception(
+                    ErrorFormatter.error(ast._tok) +
+                    f"Tuple index {ast.op.identifier} out of range.")
+                raise SystemExit(error) from None
+            return restore_tuple.types[int(ast.op.identifier.integer)]
+
+        try:
+            member_symbol = class_scope.get_symbol(ast.op.identifier.identifier)
+        except:
+            error = Exception(
+                ErrorFormatter.error(ast._tok) +
+                f"Member '{ast.op.identifier.identifier}' not found on class '{class_symbol.parts[-1].identifier}'.")
+            raise SystemExit(error) from None
         return member_symbol.type
 
 
@@ -223,15 +251,30 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        return TypeInference.infer_type_of_type_single(ast.lhs, s)
+        return TypeInference.infer_type_of_type(ast.lhs, s)
 
     @staticmethod
     def infer_type_of_assignment_expression(ast: Ast.AssignmentExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
         return CommonTypes.unknown()
 
     @staticmethod
-    def infer_type_of_type_single(ast: Ast.TypeSingleAst | Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
-        # check type exists
+    def infer_type_of_type(ast: Ast.TypeSingleAst | Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
+        if isinstance(ast, Ast.TypeTupleAst):
+            for type in ast.types:
+                TypeInference.infer_type_of_type(type, s)
+            return ast
+
+        if isinstance(ast.parts[0], Ast.SelfTypeAst):
+            scope = s.current_scope
+            while not scope.name.startswith("ClsPrototype"):
+                scope = scope.parent
+                if not scope:
+                    error = Exception(
+                        ErrorFormatter.error(ast._tok) +
+                        f"Self in a non-class scope.")
+                    raise SystemExit(error) from None
+            ast.parts[0] = s.current_scope.get_type(scope.name).type
+
         identifier = ast.identifier if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1].identifier
         if not s.global_scope.has_type(identifier):
             error = Exception(
@@ -284,3 +327,7 @@ class CommonTypes:
     @staticmethod
     def unknown() -> Ast.TypeAst:
         return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Unknown", [], -1)], -1)
+
+    @staticmethod
+    def tuple(types: list[Ast.TypeAst]) -> Ast.TypeAst:
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Tup", types, -1)], -1)

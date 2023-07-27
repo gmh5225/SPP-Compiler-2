@@ -1,5 +1,48 @@
 mod my_module_root.some_folder.inner_folder.module_name
 
+cls Tup[...Ts] {}
+
+cls Str {
+    c: Num
+}
+
+cls SomeType {}
+
+cls Num {
+    b: Str
+}
+
+sup std.ops.Add for Num {
+    fn add(self: &Num, other: Num) -> Num {
+        ret Num {
+            b=self.b + other.b
+        }
+    }
+}
+
+sup std.ops.BitXor for Num {
+    fn bit_xor(self: &Num, other: Num) -> Num {
+        ret Num {
+            b=self.b ^ other.b
+        }
+    }
+}
+
+sup std.ops.BitOr for Num {
+    fn bit_or(self: &Num, other: Num) -> Num {
+        ret Num {
+            b=self.b | other.b
+        }
+    }
+}
+
+sup std.ops.Or for Num {
+    fn or(self: &Num, other: Num) -> Num {
+        ret Num {
+            b=self.b || other.b
+        }
+    }
+}
 
 cls ClassA {
     a: Vec[Num]
@@ -68,7 +111,21 @@ fn function_test_2[T, U=T, ...V](a: Num, ...args: V) -> Num where [T, U: Default
     }
 }
 
-fn function_test_3(mut a: &mut Self.Output, mut b: std.ns.detail.Type[T].Inner[U, T=Num], c: (T, std.Other.Inner[T].Output, U)) -> Self.Item {
+cls Output {
+    a: Output
+    b: Output
+    c: Output
+    d: Output
+    e: Output
+    f: Num
+}
+
+cls OtherType {
+    a: Num
+    b: Num
+}
+
+fn function_test_3(mut a: &mut Output, mut b: std.ns.detail.Type[T].Inner[U, T=Num], c: (T, std.Other.Inner[T].Output, U)) -> Str {
     let x = function_test_3[T](400, 500)
 
     while true {
@@ -100,7 +157,7 @@ fn function_test_3(mut a: &mut Self.Output, mut b: std.ns.detail.Type[T].Inner[U
 
     let temp: Str
 
-    let b = function_call()
+    let b = function_test_1()
     let c = a.b.c.d.e.f
     let d = OtherType{a=10, b=20, else=OtherType.def(), sup=(Num.new())}
 
@@ -108,8 +165,8 @@ fn function_test_3(mut a: &mut Self.Output, mut b: std.ns.detail.Type[T].Inner[U
     yield 2
     ret 3
 
-    let x = (1, 2, 3)
-    let y = x.0
+    let z = (0, 1, 2, 3)
+    let y = z.0
 
     use T as (Num, Str, Bool)
     use U as T.0

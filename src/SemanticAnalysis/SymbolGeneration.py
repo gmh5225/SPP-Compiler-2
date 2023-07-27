@@ -18,6 +18,7 @@ class Symbol:
         self.name = name
         self.type = type_
         self.value = value
+
         self.index = index
         self.bases = []
 
@@ -67,6 +68,8 @@ class Scope:
     children: list[Scope]
     visited: bool
 
+    sup_scopes: list[Scope]
+
     def __init__(self, name: str, parent: Optional[Scope] = None):
         self.name = name
         self.symbols = SymbolTable()
@@ -78,6 +81,7 @@ class Scope:
             self.parent.children.append(self)
 
         self.visited = False
+        self.sup_scopes = []
 
     def add_symbol(self, symbol: Symbol):
         self.symbols.add(symbol)
@@ -97,6 +101,11 @@ class Scope:
             if current.symbols.has(name):
                 return current.symbols.get(name)
             current = current.parent
+
+        # next check linked sup-scopes
+        for sup_scope in self.sup_scopes:
+            if sup_scope.symbols.has(name):
+                return sup_scope.symbols.get(name)
 
         raise Exception(f"Symbol '{name}' not found")
 
@@ -297,7 +306,7 @@ class SymbolTableBuilder:
         # symbols for the expression.
         match ast:
             case Ast.TypedefStatementAst(): SymbolTableBuilder.build_typedef_statement_symbols(ast, s)
-            case Ast.ReturnStatementAst(): pass
+            case Ast.ReturnStatementAst(): SymbolTableBuilder.build_return_statement_symbols(ast, s)
             case Ast.LetStatementAst(): SymbolTableBuilder.build_let_statement_symbols(ast, s)
             case Ast.FunctionPrototypeAst(): SymbolTableBuilder.build_function_prototype_symbols(ast, s)
             case _: SymbolTableBuilder.build_expression_symbols(ast, s)
@@ -311,6 +320,17 @@ class SymbolTableBuilder:
         @return: Nothing.
         """
         s.current_scope.add_type(Symbol(convert_type_to_string(ast.new_type), ast.old_type, None))
+
+    @staticmethod
+    def build_return_statement_symbols(ast: Ast.ReturnStatementAst, s: ScopeHandler) -> None:
+        """
+        Build the symbols for a return statement. This will recursively visit the expression in the return statement to
+        build symbols for nested members.
+        @param ast: The ReturnStatementAst to generate symbols for.
+        @param s: The ScopeHandler to store the symbols in.
+        @return: Nothing.
+        """
+        SymbolTableBuilder.build_expression_symbols(ast.value, s)
 
     @staticmethod
     def build_let_statement_symbols(ast: Ast.LetStatementAst, s: ScopeHandler) -> None:
@@ -386,7 +406,7 @@ class SymbolTableBuilder:
     @staticmethod
     def build_class_prototype_symbols(ast: Ast.ClassPrototypeAst, s: ScopeHandler) -> None:
         s.current_scope.add_type(Symbol(convert_identifier_to_string(ast.identifier), None, None))
-        s.enter_scope(f"ClsPrototype{convert_identifier_to_string(ast.identifier)}")
+        s.enter_scope(f"ClsPrototype__{convert_identifier_to_string(ast.identifier)}")
         for member in ast.body.members:
             s.current_scope.add_symbol(Symbol(convert_identifier_to_string(member.identifier), member.type_annotation, None))
         s.exit_scope()
@@ -409,6 +429,12 @@ class SymbolTableBuilder:
             s.current_scope.add_type(Symbol(convert_identifier_to_string(typedef.identifier), typedef.type_annotation, None))
         for method in filter(lambda member: isinstance(member, Ast.SupMethodPrototypeAst), ast.body.members):
             SymbolTableBuilder.build_function_prototype_symbols(method, s)
+
+        # bind the sup-Scope to the cls-Scope
+        cls = ast.identifier
+        cls_scope = s.global_scope.get_child_scope_for_cls(cls.parts[0].identifier)
+        cls_scope.sup_scopes.append(s.current_scope)
+
         s.exit_scope()
 
 
