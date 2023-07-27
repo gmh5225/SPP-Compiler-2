@@ -206,6 +206,14 @@ class ScopeHandler:
 class SymbolTableBuilder:
     @staticmethod
     def build(ast: Ast.ProgramAst) -> ScopeHandler:
+        """
+        Entry function into symbol generation. This will fire off the recursive symbol generation process, starting with
+        the ProgramAst, in the global scope. The ScopeHandler will be returned, which contains the global scope and all
+        of its children.
+        @param ast: The ProgramAst to generate symbols for.
+        @return: The ScopeHandler containing the global scope and all of its children.
+        """
+
         s = ScopeHandler()
         SymbolTableBuilder.build_program_symbols(ast, s)
         s.switch_to_global_scope()
@@ -213,6 +221,16 @@ class SymbolTableBuilder:
 
     @staticmethod
     def build_program_symbols(ast: Ast.ProgramAst, s: ScopeHandler) -> None:
+        """
+        Build all the symbols for the program. This reads into the module implementation, and builds symbols for all
+        function prototypes, class prototypes, enum prototypes, and sup prototypes.
+        @param ast: The ProgramAst to generate symbols for.
+        @param s: The ScopeHandler to store the symbols in.
+        @return: Nothing.
+        """
+
+        # Match each module member by AST type, and call the appropriate function to build the symbols for that member.
+        # This will recursively call into other functions to build symbols for nested members.
         for module_member in ast.module.body.members:
             match module_member:
                 case Ast.FunctionPrototypeAst(): SymbolTableBuilder.build_function_prototype_symbols(module_member, s)
@@ -223,9 +241,23 @@ class SymbolTableBuilder:
 
     @staticmethod
     def build_function_prototype_symbols(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> None:
+        """
+        Build the symbols for a function prototype. This will add the function prototype to the current scope, and then
+        enter a new scope for the function body. The function parameters are registered as symbols with their type
+        annotations used to determine the type of the symbol. The function's generic parameters are registered as types.
+        Finally, each statement in the body of the function is recursively visited to build symbols for nested members.
+        @param ast: The FunctionPrototypeAst to generate symbols for.
+        @param s: The ScopeHandler to store the symbols in.
+        @return: Nothing.
+        """
+
+        # Add the function prototype to the current scope, and enter a new scope for the function body.
         s.current_scope.add_symbol(Symbol(convert_identifier_to_string(ast.identifier), get_function_type(ast), None))
         s.enter_scope(f"FnPrototype__{convert_identifier_to_string(ast.identifier)}")
 
+        # Register the function parameters as symbols with their type annotations used to determine the type of the
+        # symbol. Add the generic type parameters as types. Finally, recursively visit each statement in the function
+        # body to build symbols for nested members.
         for param in ast.parameters:
             s.current_scope.add_symbol(Symbol(convert_identifier_to_string(param.identifier), param.type_annotation, None))
         for generic in ast.generic_parameters:
@@ -233,10 +265,24 @@ class SymbolTableBuilder:
         for statement in ast.body.statements:
             SymbolTableBuilder.build_statement_symbols(statement, s)
 
+        # Exit the function body scope and return to the parent scope.
         s.exit_scope()
 
     @staticmethod
     def build_statement_symbols(ast: Ast.StatementAst, s: ScopeHandler) -> None:
+        """
+        Build the symbols for a statement. This will match the statement by AST type, and call the appropriate function
+        to build the symbols for that statement. This will recursively call into other functions to build symbols for
+        nested members.
+        @param ast: The StatementAst to generate symbols for.
+        @param s: The ScopeHandler to store the symbols in.
+        @return: Nothing.
+        """
+
+        # The actual statements are the non-expression statement -- TypedefStatementAst, ReturnStatementAst,
+        # LetStatementAst and FunctionPrototypeAst. The expression statements are handled in the expression match.
+        # Because an expression is a valid statement, the "default" case for non-expression statements is to build
+        # symbols for the expression.
         match ast:
             case Ast.TypedefStatementAst(): SymbolTableBuilder.build_typedef_statement_symbols(ast, s)
             case Ast.ReturnStatementAst(): pass
@@ -246,7 +292,13 @@ class SymbolTableBuilder:
 
     @staticmethod
     def build_typedef_statement_symbols(ast: Ast.TypedefStatementAst, s: ScopeHandler) -> None:
-        s.current_scope.add_type(Symbol(convert_identifier_to_string(ast.new_type), ast.old_type, None))
+        """
+        Build the symbols for a typedef statement. This will add the type to the current scope.
+        @param ast: The TypedefStatementAst to generate symbols for.
+        @param s: The ScopeHandler to store the symbols in.
+        @return: Nothing.
+        """
+        s.current_scope.add_type(Symbol(convert_type_to_string(ast.new_type), ast.old_type, None))
 
     @staticmethod
     def build_let_statement_symbols(ast: Ast.LetStatementAst, s: ScopeHandler) -> None:
@@ -293,7 +345,8 @@ class SymbolTableBuilder:
     @staticmethod
     def build_if_branch_symbols(ast: Ast.PatternStatementAst, s: ScopeHandler) -> None:
         s.enter_scope("PatternBranch")
-        SymbolTableBuilder.build_expression_symbols(ast.body, s)
+        for statement in ast.body:
+            SymbolTableBuilder.build_statement_symbols(statement, s)
         s.exit_scope()
 
     @staticmethod
@@ -358,8 +411,8 @@ def convert_type_to_string(ast: Ast.TypeAst) -> str:
         s = ""
         for p in ast.parts:
             s += p.identifier
-            if p.generic_arguments:
-                generics = list(map(lambda y: convert_type_to_string(y), p.generic_arguments))
+            if isinstance(p, Ast.GenericIdentifierAst) and p.generic_arguments:
+                generics = list(map(lambda y: convert_type_to_string(y.value), p.generic_arguments))
                 joined_generics = ", ".join(generics)
                 s += f"[{joined_generics}]"
             s += "::"

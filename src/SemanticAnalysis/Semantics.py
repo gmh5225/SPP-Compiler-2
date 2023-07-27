@@ -12,6 +12,7 @@ class Semantics:
         self._ast = ast
         self._scope_handler = SymbolTableBuilder.build(ast)
         SymbolChecker.check(ast, self._scope_handler)
-        TypeInference.infer(ast, self._scope_handler)
-
         save_json(self._scope_handler.json(), "_out/symbol_table.json")
+
+        TypeInference.infer(ast, self._scope_handler)
+        save_json(self._scope_handler.json(), "_out/type_inferred.json")

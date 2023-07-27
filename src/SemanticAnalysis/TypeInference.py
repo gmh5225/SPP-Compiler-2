@@ -180,7 +180,7 @@ class TypeInference:
         # 5. get the return type of the function (first generic argument)
         # 6. return the type
         function_name = Ast.IdentifierAst(BIN_FUNCTION_NAMES[ast.op.tok.token_type], -1)
-        member_access = Ast.PostfixMemberAccessAst(Ast.TokenAst(Token(".", TokenType.TkDynaRes), -1), function_name, -1)
+        member_access = Ast.PostfixMemberAccessAst(Ast.TokenAst(Token(".", TokenType.TkDot), -1), function_name, -1)
         member_access = Ast.PostfixExpressionAst(ast.lhs, member_access, -1)
         function_call = Ast.PostfixFunctionCallAst([Ast.FunctionArgumentAst(None, ast.rhs, None, False, -1)], -1) # todo : convention
         function_call = Ast.PostfixExpressionAst(member_access, function_call, -1)

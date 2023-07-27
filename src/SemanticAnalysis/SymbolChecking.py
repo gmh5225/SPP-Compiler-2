@@ -139,7 +139,8 @@ class SymbolChecker:
         s.next_scope()
         for pattern in ast.patterns:
             SymbolChecker.check_patterns_symbols(pattern, s)
-        SymbolChecker.check_expression_symbols(ast.body, s)
+        for statement in ast.body:
+            SymbolChecker.check_statement_symbols(statement, s)
         s.prev_scope()
 
     @staticmethod
