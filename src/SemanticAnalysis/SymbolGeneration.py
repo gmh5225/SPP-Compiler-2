@@ -422,18 +422,21 @@ def convert_type_to_string(ast: Ast.TypeAst) -> str:
     if isinstance(ast, Ast.TypeSingleAst):
         s = ""
         for p in ast.parts:
+            if isinstance(p, Ast.SelfTypeAst):
+                s += "Self."
+                continue
             s += p.identifier
             if isinstance(p, Ast.GenericIdentifierAst) and p.generic_arguments:
                 generics = list(map(lambda y: convert_type_to_string(y.value), p.generic_arguments))
                 joined_generics = ", ".join(generics)
                 s += f"[{joined_generics}]"
-            s += "::"
-        return s[:-2]
+            s += "."
+        return s[:-1]
     elif isinstance(ast, Ast.TypeTupleAst):
         s = "("
         for p in ast.types:
             s += convert_type_to_string(p) + ", "
-        return (s[:-2] if len(s) > 1 else s) + ")"
+        return (s[:-1] if len(s) > 1 else s) + ")"
     elif isinstance(ast, str):
         return ast # temp (for type: "TODO") etc
     elif ast is None:

@@ -9,7 +9,7 @@ from src.SyntacticAnalysis.Parser import ErrorFormatter
 
 
 BIN_FUNCTION_NAMES = {
-    TokenType.TkAdd: "__add__",
+    TokenType.TkAdd: "add",
     TokenType.TkSub: "__sub__",
     TokenType.TkMul: "__mul__",
     TokenType.TkDiv: "__div__",
@@ -207,7 +207,7 @@ class TypeInference:
         if class_scope is None:
             error = Exception(
                 ErrorFormatter.error(ast._tok) +
-                f"Member {ast.op.identifier.identifier} not found on class {class_symbol.parts[-1].identifier}.")
+                f"Member '{ast.op.identifier.identifier}' not found on class '{class_symbol.parts[-1].identifier}'.")
             raise SystemExit(error) from None
 
         member_symbol = class_scope.get_symbol(ast.op.identifier)

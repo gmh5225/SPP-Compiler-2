@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import functools
+import pprint
+
 import colorama
 import re
+import inspect
 
 from typing import Callable, Any, Optional, ParamSpec, TypeVar, Generic
 from src.SyntacticAnalysis import Ast
@@ -585,7 +588,7 @@ class Parser:
     def _parse_sup_identifier(self) -> BoundParser:
         def inner():
             p1 = self._parse_single_type_identifier_no_self().parse_once()
-            return p1[0]
+            return p1
         return BoundParser(self, inner)
 
     def _parse_sup_typedef(self) -> BoundParser:
@@ -656,7 +659,7 @@ class Parser:
 
     def _parse_enum_identifier(self) -> BoundParser:
         def inner():
-            p1 = self._parse_identifier().parse_once()
+            p1 = self._parse_upper_identifier().parse_once()
             return p1
         return BoundParser(self, inner)
 
@@ -1090,36 +1093,19 @@ class Parser:
 
     def _parse_primary_expression(self) -> BoundParser:
         def inner():
-            # p0 = self._parse_primary_generic_identifier_for_func_call().delay_parse()
-            p1 = self._parse_identifier().delay_parse()
-            p2 = self._parse_literal().delay_parse()
-            p3 = self._parse_lambda().delay_parse()
-            p4 = self._parse_primary_type_identifier().delay_parse()  # can only come before a {}
-            p5 = self._parse_operator_identifier_variadic().delay_parse()
-            p6 = self._parse_expression_placeholder().delay_parse()
-
+            p1 = self._parse_single_type_identifier().delay_parse()  # let x = std.Num.new();
+            p2 = self._parse_identifier().delay_parse()  # let x = identifier
+            p3 = self._parse_literal().delay_parse()  # let x = 123
+            p4 = self._parse_lambda().delay_parse()  # let x = (x) => {x + 1}
+            p5 = self._parse_operator_identifier_variadic().delay_parse()  # let x = 0 + ... + args
+            p6 = self._parse_expression_placeholder().delay_parse()  # let x = f(_, 1, 2);
             p7 = self._parse_statement_if().delay_parse()
             p8 = self._parse_statement_while().delay_parse()
             p9 = self._parse_statement_new_scope().delay_parse()
             p10 = self._parse_statement_yield().delay_parse()
             p11 = self._parse_statement_with().delay_parse()
-            p12 = (p7 | p8 | p9 | p10 | p11 | p4 | p3 | p1 | p2 | p5 | p6).parse_once()
+            p12 = (p7 | p8 | p9 | p10 | p11 | p1 | p2 | p3 | p4 | p5 | p6).parse_once()
             return p12
-        return BoundParser(self, inner)
-
-    # def _parse_primary_generic_identifier_for_func_call(self) -> BoundParser:
-    #     def inner():
-    #         p1 = self._parse_generic_identifier().parse_once()
-    #         p2 = self._parse_postfix_operator_function_call().parse_once()
-    #         return Ast.PostfixExpressionAst(p1, p2)
-    #     return BoundParser(self, inner)
-
-    def _parse_primary_type_identifier(self) -> BoundParser:
-        def inner():
-            c1 = self._current
-            p1 = self._parse_single_type_identifier().parse_once()
-            p2 = self._parse_postfix_operator_struct_initializer().parse_once()
-            return Ast.PostfixExpressionAst(p1, p2, c1)
         return BoundParser(self, inner)
 
     def _parse_binary_expression(self, __lhs, __op, __rhs) -> BoundParser:
@@ -1278,9 +1264,12 @@ class Parser:
     def _parse_single_type_identifier_no_self(self) -> BoundParser:
         # std::io::Console::WriteOutput
         # Console::WriteOutput
+        # TODO => type must end in a type (can't just be a namespace) => change from an "if" to actual parsing rules
         def inner():
             p1 = self._parse_type_identifiers_namespace_then_types().parse_once()
-            return p1
+            if not p1[-1].identifier[0].isupper():
+                raise ParseSyntaxError("A [TypeIdentifier] must contain a type after the namespace", self._current)
+            return Ast.TypeSingleAst(p1, p1[0]._tok)
         return BoundParser(self, inner)
 
     def _parse_type_identifiers_namespace_then_types(self) -> BoundParser:
@@ -1559,7 +1548,7 @@ class Parser:
     def _parse_pattern_val(self) -> BoundParser:
         def inner():
             c1 = self._current
-            p1 = self._parse_primary_type_identifier().delay_parse()
+            p1 = self._parse_pattern_match_object().delay_parse()
             p2 = self._parse_literal().delay_parse()
             p3 = (p1 | p2).parse_once()
             return Ast.PatternAst(p3, c1)
@@ -1570,6 +1559,13 @@ class Parser:
             p1 = self._parse_token(TokenType.TkPipe).parse_once()
             p2 = self._parse_pattern_val().parse_once()
             return p2
+        return BoundParser(self, inner)
+
+    def _parse_pattern_match_object(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_single_type_identifier().parse_once()
+            p2 = self._parse_postfix_operator_struct_initializer().parse_once()
+            return Ast.PostfixExpressionAst(p1, p2, p2._tok)
         return BoundParser(self, inner)
 
     def _parse_statement_while(self) -> BoundParser:
@@ -1881,9 +1877,9 @@ class Parser:
         def inner():
             p1 = self._parse_postfix_operator_function_call().delay_parse()
             p2 = self._parse_postfix_operator_member_access().delay_parse()
-            # p5 = self._parse_postfix_operator_struct_initializer().delay_parse()
-            p7 = self._parse_token(TokenType.TkQst).delay_parse()
-            p8 = (p1 | p2 | p7).parse_once()
+            p3 = self._parse_postfix_operator_struct_initializer().delay_parse()
+            p4 = self._parse_token(TokenType.TkQst).delay_parse()
+            p8 = (p1 | p2 | p3 | p4).parse_once()
             return p8
         return BoundParser(self, inner)
 
