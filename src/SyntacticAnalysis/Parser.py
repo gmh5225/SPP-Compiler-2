@@ -1283,13 +1283,14 @@ class Parser:
         # TODO => type must end in a type (can't just be a namespace) => change from an "if" to actual parsing rules
         def inner():
             p1 = self._parse_type_identifiers_namespace_then_types().parse_once()
-            if not p1[-1].identifier[0].isupper():
+            if not (isinstance(p1[-1], int) or p1[-1].identifier[0].isupper()):
                 raise ParseSyntaxError("A [TypeIdentifier] must contain a type after the namespace", self._current)
             return Ast.TypeSingleAst(p1, p1[0]._tok)
         return BoundParser(self, inner)
 
     def _parse_type_identifiers_namespace_then_types(self) -> BoundParser:
-        def inner(): # issue here: at least 1 upper type is needed, otherwise std[T] is valid -- needs a type after the ns
+        def inner():
+            # issue here: at least 1 upper type is needed, otherwise std[T] is valid -- needs a type after the ns
             p1 = self._parse_type_identifier_namespace().delay_parse()
             p2 = self._parse_type_identifier_upper_types().delay_parse()
             p3 = (p1 | p2).parse_once()
@@ -1320,7 +1321,7 @@ class Parser:
     def _parse_type_identifier_next_upper_type(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkDot).parse_once()
-            p2 = self._parse_type_identifier_upper_type().parse_once()
+            p2 = self._parse_type_identifier_upper_type_or_number().parse_once()
             return p2
         return BoundParser(self, inner)
 
@@ -1334,6 +1335,20 @@ class Parser:
         def inner():
             p1 = self._parse_generic_identifier().parse_once()
             return p1
+        return BoundParser(self, inner)
+
+    def _parse_type_identifier_upper_type_or_number(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_type_identifier_upper_type().delay_parse()
+            p2 = self._parse_type_identifier_number().delay_parse()
+            p3 = (p1 | p2).parse_once()
+            return p3
+        return BoundParser(self, inner)
+
+    def _parse_type_identifier_number(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_numeric_integer().parse_once()
+            return int(p1)
         return BoundParser(self, inner)
 
     # Type Generic Arguments
