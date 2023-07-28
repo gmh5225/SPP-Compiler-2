@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 from dataclasses import dataclass
+
 from src.LexicalAnalysis.Tokens import Token
 
 
@@ -19,6 +20,7 @@ class TokenAst:
 class ParameterPassingConventionReferenceAst:
     mutable: bool
     _tok: int
+
 
 @dataclass
 class IdentifierAst:
@@ -252,12 +254,12 @@ class LambdaAst:
 @dataclass
 class TypeGenericParameterAst:
     identifier: IdentifierAst
-    constraints: list[GenericIdentifierAst]
+    constraints: list[TypeAst]
     default: Optional[TypeAst]
     is_variadic: bool
     _tok: int
 
-def TypeGenericParameterRequiredAst(identifier: IdentifierAst, constraints: list[GenericIdentifierAst], _tok: int):
+def TypeGenericParameterRequiredAst(identifier: IdentifierAst, constraints: list[TypeAst], _tok: int):
     return TypeGenericParameterAst(identifier, constraints, None, False, _tok)
 
 def TypeGenericParameterOptionalAst(parameter: TypeGenericParameterAst, default: TypeAst):
@@ -293,7 +295,7 @@ class TypeTupleAst:
 @dataclass
 class IfStatementAst:
     condition: ExpressionAst
-    comparison_op: TokenAst
+    comparison_op: Optional[TokenAst]
     branches: list[PatternStatementAst]
     _tok: int
 

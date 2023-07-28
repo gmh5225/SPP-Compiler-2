@@ -45,7 +45,7 @@ class ErrorFormatter:
         return ansi_escape.sub('', line)
     
     @staticmethod
-    def error(start_token_index: int, *metadata: str) -> str:
+    def error(start_token_index: int, end_token_index = -1) -> str:
         while ErrorFormatter.TOKENS[start_token_index].token_type in [TokenType.TkNewLine, TokenType.TkWhitespace]:
             start_token_index += 1
 
