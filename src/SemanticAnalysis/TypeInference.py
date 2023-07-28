@@ -257,7 +257,36 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_assignment_expression(ast: Ast.AssignmentExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        return CommonTypes.unknown()
+        # todo : test & compare to other tuple assignment methods
+        lhs_types = [TypeInference.infer_type_of_expression(l, s) for l in ast.lhs]
+        rhs_type = TypeInference.infer_type_of_expression(ast.rhs, s)
+        if len(lhs_types) == 1 and lhs_types[0] != rhs_type:
+            error = Exception(
+                ErrorFormatter.error(ast.op._tok) +
+                f"Cannot assign {convert_type_to_string(rhs_type)} to {convert_type_to_string(lhs_types[0])}.")
+            raise SystemExit(error) from None
+        elif len(lhs_types) == 1:
+            return CommonTypes.void()
+        else:
+            if not isinstance(rhs_type, Ast.TypeTupleAst):
+                error = Exception(
+                    ErrorFormatter.error(ast.op._tok) +
+                    f"Multi assignment required destructuring a tuple, not a {convert_type_to_string(rhs_type)}")
+                raise SystemExit(error) from None
+
+            if len(lhs_types) != len(rhs_type.types):
+                error = Exception(
+                    ErrorFormatter.error(ast.op._tok) +
+                    f"Cannot unpack a {len(ast.rhs.values)}-tuple into {len(lhs_types)} variables.")
+                raise SystemExit(error) from None
+
+            for i in range(len(lhs_types)):
+                if lhs_types[i] != rhs_type.types[i]:
+                    error = Exception(
+                        ErrorFormatter.error(ast.rhs.values[i]._tok) +
+                        f"Cannot assign {convert_type_to_string(rhs_type.types[i])} to {convert_type_to_string(lhs_types[i])}.")
+                    raise SystemExit(error) from None
+        return CommonTypes.void()
 
     @staticmethod
     def infer_type_of_type(ast: Ast.TypeSingleAst | Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:

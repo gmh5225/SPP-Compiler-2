@@ -38,9 +38,15 @@ class GenericIdentifierAst:
     generic_arguments: list[TypeGenericArgumentAst]
     _tok: int
 
+    def __eq__(self, other):
+        return isinstance(other, GenericIdentifierAst) and self.identifier == other.identifier and self.generic_arguments == other.generic_arguments
+
 @dataclass
 class SelfTypeAst:
     _tok: int
+
+    def __eq__(self, other):
+        return isinstance(other, SelfTypeAst)
 
 @dataclass
 class ImportTypeAst:
@@ -276,6 +282,9 @@ class TypeGenericArgumentAst:
     value: TypeAst
     _tok: int
 
+    def __eq__(self, other):
+        return isinstance(other, TypeGenericArgumentAst) and self.identifier == other.identifier and self.value == other.value
+
 def TypeGenericArgumentNamedAst(identifier: IdentifierAst, value: TypeAst, _tok: int):
     return TypeGenericArgumentAst(identifier, value, _tok)
 
@@ -287,10 +296,16 @@ class TypeSingleAst:
     parts: list[SelfTypeAst | GenericIdentifierAst | int]
     _tok: int
 
+    def __eq__(self, other):
+        return isinstance(other, TypeSingleAst) and self.parts == other.parts
+
 @dataclass
 class TypeTupleAst:
     types: list[TypeAst]
     _tok: int
+
+    def __eq__(self, other):
+        return isinstance(other, TypeTupleAst) and self.types == other.types
 
 @dataclass
 class IfStatementAst:
