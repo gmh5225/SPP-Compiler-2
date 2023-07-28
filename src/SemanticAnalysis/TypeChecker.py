@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from src.SemanticAnalysis.SymbolGeneration import ScopeHandler
+from src.SemanticAnalysis.TypeInference import TypeInference
 from src.SyntacticAnalysis import Ast
+from src.SyntacticAnalysis.Parser import ErrorFormatter
 
 """
 TypeChecker:
@@ -17,7 +19,7 @@ class TypeChecker:
         TypeChecker.check_program(s)
 
     @staticmethod
-    def check_program(s: ScopeHandler) -> None:
+    def check_program(ast: Ast.ProgramAst, s: ScopeHandler) -> None:
         for module_member in s.current_scope().members:
             match module_member:
                 case Ast.FunctionPrototypeAst(): TypeChecker.check_function_prototype(module_member, s)
@@ -74,5 +76,11 @@ class TypeChecker:
 
     @staticmethod
     def check_assignment_expression(ast: Ast.AssignmentExpressionAst, s: ScopeHandler) -> None:
-        TypeChecker.check_expression(ast.lhs, s)
-        TypeChecker.check_expression(ast.rhs, s)
+        lhs_type = TypeInference.infer_type_of_expression(ast.lhs, s)
+        rhs_type = TypeInference.infer_type_of_expression(ast.rhs, s)
+        if lhs_type != rhs_type:
+            error = Exception(
+                ErrorFormatter.error(ast.op._tok) +
+                f"Type mismatch: {lhs_type} != {rhs_type}")
+            raise error
+
