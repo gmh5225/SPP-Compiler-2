@@ -2,6 +2,8 @@ from __future__ import annotations
 from typing import Callable, Optional
 
 from src.SyntacticAnalysis import Ast
+from src.SyntacticAnalysis.Parser import Parser, ErrorFormatter
+from src.LexicalAnalysis.Lexer import Lexer
 
 
 class Symbol:
@@ -259,6 +261,33 @@ class SymbolTableBuilder:
                 case Ast.SupPrototypeNormalAst(): SymbolTableBuilder.build_sup_prototype_symbols(module_member, s)
                 case Ast.SupPrototypeInheritanceAst(): SymbolTableBuilder.build_sup_prototype_symbols(module_member, s)
 
+        if ast.module.body.import_block is not None:
+            for import_ in ast.module.body.import_block.imports:
+                SymbolTableBuilder.build_import_symbols(import_, s)
+
+    @staticmethod
+    def build_import_symbols(ast: Ast.ImportStatementAst, s: ScopeHandler) -> None:
+        """
+        Build the symbols for an import statement. This will create a new scope for the imported module, and then
+        recursively build symbols for all of the members in the imported module.
+        @param ast: The ImportStatementAst to generate symbols for.
+        @param s: The ScopeHandler to store the symbols in.
+        @return: Nothing.
+        """
+
+        # Create a new scope for the imported module, and enter it.
+        ts = ErrorFormatter.TOKENS
+        module_name = f"./TestCode/{convert_module_name_to_file_name(ast.module)}.spp"
+        try:
+            module_code = open(f"{module_name}", "r").read()
+        except FileNotFoundError:
+            error = Exception(
+                ErrorFormatter.error(ast._tok) +
+                f"Could not find module '{module_name}'")
+            raise SystemExit(error) from None
+        SymbolTableBuilder.build_program_symbols(Parser(Lexer(module_code).lex()).parse(), s)  # bring into global scope
+        ErrorFormatter.TOKENS = ts
+
     @staticmethod
     def build_function_prototype_symbols(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> None:
         """
@@ -493,3 +522,6 @@ def get_function_type(ast: Ast.FunctionPrototypeAst) -> Ast.TypeAst:
     return Ast.TypeSingleAst([
         Ast.GenericIdentifierAst("std", [], -1),
         Ast.GenericIdentifierAst("FnRef", [return_type, param_types], -1)], -1)
+
+def convert_module_name_to_file_name(ast: Ast.ModuleIdentifierAst | Ast.ImportIdentifierAst) -> str:
+    return "/".join(map(lambda x: x.identifier, ast.parts))

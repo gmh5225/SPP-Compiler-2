@@ -90,7 +90,8 @@ class SymbolChecker:
 
     @staticmethod
     def check_assignment_expression_symbols(ast: Ast.AssignmentExpressionAst, s: ScopeHandler) -> None:
-        SymbolChecker.check_expression_symbols(ast.lhs, s)
+        # todo
+        for lhs in ast.lhs: SymbolChecker.check_expression_symbols(lhs, s)
         SymbolChecker.check_expression_symbols(ast.rhs, s)
 
     @staticmethod

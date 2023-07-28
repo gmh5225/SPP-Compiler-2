@@ -4,7 +4,7 @@ from typing import Optional
 
 from src.LexicalAnalysis.Tokens import Token, TokenType
 from src.SyntacticAnalysis import Ast
-from src.SemanticAnalysis.SymbolGeneration import ScopeHandler
+from src.SemanticAnalysis.SymbolGeneration import ScopeHandler, convert_type_to_string
 from src.SyntacticAnalysis.Parser import ErrorFormatter
 
 
@@ -275,7 +275,7 @@ class TypeInference:
                     raise SystemExit(error) from None
             ast.parts[0] = s.current_scope.get_type(scope.name).type
 
-        identifier = ast.identifier if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1].identifier
+        identifier = convert_type_to_string(ast)
         if not s.global_scope.has_type(identifier):
             error = Exception(
                 ErrorFormatter.error(ast._tok) +

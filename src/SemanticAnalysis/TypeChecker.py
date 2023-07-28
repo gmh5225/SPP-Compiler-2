@@ -45,7 +45,7 @@ class TypeChecker:
             TypeChecker.check_expression(ast.value, s)
 
     @staticmethod
-    def check_expression(ast: Ast.ExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+    def check_expression(ast: Ast.ExpressionAst, s: ScopeHandler) -> None:
         match ast:
             case Ast.BinaryExpressionAst(): TypeChecker.check_binary_expression(ast, s)
             case Ast.PostfixExpressionAst(): TypeChecker.check_postfix_expression(ast, s)
@@ -61,11 +61,12 @@ class TypeChecker:
             case Ast.WithStatementAst(): TypeChecker.check_with_statement(ast, s)
 
     @staticmethod
-    def check_binary_expression(ast: Ast.BinaryExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        ...
+    def check_binary_expression(ast: Ast.BinaryExpressionAst, s: ScopeHandler) -> None:
+        TypeChecker.check_expression(ast.lhs, s)
+        TypeChecker.check_expression(ast.rhs, s)
 
     @staticmethod
-    def check_postfix_expression(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+    def check_postfix_expression(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> None:
         match ast.op:
             case Ast.PostfixMemberAccessAst(): return
             case Ast.PostfixFunctionCallAst(): TypeChecker.check_function_call(ast, s)

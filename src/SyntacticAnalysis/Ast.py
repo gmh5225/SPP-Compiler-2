@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 from dataclasses import dataclass
-from src.LexicalAnalysis.Tokens import Token, TokenType
+from src.LexicalAnalysis.Tokens import Token
 
 
 @dataclass
@@ -76,7 +76,7 @@ class ImportBlockAst:
 
 @dataclass
 class ModuleImplementationAst:
-    imports: ImportBlockAst
+    import_block: ImportBlockAst
     members: list[ModuleMemberAst]
     _tok: int
 
