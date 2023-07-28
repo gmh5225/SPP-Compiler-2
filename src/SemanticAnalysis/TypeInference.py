@@ -57,6 +57,8 @@ class TypeInference:
     @staticmethod
     def infer_type_of_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> None:
         s.next_scope()
+        for parameter in ast.parameters:
+            TypeInference.infer_type_of_type(parameter.type_annotation, s)
         for statement in ast.body.statements:
             TypeInference.infer_type_of_statement(statement, s)
         s.prev_scope()
@@ -276,7 +278,7 @@ class TypeInference:
             ast.parts[0] = s.current_scope.get_type(scope.name).type
 
         identifier = convert_type_to_string(ast)
-        if not s.global_scope.has_type(identifier):
+        if not s.current_scope.has_type(identifier):
             error = Exception(
                 ErrorFormatter.error(ast._tok) +
                 f"Type {identifier} not found.")

@@ -202,7 +202,7 @@ class ValueGuardAst:
 
 @dataclass
 class DecoratorAst:
-    identifier: TypeAst # can be namespaced and generic
+    identifier: ModuleIdentifierAst
     generic_arguments: list[TypeGenericArgumentAst]
     arguments: list[FunctionArgumentAst]
     _tok: int

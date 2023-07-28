@@ -454,7 +454,7 @@ class SymbolTableBuilder:
 
         s.enter_scope("SupPrototype")
         for typedef in filter(lambda member: isinstance(member, Ast.SupTypedefAst), ast.body.members):
-            s.current_scope.add_type(Symbol(convert_identifier_to_string(typedef.identifier), typedef.type_annotation, None))
+            s.current_scope.add_type(Symbol(convert_type_to_string(typedef.new_type), typedef.old_type, None))
         for method in filter(lambda member: isinstance(member, Ast.SupMethodPrototypeAst), ast.body.members):
             SymbolTableBuilder.build_function_prototype_symbols(method, s)
 
