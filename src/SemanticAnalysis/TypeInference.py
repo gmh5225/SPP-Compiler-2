@@ -132,7 +132,7 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_tuple_literal(ast: Ast.TupleLiteralAst, s: ScopeHandler) -> Ast.TypeAst:
-        return Ast.TypeTupleAst([TypeInference.infer_type_of_expression(e, s) for e in ast.values], -1)
+        return Ast.TypeTupleAst([TypeInference.infer_type_of_expression(e, s) for e in ast.values], ast._tok)
 
     @staticmethod
     def infer_type_of_identifier(ast: Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
@@ -185,7 +185,7 @@ class TypeInference:
         # 5. get the return type of the function (first generic argument)
         # 6. return the type
         idx = ast.op._tok # todo : where to use "idx"
-        function_name = Ast.IdentifierAst(BIN_FUNCTION_NAMES[ast.op.tok.token_type], -1)
+        function_name = Ast.IdentifierAst(BIN_FUNCTION_NAMES[ast.op.tok.token_type], idx)
         member_access = Ast.PostfixMemberAccessAst(Ast.TokenAst(Token(".", TokenType.TkDot), idx), function_name, idx)
         member_access = Ast.PostfixExpressionAst(ast.lhs, member_access, idx)
         function_call = Ast.PostfixFunctionCallAst([], [Ast.FunctionArgumentAst(None, ast.rhs, None, False, idx)], idx) # todo : convention
@@ -236,7 +236,7 @@ class TypeInference:
             member_symbol = class_scope.get_symbol(ast.op.identifier.identifier)
         except:
             error = Exception(
-                ErrorFormatter.error(ast._tok) +
+                ErrorFormatter.error(ast.op.identifier._tok) +
                 f"Member '{ast.op.identifier.identifier}' not found on class '{class_symbol.parts[-1].identifier}'.")
             raise SystemExit(error) from None
         return member_symbol.type
@@ -302,27 +302,27 @@ class TypeInference:
 class CommonTypes:
     @staticmethod
     def void() -> Ast.TypeAst:
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Void", [], -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Void", [], -1)], -1)
     
     @staticmethod
     def bool() -> Ast.TypeAst:
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Bool", [], -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Bool", [], -1)], -1)
     
     @staticmethod
     def string() -> Ast.TypeAst:
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Str", [], -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Str", [], -1)], -1)
     
     @staticmethod
     def char() -> Ast.TypeAst:
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Char", [], -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Char", [], -1)], -1)
     
     @staticmethod
     def regex() -> Ast.TypeAst:
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Rgx", [], -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Rgx", [], -1)], -1)
     
     @staticmethod
     def num() -> Ast.TypeAst:
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Num", [], -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Num", [], -1)], -1)
     
     @staticmethod
     def unknown() -> Ast.TypeAst:
@@ -330,4 +330,4 @@ class CommonTypes:
 
     @staticmethod
     def tuple(types: list[Ast.TypeAst]) -> Ast.TypeAst:
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Tup", types, -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Tup", types, -1)], -1)

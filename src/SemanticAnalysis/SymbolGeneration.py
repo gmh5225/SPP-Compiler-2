@@ -516,12 +516,12 @@ def get_function_type(ast: Ast.FunctionPrototypeAst) -> Ast.TypeAst:
     @param ast:
     @return:
     """
-    return_type = Ast.TypeGenericArgumentAst(None, ast.return_type, -1)
-    param_types = Ast.TypeGenericArgumentAst(None, Ast.TypeTupleAst([a.type_annotation for a in ast.parameters], -1), -1)
+    return_type = Ast.TypeGenericArgumentAst(None, ast.return_type, ast.return_type._tok)
+    param_types = Ast.TypeGenericArgumentAst(None, Ast.TypeTupleAst([a.type_annotation for a in ast.parameters], ast.identifier._tok), ast.identifier._tok)
 
     return Ast.TypeSingleAst([
-        Ast.GenericIdentifierAst("std", [], -1),
-        Ast.GenericIdentifierAst("FnRef", [return_type, param_types], -1)], -1)
+        Ast.GenericIdentifierAst("std", [], ast.identifier._tok),
+        Ast.GenericIdentifierAst("FnRef", [return_type, param_types], ast.identifier._tok)], ast.identifier._tok)
 
 def convert_module_name_to_file_name(ast: Ast.ModuleIdentifierAst | Ast.ImportIdentifierAst) -> str:
     return "/".join(map(lambda x: x.identifier, ast.parts))
