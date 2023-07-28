@@ -1020,7 +1020,7 @@ class Parser:
             p2 = self._parse_assignment_multiple_lhs().parse_zero_or_more()
             p3 = self._parse_token(TokenType.TkAssign).parse_once()
             p4 = self._parse_non_assignment_expression().parse_once()
-            return Ast.AssignmentExpressionAst([p1, *p2], p4, c1)
+            return Ast.AssignmentExpressionAst([p1, *p2], p3, p4, c1)
         return BoundParser(self, inner)
 
     def _parse_assignment_multiple_lhs(self) -> BoundParser:

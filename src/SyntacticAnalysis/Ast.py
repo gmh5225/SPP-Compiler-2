@@ -215,6 +215,7 @@ class BinaryExpressionAst:
 @dataclass
 class AssignmentExpressionAst:
     lhs: list[ExpressionAst]
+    op: TokenAst # always "=", just to store token position
     rhs: ExpressionAst
     _tok: int
 
