@@ -84,6 +84,12 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_let_statement(ast: Ast.LetStatementAst, s: ScopeHandler) -> None:
+        if TypeInference.infer_type_of_expression(ast.value, s) == CommonTypes.void():
+            error = Exception(
+                ErrorFormatter.error(ast.value._tok) +
+                f"Cannot assign Void to a variable.")
+            raise SystemExit(error) from None
+
         if len(ast.variables) == 1:
             inferred_type = ast.type_annotation or TypeInference.infer_type_of_expression(ast.value, s)
             s.current_scope.get_symbol(ast.variables[0].identifier.identifier).type = inferred_type
@@ -154,9 +160,23 @@ class TypeInference:
     def infer_type_of_if_statement(ast: Ast.IfStatementAst, s: ScopeHandler) -> Ast.TypeAst:
         s.next_scope()
         t = CommonTypes.void()
+        ts = []
         for branch in ast.branches:
             t = TypeInference.infer_type_of_if_branch(branch, s)
+            ts.append(t)
         s.prev_scope()
+
+        if len(ts) >= 1:
+            branch_ret_type = ts[0]
+            branch_type_0 = convert_type_to_string(branch_ret_type)
+            for i in range(1, len(ts)):
+                branch_type_i = convert_type_to_string(ts[i])
+                if ts[i] != branch_ret_type:
+                    error = Exception(
+                        ErrorFormatter.error(ast.branches[i].body[-1]._tok) +
+                        f"Branch {i} has a different type ({branch_type_i}) than the first branch ({branch_type_0}).")
+                    raise SystemExit(error) from None
+
         return t
 
     @staticmethod
@@ -297,6 +317,12 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_assignment_expression(ast: Ast.AssignmentExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+        if TypeInference.infer_type_of_expression(ast.rhs.value, s) == CommonTypes.void():
+            error = Exception(
+                ErrorFormatter.error(ast.rhs.value._tok) +
+                f"Cannot assign Void to a variable.")
+            raise SystemExit(error) from None
+
         # todo : test & compare to other tuple assignment methods
         lhs_types = [TypeInference.infer_type_of_expression(l, s) for l in ast.lhs]
         rhs_type = TypeInference.infer_type_of_expression(ast.rhs, s)
