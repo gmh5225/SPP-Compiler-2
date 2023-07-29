@@ -151,6 +151,9 @@ class Scope:
             current = current.parent
         return symbols
 
+    def all_exclusive_symbols(self) -> list[str]:
+        return list(self.symbols.symbols.keys())
+
     def get_child_scope_for_fn(self, fn_name: str) -> Optional[Scope]:
         for child in self.children:
             if child.name == f"FnPrototype__{fn_name}":

@@ -59,18 +59,28 @@ class TypeInference:
         s.next_scope()
         for parameter in ast.parameters:
             TypeInference.infer_type_of_type(parameter.type_annotation, s)
+        t = CommonTypes.void()
         for statement in ast.body.statements:
-            TypeInference.infer_type_of_statement(statement, s)
+            t = TypeInference.infer_type_of_statement(statement, s)
+        if t != ast.return_type:
+            error = Exception(
+                ErrorFormatter.error(ast.body.statements[-1]._tok if ast.body.statements else ast.body._tok) +
+                f"Expected return type {convert_type_to_string(ast.return_type)}, but found {convert_type_to_string(t or CommonTypes.void())}.")
+            raise SystemExit(error) from None
         s.prev_scope()
 
     @staticmethod
     def infer_type_of_statement(ast: Ast.StatementAst, s: ScopeHandler) -> Optional[Ast.TypeAst]:
         match ast:
             case Ast.TypedefStatementAst(): return
-            case Ast.ReturnStatementAst(): return
+            case Ast.ReturnStatementAst(): return TypeInference.infer_type_of_return_statement(ast, s)
             case Ast.LetStatementAst(): TypeInference.infer_type_of_let_statement(ast, s)
             case Ast.FunctionPrototypeAst(): TypeInference.infer_type_of_function_prototype(ast, s)
             case _: return TypeInference.infer_type_of_expression(ast, s)
+
+    @staticmethod
+    def infer_type_of_return_statement(ast: Ast.ReturnStatementAst, s: ScopeHandler) -> Ast.TypeAst:
+        return TypeInference.infer_type_of_expression(ast.value, s)
 
     @staticmethod
     def infer_type_of_let_statement(ast: Ast.LetStatementAst, s: ScopeHandler) -> None:
@@ -253,7 +263,37 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        return TypeInference.infer_type_of_type(ast.lhs, s)
+        given_fields = [f.identifier.identifier for f in ast.op.fields if isinstance(f.identifier, Ast.IdentifierAst)]
+        for given_field in ast.op.fields:
+            TypeInference.infer_type_of_expression(given_field.value, s)
+
+        all_fields = any(isinstance(f.identifier, Ast.TokenAst) and f.identifier.tok.token_type == TokenType.KwElse for f in ast.op.fields)
+
+        struct_type = TypeInference.infer_type_of_type(ast.lhs, s)
+        actual_fields = s.global_scope.get_child_scope_for_cls(struct_type.parts[-1].identifier).all_exclusive_symbols()
+
+        if len(given_fields) < len(actual_fields) and not all_fields:
+            error = Exception(
+                ErrorFormatter.error(ast._tok) +
+                f"Struct initializer for {struct_type.parts[-1].identifier} is missing fields: {set(actual_fields) - set(given_fields)}.")
+            raise SystemExit(error) from None
+
+        if len(given_fields) > len(actual_fields):
+            error = Exception(
+                ErrorFormatter.error(ast._tok) +
+                f"Struct initializer for {struct_type.parts[-1].identifier} given unknown fields: {set(given_fields) - set(actual_fields)}.")
+            raise SystemExit(error) from None
+
+        for given, actual in zip(sorted(given_fields), sorted(actual_fields)):
+            given_value_type = TypeInference.infer_type_of_expression(ast.op.fields[given_fields.index(given)].value or s.current_scope.get_symbol(given).type, s)
+            actual_value_type = s.global_scope.get_child_scope_for_cls(struct_type.parts[-1].identifier).get_symbol(actual).type
+            if given_value_type != actual_value_type:
+                error = Exception(
+                    ErrorFormatter.error(ast.op.fields[given_fields.index(given)]._tok) +
+                    f"Cannot assign {convert_type_to_string(given_value_type)} to {convert_type_to_string(actual_value_type)}.")
+                raise SystemExit(error) from None
+
+        return struct_type
 
     @staticmethod
     def infer_type_of_assignment_expression(ast: Ast.AssignmentExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
