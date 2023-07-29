@@ -7,6 +7,21 @@ from src.SyntacticAnalysis import Ast
 from src.SemanticAnalysis.SymbolGeneration import ScopeHandler, convert_type_to_string
 from src.SyntacticAnalysis.Parser import ErrorFormatter
 
+# todo : function selection (via signature)
+# todo : base class auto upcast? maybe make it explicit
+# todo : type inference for lambdas
+# todo : all things "type generics"
+# todo : mutability checks
+# todo : visibility checks
+# todo : builtin decorators
+# todo : memory checks
+#   - moves
+#   - mutable references from mutable variables (required mutability)
+#   - enforce the law of exclusivity
+# todo : "partial moves"
+# todo : symbol initialization for tuple types
+# todo : merge most of "let" and "assignment" checks
+
 
 BIN_FUNCTION_NAMES = {
     TokenType.TkAdd: "add",
@@ -84,11 +99,29 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_let_statement(ast: Ast.LetStatementAst, s: ScopeHandler) -> None:
+        if not ast.value:
+            s.current_scope.get_symbol(ast.variables[0].identifier.identifier).initialized = False
+            return
+
+        s.current_scope.get_symbol(ast.variables[0].identifier.identifier).initialized = True
+
         if TypeInference.infer_type_of_expression(ast.value, s) == CommonTypes.void():
             error = Exception(
                 ErrorFormatter.error(ast.value._tok) +
                 f"Cannot assign Void to a variable.")
             raise SystemExit(error) from None
+
+        if isinstance(ast.value, Ast.IdentifierAst) and not s.current_scope.get_symbol(ast.value.identifier).initialized:
+            error = Exception(
+                ErrorFormatter.error(ast.value._tok) +
+                f"Variable '{ast.value.identifier}' is not initialized.")
+            raise SystemExit(error) from None
+
+        if isinstance(ast.value, Ast.IdentifierAst):
+            s.current_scope.get_symbol(ast.value.identifier).initialized = False
+        elif isinstance(ast.value, Ast.TupleLiteralAst):
+            # todo (recursive)
+            ...
 
         if len(ast.variables) == 1:
             inferred_type = ast.type_annotation or TypeInference.infer_type_of_expression(ast.value, s)
@@ -304,6 +337,15 @@ class TypeInference:
                 f"Struct initializer for {struct_type.parts[-1].identifier} given unknown fields: {set(given_fields) - set(actual_fields)}.")
             raise SystemExit(error) from None
 
+        if all_fields:
+            all_fields_value = ast.op.fields[[isinstance(f.identifier, Ast.TokenAst) and f.identifier.tok.token_type == TokenType.KwElse for f in ast.op.fields].index(True)].value
+            all_fields_value_type = TypeInference.infer_type_of_expression(all_fields_value, s)
+            if all_fields_value_type != struct_type:
+                error = Exception(
+                    ErrorFormatter.error(all_fields_value._tok) +
+                    f"Struct initializer default for {struct_type.parts[-1].identifier} given a value of type {convert_type_to_string(all_fields_value_type)}.")
+                raise SystemExit(error) from None
+
         for given, actual in zip(sorted(given_fields), sorted(actual_fields)):
             given_value_type = TypeInference.infer_type_of_expression(ast.op.fields[given_fields.index(given)].value or s.current_scope.get_symbol(given).type, s)
             actual_value_type = s.global_scope.get_child_scope_for_cls(struct_type.parts[-1].identifier).get_symbol(actual).type
@@ -317,11 +359,15 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_assignment_expression(ast: Ast.AssignmentExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        if TypeInference.infer_type_of_expression(ast.rhs.value, s) == CommonTypes.void():
+        if TypeInference.infer_type_of_expression(ast.rhs, s) == CommonTypes.void():
             error = Exception(
                 ErrorFormatter.error(ast.rhs.value._tok) +
                 f"Cannot assign Void to a variable.")
             raise SystemExit(error) from None
+
+        for l in ast.lhs:
+            if isinstance(l, Ast.IdentifierAst):
+                s.current_scope.get_symbol(l.identifier).initialized = True
 
         # todo : test & compare to other tuple assignment methods
         lhs_types = [TypeInference.infer_type_of_expression(l, s) for l in ast.lhs]

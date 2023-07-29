@@ -15,6 +15,9 @@ class Symbol:
     index: int
     bases: list[Ast.TypeAst]
 
+    # memory
+    initialized: bool
+
     def __init__(self, name: str, type_: Optional[Ast.TypeAst], value: Optional[Ast.ExpressionAst], index: int = 0):
         self.name = name
         self.type = type_
@@ -22,6 +25,8 @@ class Symbol:
 
         self.index = index
         self.bases = []
+
+        self.initialized = self.value is not None
 
     def json(self) -> dict[str, any]:
         d = {
