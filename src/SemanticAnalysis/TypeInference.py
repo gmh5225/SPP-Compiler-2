@@ -64,10 +64,13 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_program(ast: Ast.ProgramAst, s: ScopeHandler) -> None:
+        for decorator in ast.module.decorators:
+            TypeInference.infer_type_of_decorator(decorator, s)
+
         for module_member in ast.module.body.members:
             match module_member:
                 case Ast.FunctionPrototypeAst(): TypeInference.infer_type_of_function_prototype(module_member, s)
-                case Ast.ClassPrototypeAst(): s.skip_scope()
+                case Ast.ClassPrototypeAst(): TypeInference.infer_type_of_class_prototype(module_member, s)
                 case Ast.EnumPrototypeAst(): s.skip_scope()
                 case Ast.SupPrototypeNormalAst(): TypeInference.infer_type_of_sup_prototype(module_member, s)
                 case Ast.SupPrototypeInheritanceAst(): TypeInference.infer_type_of_sup_prototype(module_member, s)
@@ -79,6 +82,10 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> None:
+        # Handle all the decorators
+        for decorator in ast.decorators:
+            TypeInference.infer_type_of_decorator(decorator, s)
+
         s.next_scope()
         # Run semantic checks for each parameter in the function prototype. This will handle type-checking and default
         # expression checking.
@@ -102,16 +109,34 @@ class TypeInference:
         s.prev_scope()
 
     @staticmethod
+    def infer_type_of_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeHandler) -> None:
+        for decorator in ast.decorators:
+            TypeInference.infer_type_of_decorator(decorator, s)
+
+        s.next_scope()
+        for member in ast.body.members:
+            TypeInference.infer_type_of_class_attribute(member, s)
+        s.prev_scope()
+
+    @staticmethod
+    def infer_type_of_class_attribute(ast: Ast.ClassAttributeAst, s: ScopeHandler) -> None:
+        for decorator in ast.decorators:
+            TypeInference.infer_type_of_decorator(decorator, s)
+
+        TypeInference.infer_type_of_type(ast.type_annotation, s)
+
+    @staticmethod
     def infer_type_of_parameter(ast: Ast.FunctionParameterAst, s: ScopeHandler) -> None:
         # Check the type of parameter exists, and if the parameter has a default value, check the expression. This
         # expression will actually be evaluated per call at runtime, so only type info is needed here.
         TypeInference.infer_type_of_type(ast.type_annotation, s)
         TypeInference.infer_type_of_expression(ast.default_value, s) if ast.default_value else None
+        s.current_scope.get_symbol(ast.identifier.identifier).defined = True
 
     @staticmethod
     def infer_type_of_statement(ast: Ast.StatementAst, s: ScopeHandler) -> Optional[Ast.TypeAst]:
         match ast:
-            case Ast.TypedefStatementAst(): return
+            case Ast.TypedefStatementAst(): TypeInference.infer_type_of_typedef(ast, s)
             case Ast.ReturnStatementAst(): return TypeInference.infer_type_of_return_statement(ast, s)
             case Ast.LetStatementAst(): TypeInference.infer_type_of_let_statement(ast, s)
             case Ast.FunctionPrototypeAst(): TypeInference.infer_type_of_function_prototype(ast, s)
@@ -125,8 +150,20 @@ class TypeInference:
     def infer_type_of_sup_prototype(ast: Ast.SupPrototypeNormalAst | Ast.SupPrototypeInheritanceAst, s: ScopeHandler) -> None:
         s.next_scope()
         for statement in ast.body.members:
-            TypeInference.infer_type_of_statement(statement, s)
+            match statement:
+                case Ast.SupMethodPrototypeAst(): TypeInference.infer_type_of_function_prototype(statement, s)
+                case Ast.SupTypedefAst(): TypeInference.infer_type_of_sup_typedef(statement, s)
         s.prev_scope()
+
+    @staticmethod
+    def infer_type_of_sup_typedef(ast: Ast.SupTypedefAst, s: ScopeHandler) -> None:
+        for decorator in ast.decorators:
+            TypeInference.infer_type_of_decorator(decorator, s)
+        TypeInference.infer_type_of_typedef(ast, s)
+
+    @staticmethod
+    def infer_type_of_typedef(ast: Ast.TypedefStatementAst, s: ScopeHandler) -> None:
+        TypeInference.infer_type_of_type(ast.old_type, s)
 
     @staticmethod
     def infer_type_of_expression(ast: Ast.ExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
