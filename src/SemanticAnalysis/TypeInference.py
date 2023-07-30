@@ -19,6 +19,7 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : memory checks
 #   - mutable references from mutable variables (required mutability)
 #   - enforce the law of exclusivity for member-access-attributes (locals done)
+#   - consuming self (will require function selection)
 # todo : "partial moves"
 # todo : symbol initialization for tuple types
 # todo : symbols defined after current line still discovered as valid - add "defined" flag?
@@ -303,7 +304,15 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_with_statement(ast: Ast.WithStatementAst, s: ScopeHandler) -> Ast.TypeAst:
+        # todo : issue with the aliased variable? might need type-inferring too
+
         s.next_scope()
+
+        if ast.alias:
+            s.current_scope.get_symbol(ast.alias.identifier.identifier).type = TypeInference.infer_type_of_expression(ast.value, s)
+            s.current_scope.get_symbol(ast.alias.identifier.identifier).defined = True
+            MemoryEnforcer.set_variable_initialized([ast.alias], s, True)
+
         t = CommonTypes.void()
         for statement in ast.body:
             t = TypeInference.infer_type_of_statement(statement, s)
@@ -522,7 +531,8 @@ class TypeInference:
                 s.current_scope.get_symbol(ast.variables[i].identifier.identifier).defined = True
                 s.current_scope.get_symbol(ast.variables[i].identifier.identifier).type = rhs_type.types[i]
 
-        # Handle the "else" clause for assignment
+        # Handle the "else" clause for the let statement. If the "else" clause is present, then the type of the "else"
+        # clause must match the type of the variable being assigned to.
         if ast.if_null:
             t = CommonTypes.void()
             for statement in ast.if_null.body:
