@@ -1,0 +1,14 @@
+mod std.vec3
+
+cls Vec3 {
+    b: Vec3
+    c: Vec4
+}
+
+cls Vec4 {
+    e: Num
+}
+
+sup Vec3 {
+    fn new() -> Vec3 {}
+}

@@ -21,7 +21,14 @@ cls Num {
     e: Str
 }
 
-cls Vec[T] {}
+cls Vec[T] {
+    a: Num
+}
+sup Vec {
+    fn new() -> Vec {
+        ret Vec {a=1}
+    }
+}
 
 sup std.Default for Num {
     fn default() -> Num {
@@ -42,71 +49,24 @@ sup std.Default for Str {
     }
 }
 
-sup std.ops.BitOr for Bool {
-    fn bit_or(self: &Bool, other: Bool) -> Bool {
-        ret Bool {
-            b=self.b | other.b
-        }
-    }
-}
-
-sup std.ops.Add for Str {
-    fn add(self: &Str, other: Str) -> Str {
-        ret Str {
-            c=self.c + other.c,
-            f=self.f | other.f
-        }
-    }
-}
-
-sup std.ops.Add for Num {
-    fn add(self: &Num, other: Num) -> Num {
-        ret Num {
-            b=self.b + other.b,
-            e=self.e + other.e,
-            d=self.d + other.d
-        }
-    }
-}
-
-sup std.ops.BitXor for Num {
-    fn bit_xor(self: &Num, other: Num) -> Num {
-        ret Num {
-            else=Num.default()
-        }
-    }
-}
-
-sup std.ops.BitOr for Num {
-    fn bit_or(self: &Num, other: Num) -> Num {
-        ret Num {
-            b=self.b,
-            else=Num.default()
-        }
-    }
-}
-
-sup std.ops.Or for Num {
-    fn or(self: &Num, other: Num) -> Num {
-        ret Num {
-            else=Num.default()
-        }
-    }
-}
 
 cls ClassA {
-    a: std.Vec3[Num]
+    a: Vec3
     b: Str
-    c: Map[Str, Set[Num]]
+    c: Vec
 }
 
 sup ClassA {
     fn new() -> ClassA {
         let p = 1
-        let q = p
-        let r = p
+        let q = 1
 
-        let a = Vec3.new()
+        let s = ClassA {
+            a=Vec3.new(),
+            b="",
+            c=Vec.new()
+        }
+
         let a = 1
         let x = function_test_1(a)
         let y = a.b.c.e
@@ -114,19 +74,28 @@ sup ClassA {
         let z = 123_124_999
 
         ret ClassA {
-            a=Vec.new(),
+            a=Vec3.new(),
             b="",
-            c=Map.new()
+            c=Vec.new()
         }
     }
 }
 
 sup std.ops.Add for ClassA {
+    use X as ClassA
+
+    @meta.private
     fn add(self: &ClassA, other: ClassA) -> ClassA {
+        let p = 123
+        let q = function_test_4(&mut p, 123)
+        let r = p
+
+        use T as X
+
         ret ClassA {
-            a=self.a + other.a,
-            b=self.b + other.b,
-            c=self.c + other.c
+            a=self.a,
+            b=self.b,
+            d=self.c
         }
     }
 }
