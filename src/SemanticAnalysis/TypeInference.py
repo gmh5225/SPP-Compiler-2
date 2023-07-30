@@ -15,6 +15,7 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : mutability checks
 # todo : visibility checks
 # todo : builtin decorators
+# todo : "self" automatic parameter
 # todo : memory checks
 #   - mutable references from mutable variables (required mutability)
 #   - enforce the law of exclusivity for member-access-attributes (locals done)
@@ -259,14 +260,16 @@ class TypeInference:
             # For functions, change the output slightly -- firstly, offer alternative signature suggestions, and
             # secondly, offset alternative function names.
             else:
+                # todo : methods in "sup" blocks are not found as matching function signatures
                 # Get all functions in the scope that have the same identifier as the one being called, but keep
                 # searching the entire scope so that every overload is discovered.
-                matching_functions_dif_signatures = [s for s in s.current_scope.all_symbols() if "#" in s and s.split("#")[0] == ast.identifier]
+                matching_functions_dif_signatures = [s for s in s.current_scope.all_symbols() if "#" in s and s.split("#")[0] == ast.identifier.split("#")[0]]
 
                 # If there are any matching function names, then multiple overloads have been provided -- convert them
                 # into strings for the error message.
                 if matching_functions_dif_signatures:
-                    string = f"Function '{ast.identifier}' not found in scope. Available signatures:\n"
+                    bad_function_identifier = ast.identifier.replace("#", "(").replace(",", ", ") + ")"
+                    string = f"Matching signature for '{bad_function_identifier}' not found in scope. Available signatures:\n"
                     for f in matching_functions_dif_signatures:
                         f = f.replace("#", "(").replace(",", ", ") + ")"
                         string += f"    - {f}\n"
@@ -275,7 +278,8 @@ class TypeInference:
                 # If there are no matching function names, then the symbol doesn't exist -- offer the most likely
                 # alternative match.
                 most_likely = most_likely[1].replace("#", "(").replace(",", ", ") + ")"
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Function '{ast.identifier}' not found in scope. Did you mean '{most_likely}'?")
+                bad_function_identifier = ast.identifier.replace("#", "(").replace(",", ", ") + ")"
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Function '{bad_function_identifier}' not found in scope. Did you mean '{most_likely}'?")
 
         # Return the type of the symbol, which is found in the current scope, or a parent scope. This symbol must exist,
         # as prior checks have guaranteed this.
@@ -413,19 +417,17 @@ class TypeInference:
         # Otherwise, the access is attribute, not index, based, so try to get the attribute from the class definition's
         # symbol table.
         try:
-            member_symbol = class_scope.get_symbol(ast.op.identifier.identifier)
+            return class_scope.get_symbol(ast.op.identifier.identifier).type
 
         # If there was an error, then the symbol, and therefore the attribute, doesn't exist.
         except:
             # It is known that the attribute doesn't exist, so simulate an IdentifierAst access on the class's scope, as
             # it will force the same errors to be thrown.
+            # todo : scope is correct but error not so much
             restore_scope = s.current_scope
             s.current_scope = class_scope
             TypeInference.infer_type_of_identifier(ast.op.identifier, s, True)
             s.current_scope = restore_scope
-
-        # Return the type of the attribute.
-        return member_symbol.type
 
     @staticmethod
     def infer_type_of_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
