@@ -238,14 +238,6 @@ class ScopeHandler:
 class SymbolTableBuilder:
     @staticmethod
     def build(ast: Ast.ProgramAst) -> ScopeHandler:
-        """
-        Entry function into symbol generation. This will fire off the recursive symbol generation process, starting with
-        the ProgramAst, in the global scope. The ScopeHandler will be returned, which contains the global scope and all
-        of its children.
-        @param ast: The ProgramAst to generate symbols for.
-        @return: The ScopeHandler containing the global scope and all of its children.
-        """
-
         s = ScopeHandler()
         SymbolTableBuilder.build_program_symbols(ast, s)
         s.switch_to_global_scope()
@@ -253,14 +245,6 @@ class SymbolTableBuilder:
 
     @staticmethod
     def build_program_symbols(ast: Ast.ProgramAst, s: ScopeHandler) -> None:
-        """
-        Build all the symbols for the program. This reads into the module implementation, and builds symbols for all
-        function prototypes, class prototypes, enum prototypes, and sup prototypes.
-        @param ast: The ProgramAst to generate symbols for.
-        @param s: The ScopeHandler to store the symbols in.
-        @return: Nothing.
-        """
-
         # Match each module member by AST type, and call the appropriate function to build the symbols for that member.
         # This will recursively call into other functions to build symbols for nested members.
         for module_member in ast.module.body.members:
@@ -277,15 +261,8 @@ class SymbolTableBuilder:
 
     @staticmethod
     def build_import_symbols(ast: Ast.ImportStatementAst, s: ScopeHandler) -> None:
-        """
-        Build the symbols for an import statement. This will create a new scope for the imported module, and then
-        recursively build symbols for all of the members in the imported module.
-        @param ast: The ImportStatementAst to generate symbols for.
-        @param s: The ScopeHandler to store the symbols in.
-        @return: Nothing.
-        """
-
         # Create a new scope for the imported module, and enter it.
+        # todo : only import what's needed per module (somehow)
         ts = ErrFmt.TOKENS
         module_name = f"./TestCode/{convert_module_name_to_file_name(ast.module)}.spp"
         try:
@@ -300,16 +277,6 @@ class SymbolTableBuilder:
 
     @staticmethod
     def build_function_prototype_symbols(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> None:
-        """
-        Build the symbols for a function prototype. This will add the function prototype to the current scope, and then
-        enter a new scope for the function body. The function parameters are registered as symbols with their type
-        annotations used to determine the type of the symbol. The function's generic parameters are registered as types.
-        Finally, each statement in the body of the function is recursively visited to build symbols for nested members.
-        @param ast: The FunctionPrototypeAst to generate symbols for.
-        @param s: The ScopeHandler to store the symbols in.
-        @return: Nothing.
-        """
-
         # Add the function prototype to the current scope, and enter a new scope for the function body.
         s.current_scope.add_symbol(Symbol(convert_identifier_to_string(ast.identifier), get_function_type(ast), None))
         s.enter_scope(f"FnPrototype__{convert_identifier_to_string(ast.identifier)}")
@@ -329,15 +296,6 @@ class SymbolTableBuilder:
 
     @staticmethod
     def build_statement_symbols(ast: Ast.StatementAst, s: ScopeHandler) -> None:
-        """
-        Build the symbols for a statement. This will match the statement by AST type, and call the appropriate function
-        to build the symbols for that statement. This will recursively call into other functions to build symbols for
-        nested members.
-        @param ast: The StatementAst to generate symbols for.
-        @param s: The ScopeHandler to store the symbols in.
-        @return: Nothing.
-        """
-
         # The actual statements are the non-expression statement -- TypedefStatementAst, ReturnStatementAst,
         # LetStatementAst and FunctionPrototypeAst. The expression statements are handled in the expression match.
         # Because an expression is a valid statement, the "default" case for non-expression statements is to build
@@ -351,23 +309,10 @@ class SymbolTableBuilder:
 
     @staticmethod
     def build_typedef_statement_symbols(ast: Ast.TypedefStatementAst, s: ScopeHandler) -> None:
-        """
-        Build the symbols for a typedef statement. This will add the type to the current scope.
-        @param ast: The TypedefStatementAst to generate symbols for.
-        @param s: The ScopeHandler to store the symbols in.
-        @return: Nothing.
-        """
         s.current_scope.add_type(Symbol(convert_type_to_string(ast.new_type), ast.old_type, None))
 
     @staticmethod
     def build_return_statement_symbols(ast: Ast.ReturnStatementAst, s: ScopeHandler) -> None:
-        """
-        Build the symbols for a return statement. This will recursively visit the expression in the return statement to
-        build symbols for nested members.
-        @param ast: The ReturnStatementAst to generate symbols for.
-        @param s: The ScopeHandler to store the symbols in.
-        @return: Nothing.
-        """
         SymbolTableBuilder.build_expression_symbols(ast.value, s)
 
     @staticmethod
@@ -519,16 +464,6 @@ def convert_identifier_to_string_no_generics(ast: Ast.IdentifierAst | Ast.Generi
     return ast.identifier
 
 def get_function_type(ast: Ast.FunctionPrototypeAst) -> Ast.TypeAst:
-    """
-    Determine the type of a function. The function types are either std::FnRef, std::FnMut, or std::Fn. The generics of
-    the function type are the return type, followed by the arguments as a tuple. For example, a function accepting two
-    numbers and returning a string would have the type std::FnRef[String, (Num, Num)]. Steps:
-    1. Determine the type of the function => free functions are FnRef, methods are determined by the Self type
-    2. Determine the generics of the function => return type, followed by the arguments as a tuple
-
-    @param ast:
-    @return:
-    """
     return_type = Ast.TypeGenericArgumentAst(None, ast.return_type, ast.return_type._tok)
     param_types = Ast.TypeGenericArgumentAst(None, Ast.TypeTupleAst([a.type_annotation for a in ast.parameters], ast.identifier._tok), ast.identifier._tok)
 
