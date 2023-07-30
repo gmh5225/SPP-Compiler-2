@@ -17,6 +17,7 @@ class Symbol:
 
     # memory
     initialized: bool
+    defined: bool # ie exists but not initialized
 
     def __init__(self, name: str, type_: Optional[Ast.TypeAst], value: Optional[Ast.ExpressionAst], index: int = 0):
         self.name = name
@@ -27,6 +28,7 @@ class Symbol:
         self.bases = []
 
         self.initialized = self.value is not None
+        self.defined = False
 
     def json(self) -> dict[str, any]:
         d = {

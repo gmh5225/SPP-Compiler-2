@@ -164,6 +164,8 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_identifier(ast: Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
+        if not s.current_scope.get_symbol(ast.identifier).defined:
+            raise SystemExit(ErrFmt.err(ast._tok) + f"Variable '{ast.identifier}' is not defined.")
         return s.current_scope.get_symbol(ast.identifier).type
 
     @staticmethod
@@ -397,6 +399,7 @@ class TypeInference:
         # For a single variable being defined, set its type by inferring the expression value being assigned to it.
         if len(ast.variables) == 1:
             rhs_type = ast.type_annotation or rhs_type
+            s.current_scope.get_symbol(ast.variables[0].identifier.identifier).defined = True
             s.current_scope.get_symbol(ast.variables[0].identifier.identifier).type = rhs_type
 
         # Otherwise, destructure a tuple into the variables being defined. The tuple type will be inferred, but is
@@ -415,6 +418,7 @@ class TypeInference:
             # Finally, ensure that the type of each variable matches the type of the corresponding tuple element. This
             # is done by checking the type of each variable against the type of the corresponding tuple element.
             for i in range(len(ast.variables)):
+                s.current_scope.get_symbol(ast.variables[i].identifier.identifier).defined = True
                 s.current_scope.get_symbol(ast.variables[i].identifier.identifier).type = rhs_type.types[i]
 
         return CommonTypes.void()
