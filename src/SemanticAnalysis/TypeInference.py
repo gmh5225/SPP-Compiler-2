@@ -177,11 +177,21 @@ class TypeInference:
         if isinstance(ast, Ast.SupPrototypeInheritanceAst):
             TypeInference.infer_type_of_type(ast.super_class, s)
 
-        for statement in ast.body.members:
-            match statement:
-                case Ast.SupMethodPrototypeAst(): TypeInference.infer_type_of_function_prototype(statement, s)
-                case Ast.SupTypedefAst(): TypeInference.infer_type_of_sup_typedef(statement, s)
+        for member in ast.body.members:
+            match member:
+                case Ast.SupMethodPrototypeAst(): TypeInference.infer_type_of_sup_method_prototype(member, ast, s)
+                case Ast.SupTypedefAst(): TypeInference.infer_type_of_sup_typedef(member, s)
         s.prev_scope()
+
+    @staticmethod
+    def infer_type_of_sup_method_prototype(ast: Ast.SupMethodPrototypeAst, sup_block: Ast.SupPrototypeNormalAst | Ast.SupPrototypeInheritanceAst, s: ScopeHandler) -> None:
+        if isinstance(sup_block, Ast.SupPrototypeInheritanceAst):
+            super_class_scope = s.global_scope.get_child_scope_for_cls(convert_type_to_string(sup_block.super_class))
+            if not super_class_scope.has_symbol(ast.identifier.identifier):
+                bad_function_identifier = ast.identifier.identifier.replace("#", "(").replace(",", ", ") + ")"
+                raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{bad_function_identifier}' not found in super class '{convert_type_to_string(sup_block.super_class)}'.")
+
+        TypeInference.infer_type_of_function_prototype(ast, s)
 
     @staticmethod
     def infer_type_of_sup_typedef(ast: Ast.SupTypedefAst, s: ScopeHandler) -> None:

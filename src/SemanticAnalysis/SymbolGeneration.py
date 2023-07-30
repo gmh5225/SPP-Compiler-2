@@ -123,6 +123,11 @@ class Scope:
                 return True
             current = current.parent
 
+        # next check linked sup-scopes
+        for sup_scope in self.sup_scopes:
+            if sup_scope.symbols.has(name):
+                return True
+
         return False
 
     def has_type(self, name: str) -> bool:
