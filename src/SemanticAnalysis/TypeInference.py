@@ -522,6 +522,17 @@ class TypeInference:
                 s.current_scope.get_symbol(ast.variables[i].identifier.identifier).defined = True
                 s.current_scope.get_symbol(ast.variables[i].identifier.identifier).type = rhs_type.types[i]
 
+        # Handle the "else" clause for assignment
+        if ast.if_null:
+            t = CommonTypes.void()
+            for statement in ast.if_null.body:
+                t = TypeInference.infer_type_of_statement(statement, s)
+
+            # The returning expression from the "else" clause must be the same type as the variable being assigned to.
+            # This is done by checking the type of the returning expression against the type of the variable.
+            if t != rhs_type:
+                raise SystemExit(ErrFmt.err(ast.if_null._tok) + f"Cannot assign {convert_type_to_string(t)} to {convert_type_to_string(rhs_type)}.")
+
         return CommonTypes.void()
 
     @staticmethod
