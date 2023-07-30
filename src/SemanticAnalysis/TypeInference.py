@@ -15,13 +15,10 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : visibility checks
 # todo : builtin decorators
 # todo : memory checks
-#   - moves
 #   - mutable references from mutable variables (required mutability)
 #   - enforce the law of exclusivity
 # todo : "partial moves"
 # todo : symbol initialization for tuple types
-# todo : merge most of "let" and "assignment" checks
-#   - do this by converting "let x = 123" to "let x: Num" and "x = 123"
 
 
 BIN_FUNCTION_NAMES = {
@@ -344,49 +341,36 @@ class TypeInference:
         return struct_type
 
     @staticmethod
-    def infer_type_of_let_statement(ast: Ast.LetStatementAst, s: ScopeHandler) -> None:
+    def infer_type_of_let_statement(ast: Ast.LetStatementAst, s: ScopeHandler) -> Ast.TypeAst:
         # If only a type annotation is provided, and not a value, then the variable is not initialized. Mark the symbol
         # as non-initialized so that it can be checked later.
         if not ast.value:
             # The only type a variable cannot be is the void type, so check that the provided type annotation is not the
             # Void type. todo : same for class attribute types
             if ast.type_annotation == CommonTypes.void():
-                error = SemanticError(ErrFmt.err(ast._tok) + f"Cannot annotate a variable as Void.")
-                raise SystemExit(error) from None
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot annotate a variable as Void.")
 
             s.current_scope.get_symbol(ast.variables[0].identifier.identifier).initialized = False
-            return
-
-        # If this step is reached, then a value has been provided, as providing a type annotation or a value is mutually
-        # exclusive. As a value has been provided, the variable is initialized. Mark the symbol as initialized.
-        s.current_scope.get_symbol(ast.variables[0].identifier.identifier).initialized = True
+            return CommonTypes.void()
 
         # If the variable is provided a value, but the result of the value expression is a Void type, then throw an
         # error, as the variables inferred type would be Void, but Void is the only invalid type for a variable.
         if TypeInference.infer_type_of_expression(ast.value, s) == CommonTypes.void():
-            error = SemanticError(
-                ErrFmt.err(ast.value._tok) +
-                f"Cannot assign Void to a variable.")
-            raise SystemExit(error) from None
+            raise SystemExit(ErrFmt.err(ast.value._tok) + f"Cannot assign Void to a variable.")
+
+        # If this step is reached, then a value has been provided, as providing a type annotation or a value is mutually
+        # exclusive. As a value has been provided, the variable is initialized. Mark the symbol as initialized. Mark the
+        # RHS identifiers as uninitialized, as they are "moved" into the LHS identifiers.
+        MemoryEnforcer.set_variable_initialized(ast.variables, s, True)
 
         # If the value expression being assigned to variables isn't initialized, or has been moved into another
         # variable, then is a violation of linear types - a value can only be used exactly once.
         # todo : differentiate between uninitialized and moved -- and for moved show where it was moved by using 2
         #  ErrorFormatting.error() calls concatenated
         if isinstance(ast.value, Ast.IdentifierAst) and not s.current_scope.get_symbol(ast.value.identifier).initialized:
-            error = SemanticError(
-                ErrFmt.err(ast.value._tok) +
-                f"Variable '{ast.value.identifier}' is not initialized or has been moved.")
-            raise SystemExit(error) from None
+            raise SystemExit(ErrFmt.err(ast.value._tok) + f"Variable '{ast.value.identifier}' is not initialized or has been moved.")
 
-        # As assignment is a destructive move, so mark the variable as moved, by clearing its "initialized" flag. For
-        # tuples, mark each item in the tuple as moved, recursively.
-        # todo : create a function to uninitialize symbols - allow recursive for tuples
-        if isinstance(ast.value, Ast.IdentifierAst):
-            s.current_scope.get_symbol(ast.value.identifier).initialized = False
-        elif isinstance(ast.value, Ast.TupleLiteralAst):
-            # todo (recursive)
-            ...
+        MemoryEnforcer.set_variable_initialized([ast.value], s, False)
 
         # For a single variable being defined, set its type by inferring the expression value being assigned to it.
         if len(ast.variables) == 1:
@@ -402,68 +386,61 @@ class TypeInference:
             # Firstly ensure that the inferred type is a tuple type, as a tuple is being destructured. This is done by
             # checking the AST type.
             if not isinstance(inferred_type, Ast.TypeTupleAst):
-                exception = SemanticError(
-                    ErrFmt.err(ast._tok) +
-                    f"Expected a tuple type, but found {inferred_type}.")
-                raise SystemExit(exception) from None
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Expected a tuple type to destructure, but found {inferred_type}.")
 
             # Secondly, ensure that the length of the tuple type matches the number of variables being defined. This is
             # done by checking the length of the tuple AST node. This ensures that all variables are handled.
             if len(inferred_type.types) != len(ast.variables):
-                exception = SemanticError(
-                    ErrFmt.err(ast._tok) +
-                    f"Expected a tuple of length {len(ast.variables)}, but found {inferred_type}.")
-                raise SystemExit(exception) from None
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a {len(inferred_type.types)}-tuple into {len(ast.variables)} variables.")
 
             # Finally, ensure that the type of each variable matches the type of the corresponding tuple element. This
             # is done by checking the type of each variable against the type of the corresponding tuple element.
             for i in range(len(ast.variables)):
                 s.current_scope.get_symbol(ast.variables[i].identifier.identifier).type = inferred_type.types[i]
 
+        return CommonTypes.void()
+
     @staticmethod
     def infer_type_of_assignment_expression(ast: Ast.AssignmentExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
         if TypeInference.infer_type_of_expression(ast.rhs, s) == CommonTypes.void():
-            error = SemanticError(
-                ErrFmt.err(ast.rhs.value._tok) +
-                f"Cannot assign Void to a variable.")
-            raise SystemExit(error) from None
+            raise SystemExit(ErrFmt.err(ast.rhs._tok) + f"Cannot assign Void to a variable.")
 
         # Any variables on the left hand side of the assignment are now initialized. Mark them as such, so that they can
         # be checked later.
-        for l in [l for l in ast.lhs if isinstance(l, Ast.IdentifierAst)]:
-            s.current_scope.get_symbol(l.identifier).initialized = True
+        MemoryEnforcer.set_variable_initialized(ast.lhs, s, True)
 
-        # todo : test & compare to other tuple assignment methods
+        if isinstance(ast.rhs, Ast.IdentifierAst) and not s.current_scope.get_symbol(ast.rhs.identifier).initialized:
+            raise SystemExit(ErrFmt.err(ast.rhs._tok) + f"Variable '{ast.rhs.identifier}' is not initialized or has been moved.")
+
+        MemoryEnforcer.set_variable_initialized([ast.rhs], s, False)
+
+        # Check the LHS and RHS types are the same -- for single types, just do a simple comparison. For tuples, check
+        # that the number of elements in the tuple matches the number of variables on the LHS, and that the type of
+        # each element matches the type of the corresponding variable on the LHS.
         lhs_types = [TypeInference.infer_type_of_expression(l, s) for l in ast.lhs]
         rhs_type = TypeInference.infer_type_of_expression(ast.rhs, s)
         if len(lhs_types) == 1 and lhs_types[0] != rhs_type:
-            error = SemanticError(
-                ErrFmt.err(ast.op._tok) +
-                f"Cannot assign {convert_type_to_string(rhs_type)} to {convert_type_to_string(lhs_types[0])}.")
-            raise SystemExit(error) from None
+            raise SystemExit(ErrFmt.err(ast.op._tok) + f"Cannot assign {convert_type_to_string(rhs_type)} to {convert_type_to_string(lhs_types[0])}.")
+
+        # If there was only 1 variable and the type was valid, return Void, as assignment expression don't return
+        # anything, to ensure ownership safety.
         elif len(lhs_types) == 1:
             return CommonTypes.void()
+
+        # Otherwise, there are more than 1 variable being assigned to. Check that the RHS type is a tuple type, and that
+        # the number of elements in the tuple matches the number of variables on the LHS, and that the type of each
+        # element matches the type of the corresponding variable on the LHS.
         else:
-            # TODO : DUP
             if not isinstance(rhs_type, Ast.TypeTupleAst):
-                error = SemanticError(
-                    ErrFmt.err(ast.op._tok) +
-                    f"Multi assignment required destructuring a tuple, not a {convert_type_to_string(rhs_type)}")
-                raise SystemExit(error) from None
+                raise SystemExit(ErrFmt.err(ast.op._tok) + f"Expected a tuple type to destructure, but found {rhs_type}.")
 
             if len(lhs_types) != len(rhs_type.types):
-                error = SemanticError(
-                    ErrFmt.err(ast.op._tok) +
-                    f"Cannot unpack a {len(ast.rhs.values)}-tuple into {len(lhs_types)} variables.")
-                raise SystemExit(error) from None
-            # TODO : DUP
+                raise SystemExit(ErrFmt.err(ast.op._tok) + f"Cannot unpack a {len(rhs_type.types)}-tuple into {len(lhs_types)} variables.")
 
             for i in range(len(lhs_types)):
                 if lhs_types[i] != rhs_type.types[i]:
-                    error = SemanticError(
-                        ErrFmt.err(ast.rhs.values[i]._tok) +
-                        f"Cannot assign {convert_type_to_string(rhs_type.types[i])} to {convert_type_to_string(lhs_types[i])}.")
-                    raise SystemExit(error) from None
+                    raise SystemExit(ErrFmt.err(ast.op._tok) + f"Cannot assign {convert_type_to_string(rhs_type.types[i])} to {convert_type_to_string(lhs_types[i])}.")
+
         return CommonTypes.void()
 
     @staticmethod
@@ -540,3 +517,15 @@ class CommonTypes:
     @staticmethod
     def tuple(types: list[Ast.TypeAst]) -> Ast.TypeAst:
         return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Tup", types, -1)], -1)
+
+class MemoryEnforcer:
+    @staticmethod
+    def set_variable_initialized(asts, s: ScopeHandler, initialized: bool) -> None:
+        for ast in asts:
+            if isinstance(ast, Ast.IdentifierAst):
+                s.current_scope.get_symbol(ast.identifier).initialized = initialized
+            elif isinstance(ast, Ast.LocalVariableAst):
+                s.current_scope.get_symbol(ast.identifier.identifier).initialized = initialized
+            elif isinstance(ast, Ast.TupleLiteralAst):
+                for item in ast.values:
+                    MemoryEnforcer.set_variable_initialized([item], s, initialized)
