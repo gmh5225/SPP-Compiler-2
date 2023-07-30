@@ -25,6 +25,8 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : all things lambdas => maybe convert into a function prototype?
 # todo : sup methods can only override methods defined in the base class that are virtual or abstract (overrideable)
 # todo : exhaustion or default for "if comparisons" that are for assignment => add optional param to "check-if"...
+# todo : fold expressions
+# todo : partial functions with underscore placeholder -> make a new type, also memory rules
 
 
 BIN_FUNCTION_NAMES = {
@@ -234,6 +236,8 @@ class TypeInference:
             identifier = ast.identifier
             candidate_symbols = [sym for sym in s.current_scope.all_symbols() if s.current_scope.get_symbol(sym).defined or s.global_scope.has_symbol(sym)]
             most_likely = (-1.0, "")
+
+            # Check each candidate symbol
             for candidate in candidate_symbols:
                 ratio = difflib.SequenceMatcher(None, identifier, candidate).ratio()
 
@@ -420,7 +424,7 @@ class TypeInference:
         # the provided value for the field, or the variable with an equivalent identifier to the field.
         given_fields = [f.identifier.identifier for f in ast.op.fields if isinstance(f.identifier, Ast.IdentifierAst)]
         for given_field in ast.op.fields:
-            TypeInference.infer_type_of_expression(given_field.value, s)
+            TypeInference.infer_type_of_expression(given_field.value or given_field.identifier, s)
 
         # The "default_obj_given" field is a special field that is used to provide a default value for all fields not
         # given explicitly. If this field is present, then all fields not given explicitly are moved from the default
