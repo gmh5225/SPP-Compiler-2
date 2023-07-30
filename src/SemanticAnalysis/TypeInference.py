@@ -7,6 +7,7 @@ from src.SyntacticAnalysis import Ast
 from src.SemanticAnalysis.SymbolGeneration import ScopeHandler, convert_type_to_string
 from src.SyntacticAnalysis.Parser import ErrFmt
 
+
 # todo : function selection (via signature)
 # todo : base class auto upcast? maybe make it explicit
 # todo : type inference for lambdas
@@ -16,10 +17,12 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : builtin decorators
 # todo : memory checks
 #   - mutable references from mutable variables (required mutability)
-#   - enforce the law of exclusivity for attributes (locals done)
+#   - enforce the law of exclusivity for member-access-attributes (locals done)
 # todo : "partial moves"
 # todo : symbol initialization for tuple types
 # todo : symbols defined after current line still discovered as valid - add "defined" flag?
+# todo : all things lambdas => maybe convert into a function prototype?
+# todo : sup methods can only override methods defined in the base class that are virtual or abstract (overrideable)
 
 
 BIN_FUNCTION_NAMES = {
@@ -470,32 +473,41 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_type(ast: Ast.TypeSingleAst | Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
+        # For a tuple type, check that each type in the tuple is a valid type, by recursively calling this function.
+        # Return the same ast back out, as the inference of a type node is the same as the type node itself.
         if isinstance(ast, Ast.TypeTupleAst):
             for type in ast.types:
                 TypeInference.infer_type_of_type(type, s)
             return ast
 
+        # Infer the "Self" keyword to the current class type. This is done by moving up the scopes until the current
+        # scope is the class scope, and then getting the type of the class.
+        # todo : infer Self for a "sup" scope
         if isinstance(ast.parts[0], Ast.SelfTypeAst):
             scope = s.current_scope
             while not scope.name.startswith("ClsPrototype"):
                 scope = scope.parent
                 if not scope:
-                    error = SemanticError(
-                        ErrFmt.err(ast._tok) +
-                        f"Self in a non-class scope.")
-                    raise SystemExit(error) from None
+                    raise SystemExit(ErrFmt.err(ast._tok) + f"Found 'Self' in a non-class scope.")
+
+            # Change the "Self" to the actual class name. The "Self" is only able to be the first part of a type, so
+            # only "ast.part[0]" has to be inspected and changed.
             ast.parts[0] = s.current_scope.get_type(scope.name).type
 
+        # Check if the type exists, by checking the string representation of the type against the types in the current
+        # scope (and its parent scopes). If the type doesn't exist, throw an error.
         identifier = convert_type_to_string(ast)
         if not s.current_scope.has_type(identifier):
-            error = SemanticError(
-                ErrFmt.err(ast._tok) +
-                f"Type {identifier} not found.")
-            raise SystemExit(error) from None
+            raise SystemExit(ErrFmt.err(ast._tok) + f"Type {identifier} not found.")
+
+        # If the type exists, return the type.
         return ast
 
     @staticmethod
     def infer_type_of_while_statement(ast: Ast.WhileStatementAst, s: ScopeHandler) -> Ast.TypeAst:
+        # A "while" statement always returns the Void type, because it doesn't return anything. There are no "break"
+        # statements, meaning that the loop will always run until the condition is false.
+
         s.next_scope()
         for statement in ast.body:
             TypeInference.infer_type_of_statement(statement, s)
@@ -504,6 +516,8 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_lambda(ast: Ast.LambdaAst, s: ScopeHandler) -> Ast.TypeAst:
+        # todo
+
         s.next_scope()
         t = CommonTypes.unknown()
         s.prev_scope()
