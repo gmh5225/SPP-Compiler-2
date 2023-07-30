@@ -51,19 +51,15 @@ class SymbolTable:
         self.symbols = {}
 
     def add(self, symbol: Symbol):
-        self.symbols[symbol.name] = symbol
+        # todo : check for duplicates if a "#" is in the name
 
-    def set(self, name: str, value: Ast.ExpressionAst):
-        self.symbols[name].value = value
+        self.symbols[symbol.name] = symbol
 
     def get(self, name: str) -> Symbol:
         return self.symbols[name]
 
     def has(self, name: str) -> bool:
         return name in self.symbols
-
-    def rem(self, name: str):
-        del self.symbols[name]
 
     def json(self) -> dict[str, any]:
         return {name: symbol.json() for name, symbol in self.symbols.items()}
@@ -96,12 +92,6 @@ class Scope:
 
     def add_type(self, symbol: Symbol):
         self.types.add(symbol)
-
-    def set_symbol(self, name: str, value: Ast.ExpressionAst):
-        self.symbols.set(name, value)
-
-    def set_type(self, name: str, value: Ast.ExpressionAst):
-        self.types.set(name, value)
 
     def get_symbol(self, name: str) -> Symbol:
         current = self
@@ -143,12 +133,6 @@ class Scope:
             current = current.parent
 
         return False
-
-    def rem_symbol(self, name: str):
-        self.symbols.rem(name)
-
-    def rem_type(self, name: str):
-        self.types.rem(name)
 
     def all_symbols(self) -> list[str]:
         current = self
@@ -278,6 +262,8 @@ class SymbolTableBuilder:
     @staticmethod
     def build_function_prototype_symbols(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> None:
         # Add the function prototype to the current scope, and enter a new scope for the function body.
+        ast.identifier.identifier += f"#{','.join([convert_type_to_string(p.type_annotation) for p in ast.parameters])}"
+
         s.current_scope.add_symbol(Symbol(convert_identifier_to_string(ast.identifier), get_function_type(ast), None))
         s.enter_scope(f"FnPrototype__{convert_identifier_to_string(ast.identifier)}")
 
@@ -464,6 +450,8 @@ def convert_identifier_to_string_no_generics(ast: Ast.IdentifierAst | Ast.Generi
     return ast.identifier
 
 def get_function_type(ast: Ast.FunctionPrototypeAst) -> Ast.TypeAst:
+    # todo : FnRef vs FnMut vs Fn
+
     return_type = Ast.TypeGenericArgumentAst(None, ast.return_type, ast.return_type._tok)
     param_types = Ast.TypeGenericArgumentAst(None, Ast.TypeTupleAst([a.type_annotation for a in ast.parameters], ast.identifier._tok), ast.identifier._tok)
 

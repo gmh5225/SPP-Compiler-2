@@ -91,11 +91,6 @@ class TypeInference:
         for decorator in ast.decorators:
             TypeInference.infer_type_of_decorator(decorator, s)
 
-        # Whilst a function exists with the name, it needs to be checked that one of the (possibly overloaded) functions
-        # has a matching signature. This is done by checking the signature of each function with the same name, and
-        # selecting the first one that matches. No matches => error.
-
-
         s.next_scope()
         # Run semantic checks for each parameter in the function prototype. This will handle type-checking and default
         # expression checking.
@@ -192,9 +187,9 @@ class TypeInference:
         TypeInference.infer_type_of_type(ast.old_type, s)
 
     @staticmethod
-    def infer_type_of_expression(ast: Ast.ExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+    def infer_type_of_expression(ast: Ast.ExpressionAst, s: ScopeHandler, call: bool = False) -> Ast.TypeAst:
         match ast:
-            case Ast.IdentifierAst(): return TypeInference.infer_type_of_identifier(ast, s)
+            case Ast.IdentifierAst(): return TypeInference.infer_type_of_identifier(ast, s, call)
             case Ast.LambdaAst(): return TypeInference.infer_type_of_lambda(ast, s)
             case Ast.IfStatementAst(): return TypeInference.infer_type_of_if_statement(ast, s)
             case Ast.YieldStatementAst(): return
@@ -229,7 +224,7 @@ class TypeInference:
 
 
     @staticmethod
-    def infer_type_of_identifier(ast: Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
+    def infer_type_of_identifier(ast: Ast.IdentifierAst, s: ScopeHandler, call: bool = False) -> Ast.TypeAst:
         # For an identifier to be valid, it must exist in the current scope, or a parent scope, and must also be
         # "defined" -- this means that if it's found in a scope, it must be before the current line. If it's not, then
         # whilst the symbol technically exists, it's not valid to use it, as it hasn't been assigned a value yet. If
@@ -257,8 +252,24 @@ class TypeInference:
                     if abs(len(identifier) - len(candidate)) < abs(len(identifier) - len(most_likely[1])):
                         most_likely = (ratio, candidate)
 
-            # Raise the unknown symbol error, and suggest the most likely match.
-            raise SystemExit(ErrFmt.err(ast._tok) + f"Identifier '{ast.identifier}' not found in scope. Did you mean '{most_likely[1]}'?")
+            # Raise the unknown symbol error, and suggest the most likely match. This is when a non-function type is
+            # being called.
+            if not call:
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Identifier '{ast.identifier}' not found in scope. Did you mean '{most_likely[1]}'?")
+
+            # For functions, change the output slightly -- firstly, offer alternative signature suggestions, and
+            # secondly, offset alternative function names.
+            else:
+                matching_functions_dif_signatures = [s for s in s.current_scope.all_symbols() if "#" in s and s.split("#")[0] == ast.identifier]
+                if matching_functions_dif_signatures:
+                    string = f"Function '{ast.identifier}' not found in scope. Available signatures:\n"
+                    for f in matching_functions_dif_signatures:
+                        f = f.replace("#", "(").replace(",", ", ") + ")"
+                        string += f"    - {f}\n"
+                    raise SystemExit(ErrFmt.err(ast._tok) + string)
+
+                most_likely = most_likely[1].replace("#", "(").replace(",", ", ") + ")"
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Function '{ast.identifier}' not found in scope. Did you mean '{most_likely}'?")
 
         return s.current_scope.get_symbol(ast.identifier).type
 
@@ -389,10 +400,10 @@ class TypeInference:
     def infer_type_of_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
         ref_args = set()
         mut_args = set()
+        arg_types = []
 
         for a in ast.op.arguments:
-            TypeInference.infer_type_of_expression(a.value, s)
-
+            arg_types.append(TypeInference.infer_type_of_expression(a.value, s))
             # Check that the value to be moved is initialized, and if so, mark it as uninitialized, as it is being
             # moved into the function call.
             if isinstance(a.value, Ast.IdentifierAst) and not MemoryEnforcer.get_variable_initialized(a.value, s):
@@ -414,8 +425,23 @@ class TypeInference:
             if isinstance(a.value, Ast.IdentifierAst) and not a.calling_convention:
                 MemoryEnforcer.set_variable_initialized([a.value], s, False)
 
-        lhs_type = TypeInference.infer_type_of_expression(ast.lhs, s)
-        # lhs_type = s.current_scope.get_type(lhs_type.parts[-1].identifier).type
+        # Get to the innermost IdentifierAst (if there is one), and add the types after a "#", so the correct overload
+        # of the function is called.
+        lhs = ast.lhs
+        while isinstance(lhs, Ast.PostfixExpressionAst) and isinstance(lhs.op, Ast.PostfixMemberAccessAst):
+            lhs = lhs.op
+            if isinstance(lhs.identifier, Ast.IdentifierAst):
+                lhs = lhs.identifier
+                lhs.identifier += f"#{','.join([convert_type_to_string(arg_type) for arg_type in arg_types])}"
+                break
+        else:
+            if isinstance(lhs, Ast.IdentifierAst):
+                lhs.identifier += f"#{','.join([convert_type_to_string(arg_type) for arg_type in arg_types])}"
+
+
+        lhs_type = TypeInference.infer_type_of_expression(ast.lhs, s, call=True)
+        assert isinstance(lhs, Ast.IdentifierAst), f"{type(lhs)}"
+        lhs.identifier = lhs.identifier.split("#")[0]
         lhs_type = lhs_type.parts[-1].generic_arguments[0].value
         return lhs_type
 
