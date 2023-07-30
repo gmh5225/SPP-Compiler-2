@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional
+import difflib
 
 from src.LexicalAnalysis.Tokens import Token, TokenType
 from src.SyntacticAnalysis import Ast
@@ -87,6 +88,10 @@ class TypeInference:
         for decorator in ast.decorators:
             TypeInference.infer_type_of_decorator(decorator, s)
 
+        # Whilst a function exists with the name, it needs to be checked that one of the (possibly overloaded) functions
+        # has a matching signature. This is done by checking the signature of each function with the same name, and
+        # selecting the first one that matches. No matches => error.
+
         s.next_scope()
         # Run semantic checks for each parameter in the function prototype. This will handle type-checking and default
         # expression checking.
@@ -101,12 +106,10 @@ class TypeInference:
             discovered_ret_type = TypeInference.infer_type_of_statement(statement, s)
 
         # Check that the final statement's inferred type matches the return type of the function. If not, throw an
-        # error.
+        # error. If there are no statements in the body, then the token position is just the "{" scope opening token.
         if discovered_ret_type != ast.return_type:
-            error = SemanticError(
-                ErrFmt.err(ast.body.statements[-1]._tok if ast.body.statements else ast.body._tok) +
-                f"Expected return type {convert_type_to_string(ast.return_type)}, but found {convert_type_to_string(discovered_ret_type or CommonTypes.void())}.")
-            raise SystemExit(error) from None
+            final_statement_ast = ast.body.statements[-1] if ast.body.statements else ast.body
+            raise SystemExit(ErrFmt.err(final_statement_ast._tok) + f"Expected return type {convert_type_to_string(ast.return_type)}, but found {convert_type_to_string(discovered_ret_type or CommonTypes.void())}.")
         s.prev_scope()
 
     @staticmethod
@@ -223,10 +226,34 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_identifier(ast: Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
-        # If in a local scope, only symbols defined after the current line can be used. Anything defined in the global
-        # scope is fine to use.
-        if not s.current_scope.get_symbol(ast.identifier).defined and not s.global_scope.has_symbol(ast.identifier):
-            raise SystemExit(ErrFmt.err(ast._tok) + f"Variable '{ast.identifier}' is not defined.")
+        # For an identifier to be valid, it must exist in the current scope, or a parent scope, and must also be
+        # "defined" -- this means that if it's found in a scope, it must be before the current line. If it's not, then
+        # whilst the symbol technically exists, it's not valid to use it, as it hasn't been assigned a value yet. If
+        # it's in the global scope, then the order doesn't matter - these are the functions, classes, enums etc.
+        if (not s.current_scope.has_symbol(ast.identifier) or not s.current_scope.get_symbol(ast.identifier).defined) and not s.global_scope.has_symbol(ast.identifier):
+            identifier = ast.identifier
+            candidate_symbols = [sym for sym in s.current_scope.all_symbols() if s.current_scope.get_symbol(sym).defined or s.global_scope.has_symbol(sym)]
+            most_likely = (-1.0, "")
+            for candidate in candidate_symbols:
+                ratio = difflib.SequenceMatcher(None, identifier, candidate).ratio()
+
+                # If a more likely match is found, based on string comparison, then update the most likely match. This
+                # is calculated by comparing comparison ratios. If the ratio is greater than the current most likely
+                # match, then it is more likely, and is therefore the new most likely match.
+                if ratio > most_likely[0]:
+                    most_likely = (ratio, candidate)
+
+                # If the ratio is equal to the current most likely match, then choose the option that is closest to the
+                # length of the identifier. This is done by comparing the absolute difference between the lengths of the
+                # identifier and the candidate. If the difference is less than the difference between the identifier
+                # and the current most likely match, then the candidate is more likely.
+                elif ratio == most_likely[0]:
+                    if abs(len(identifier) - len(candidate)) < abs(len(identifier) - len(most_likely[1])):
+                        most_likely = (ratio, candidate)
+
+            # Raise the unknown symbol error, and suggest the most likely match.
+            raise SystemExit(ErrFmt.err(ast._tok) + f"Identifier '{ast.identifier}' not found in scope. Did you mean '{most_likely[1]}'?")
+
         return s.current_scope.get_symbol(ast.identifier).type
 
     @staticmethod
@@ -429,10 +456,7 @@ class TypeInference:
             given_value_type = TypeInference.infer_type_of_expression(ast.op.fields[given_fields.index(given)].value or s.current_scope.get_symbol(given).type, s)
             actual_value_type = s.global_scope.get_child_scope_for_cls(struct_type.parts[-1].identifier).get_symbol(actual).type
             if given_value_type != actual_value_type:
-                error = SemanticError(
-                    ErrFmt.err(ast.op.fields[given_fields.index(given)]._tok) +
-                    f"Cannot assign {convert_type_to_string(given_value_type)} to {convert_type_to_string(actual_value_type)}.")
-                raise SystemExit(error) from None
+                raise SystemExit(ErrFmt.err(ast.op.fields[given_fields.index(given)]._tok) + f"Cannot assign {convert_type_to_string(given_value_type)} to {convert_type_to_string(actual_value_type)}.")
 
         return struct_type
 
