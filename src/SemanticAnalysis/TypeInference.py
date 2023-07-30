@@ -4,7 +4,7 @@ from typing import Optional
 
 from src.LexicalAnalysis.Tokens import Token, TokenType
 from src.SyntacticAnalysis import Ast
-from src.SemanticAnalysis.SymbolGeneration import ScopeHandler, convert_type_to_string
+from src.SemanticAnalysis.SymbolGeneration import ScopeHandler, convert_type_to_string, convert_multi_identifier_to_string
 from src.SyntacticAnalysis.Parser import ErrFmt
 
 
@@ -23,6 +23,7 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : symbols defined after current line still discovered as valid - add "defined" flag?
 # todo : all things lambdas => maybe convert into a function prototype?
 # todo : sup methods can only override methods defined in the base class that are virtual or abstract (overrideable)
+# todo : exhaustion or default for "if comparisons" that are for assignment => add optional param to "check-if"...
 
 
 BIN_FUNCTION_NAMES = {
@@ -107,6 +108,24 @@ class TypeInference:
                 f"Expected return type {convert_type_to_string(ast.return_type)}, but found {convert_type_to_string(discovered_ret_type or CommonTypes.void())}.")
             raise SystemExit(error) from None
         s.prev_scope()
+
+    @staticmethod
+    def infer_type_of_decorator(ast: Ast.DecoratorAst, s: ScopeHandler) -> None:
+        match convert_multi_identifier_to_string(ast.identifier):
+            case "private":
+                ...
+            case "public":
+                ...
+            case "protected":
+                ...
+            case "virtualmethod":
+                ...
+            case "abstractmethod":
+                ...
+            case "staticmethod":
+                ...
+            case _:
+                ...
 
     @staticmethod
     def infer_type_of_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeHandler) -> None:
@@ -364,28 +383,40 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+        # todo : base class field with sup=(...)
+
+        # Check that the type of struct being initialized exists. As all types are Objects, there is no requirement to
+        # check that the type is a struct type, as all types are structs.
+        struct_type = TypeInference.infer_type_of_type(ast.lhs, s)
+
+        # Get the fields that were given to the initializer, and ensure that their values are valid. The value is either
+        # the provided value for the field, or the variable with an equivalent identifier to the field.
         given_fields = [f.identifier.identifier for f in ast.op.fields if isinstance(f.identifier, Ast.IdentifierAst)]
         for given_field in ast.op.fields:
             TypeInference.infer_type_of_expression(given_field.value, s)
 
-        all_fields = any(isinstance(f.identifier, Ast.TokenAst) and f.identifier.tok.token_type == TokenType.KwElse for f in ast.op.fields)
+        # The "default_obj_given" field is a special field that is used to provide a default value for all fields not
+        # given explicitly. If this field is present, then all fields not given explicitly are moved from the default
+        # object to the current one. The "default_obj_given" field is given by the "else=..." syntax.
+        default_obj_given = any(isinstance(f.identifier, Ast.TokenAst) and f.identifier.tok.token_type == TokenType.KwElse for f in ast.op.fields)
 
-        struct_type = TypeInference.infer_type_of_type(ast.lhs, s)
+        # Get a list of all the fields on a struct, so that the "given_fields" can be checked against the
+        # "actual_fields" to make sure all fields are given, and that no unknown fields are given.
         actual_fields = s.global_scope.get_child_scope_for_cls(struct_type.parts[-1].identifier).all_exclusive_symbols()
 
-        if len(given_fields) < len(actual_fields) and not all_fields:
-            error = SemanticError(
-                ErrFmt.err(ast._tok) +
-                f"Struct initializer for {struct_type.parts[-1].identifier} is missing fields: {set(actual_fields) - set(given_fields)}.")
-            raise SystemExit(error) from None
+        # If the number of given fields is less than the number of actual fields, then not all fields have been given,
+        # so display the different in sets of fields.
+        if len(given_fields) < len(actual_fields) and not default_obj_given:
+            raise SystemExit(ErrFmt.err(ast._tok) + f"Struct initializer for {struct_type.parts[-1].identifier} is missing fields: {set(actual_fields) - set(given_fields)}.")
 
-        if len(given_fields) > len(actual_fields):
-            error = SemanticError(
-                ErrFmt.err(ast._tok) +
-                f"Struct initializer for {struct_type.parts[-1].identifier} given unknown fields: {set(given_fields) - set(actual_fields)}.")
-            raise SystemExit(error) from None
+        # Now it is guaranteed that the number of given fields is greater than or equal to the number of actual fields,
+        # so check that all given fields are actual fields.
+        if unknown_fields := set(given_fields) - set(actual_fields):
+            unknown_field = unknown_fields.pop()
+            unknown_field_ast = ast.op.fields[given_fields.index(unknown_field)]
+            raise SystemExit(ErrFmt.err(unknown_field_ast._tok) + f"Struct initializer for '{struct_type.parts[-1].identifier}' given unknown field: '{unknown_field}'.")
 
-        if all_fields:
+        if default_obj_given:
             all_fields_value = ast.op.fields[[isinstance(f.identifier, Ast.TokenAst) and f.identifier.tok.token_type == TokenType.KwElse for f in ast.op.fields].index(True)].value
             all_fields_value_type = TypeInference.infer_type_of_expression(all_fields_value, s)
             if all_fields_value_type != struct_type:
@@ -620,3 +651,7 @@ class MemoryEnforcer:
             return True
         else:
             raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot check if {ast} is initialized.")
+
+
+class CompiletimeDecorators:
+    ...
