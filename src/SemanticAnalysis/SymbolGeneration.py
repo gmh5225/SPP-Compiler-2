@@ -483,6 +483,9 @@ def convert_identifier_to_string(ast: Ast.IdentifierAst | Ast.GenericIdentifierA
         return x + f"[{', '.join(map(lambda y: convert_identifier_to_string(y.identifier), ast.generic_arguments))}]"
     return x
 
+def convert_multi_identifier_to_string(ast: Ast.ModuleIdentifierAst) -> str:
+    return ".".join(map(lambda x: x.identifier, ast.parts))
+
 def convert_type_to_string(ast: Ast.TypeAst) -> str:
     if isinstance(ast, Ast.TypeSingleAst):
         s = ""
