@@ -9,7 +9,6 @@ from src.SemanticAnalysis.SymbolGeneration import ScopeHandler, convert_type_to_
 from src.SyntacticAnalysis.Parser import ErrFmt
 
 
-# todo : function selection (via signature)
 # todo : base class auto upcast? maybe make it explicit
 # todo : type inference for lambdas
 # todo : all things "type generics"
@@ -260,7 +259,12 @@ class TypeInference:
             # For functions, change the output slightly -- firstly, offer alternative signature suggestions, and
             # secondly, offset alternative function names.
             else:
+                # Get all functions in the scope that have the same identifier as the one being called, but keep
+                # searching the entire scope so that every overload is discovered.
                 matching_functions_dif_signatures = [s for s in s.current_scope.all_symbols() if "#" in s and s.split("#")[0] == ast.identifier]
+
+                # If there are any matching function names, then multiple overloads have been provided -- convert them
+                # into strings for the error message.
                 if matching_functions_dif_signatures:
                     string = f"Function '{ast.identifier}' not found in scope. Available signatures:\n"
                     for f in matching_functions_dif_signatures:
@@ -268,9 +272,13 @@ class TypeInference:
                         string += f"    - {f}\n"
                     raise SystemExit(ErrFmt.err(ast._tok) + string)
 
+                # If there are no matching function names, then the symbol doesn't exist -- offer the most likely
+                # alternative match.
                 most_likely = most_likely[1].replace("#", "(").replace(",", ", ") + ")"
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Function '{ast.identifier}' not found in scope. Did you mean '{most_likely}'?")
 
+        # Return the type of the symbol, which is found in the current scope, or a parent scope. This symbol must exist,
+        # as prior checks have guaranteed this.
         return s.current_scope.get_symbol(ast.identifier).type
 
     @staticmethod
@@ -361,39 +369,62 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        class_symbol = TypeInference.infer_type_of_expression(ast.lhs, s)
-        class_symbol = TypeInference.infer_type_of_type(class_symbol, s)
-        restore_tuple = class_symbol
-        if isinstance(class_symbol, Ast.TypeTupleAst):
-            class_symbol = CommonTypes.tuple(class_symbol.types)
+        # todo : errors come up on the RHS before the LHS - try switch this
 
-        class_scope = s.global_scope.get_child_scope_for_cls(class_symbol.parts[-1].identifier)
+        # Infer the type of the LHS of the member access expression. This will be the type of the class that the member
+        # is being accessed on. Because things like (x + 1).function().attr is valid, it needs to recursively infer the
+        # type of the LHS until it is an IdentifierAst, so that it's type can be retrieved from the symbol table.
+        lhs = TypeInference.infer_type_of_expression(ast.lhs, s)
+        lhs_type = TypeInference.infer_type_of_type(lhs, s)
+
+        # If the LHS type is a TypeTupleAst node, then save this node. This is because the LHS type will be converted
+        # into the language Tup type, for super-imposition etc. Convert the LHS into the Tup[...] type.
+        restore_tuple = lhs_type
+        if isinstance(lhs_type, Ast.TypeTupleAst):
+            lhs_type = CommonTypes.tuple(lhs_type.types)
+
+        # Get the scope that contains the symbol of the class definition, so that the attribute can be checked.
+        class_scope = s.global_scope.get_child_scope_for_cls(lhs_type.parts[-1].identifier)
+
+        # If the class scope doesn't exist, then the type of the variable being operated on is not a class, so throw
+        # an error. todo : would this stage ever be reached? Type inference for LHS member should catch this?
         if class_scope is None:
-            error = SemanticError(
-                ErrFmt.err(ast._tok) +
-                f"Class {class_symbol.parts[-1].identifier} not found.")
-            raise SystemExit(error) from None
+            raise SystemExit(ErrFmt.err(ast._tok) + f"Class {lhs_type.parts[-1].identifier} not found.")
 
+        # If the member access is a number, then perform some additional checks to ensure the LHS conforms to certain
+        # type constraints, specifically regarding tuples.
         if isinstance(ast.op.identifier, Ast.NumberLiteralBase10Ast):
+
+            # If the originally inferred type of the LHS was a not TypeTupleAst, then throw an error, as the member
+            # access is trying to access a tuple index on a non-tuple type.
             if not isinstance(restore_tuple, Ast.TypeTupleAst):
-                error = SemanticError(
-                    ErrFmt.err(ast._tok) +
-                    f"Class {class_symbol.parts[-1].identifier} is not a tuple.")
-                raise SystemExit(error) from None
-            if int(ast.op.identifier.integer) >= len(restore_tuple.types):
-                error = SemanticError(
-                    ErrFmt.err(ast._tok) +
-                    f"Tuple index {ast.op.identifier} out of range.")
-                raise SystemExit(error) from None
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Class {lhs_type.parts[-1].identifier} is not a tuple.")
+
+            # If the tuple index is out of range, then throw an error, as the member access is trying to access a tuple
+            # index that doesn't exist.
+            # todo : is the negative check required?
+            if int(ast.op.identifier.integer) >= len(restore_tuple.types) or int(ast.op.identifier.integer) < 0:
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Tuple index {ast.op.identifier} out of range.")
+
+            # If the tuple index is valid, then return the type of the tuple index.
+            # todo : partial moves for a tuple created here
             return restore_tuple.types[int(ast.op.identifier.integer)]
 
+        # Otherwise, the access is attribute, not index, based, so try to get the attribute from the class definition's
+        # symbol table.
         try:
             member_symbol = class_scope.get_symbol(ast.op.identifier.identifier)
+
+        # If there was an error, then the symbol, and therefore the attribute, doesn't exist.
         except:
-            error = SemanticError(
-                ErrFmt.err(ast.op.identifier._tok) +
-                f"Member '{ast.op.identifier.identifier}' not found on class '{class_symbol.parts[-1].identifier}'.")
-            raise SystemExit(error) from None
+            # It is known that the attribute doesn't exist, so simulate an IdentifierAst access on the class's scope, as
+            # it will force the same errors to be thrown.
+            restore_scope = s.current_scope
+            s.current_scope = class_scope
+            TypeInference.infer_type_of_identifier(ast.op.identifier, s, True)
+            s.current_scope = restore_scope
+
+        # Return the type of the attribute.
         return member_symbol.type
 
     @staticmethod
@@ -427,6 +458,7 @@ class TypeInference:
 
         # Get to the innermost IdentifierAst (if there is one), and add the types after a "#", so the correct overload
         # of the function is called.
+        # todo : other Ast types that need to be inspected in order to modify the underlying fn-call name?
         lhs = ast.lhs
         while isinstance(lhs, Ast.PostfixExpressionAst) and isinstance(lhs.op, Ast.PostfixMemberAccessAst):
             lhs = lhs.op
