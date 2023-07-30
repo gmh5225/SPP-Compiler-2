@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from src.SyntacticAnalysis import Ast
 from src.SemanticAnalysis.SymbolGeneration import ScopeHandler
-from src.SyntacticAnalysis.Parser import ErrorFormatter
+from src.SyntacticAnalysis.Parser import ErrFmt
 
 import difflib
 
@@ -110,7 +110,7 @@ class SymbolChecker:
                         most_likely = (ratio, p)
 
             error = Exception(
-                ErrorFormatter.error(ast._tok) +
+                ErrFmt.err(ast._tok) +
                 f"Identifier '{ast.identifier}' not found in scope. Did you mean '{most_likely[1]}'?")
             raise SystemExit(error) from None
 

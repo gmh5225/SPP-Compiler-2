@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Callable, Optional
 
 from src.SyntacticAnalysis import Ast
-from src.SyntacticAnalysis.Parser import Parser, ErrorFormatter
+from src.SyntacticAnalysis.Parser import Parser, ErrFmt
 from src.LexicalAnalysis.Lexer import Lexer
 
 
@@ -284,17 +284,17 @@ class SymbolTableBuilder:
         """
 
         # Create a new scope for the imported module, and enter it.
-        ts = ErrorFormatter.TOKENS
+        ts = ErrFmt.TOKENS
         module_name = f"./TestCode/{convert_module_name_to_file_name(ast.module)}.spp"
         try:
             module_code = open(f"{module_name}", "r").read()
         except FileNotFoundError:
             error = Exception(
-                ErrorFormatter.error(ast._tok) +
+                ErrFmt.err(ast._tok) +
                 f"Could not find module '{module_name}'")
             raise SystemExit(error) from None
         SymbolTableBuilder.build_program_symbols(Parser(Lexer(module_code).lex()).parse(), s)  # bring into global scope
-        ErrorFormatter.TOKENS = ts
+        ErrFmt.TOKENS = ts
 
     @staticmethod
     def build_function_prototype_symbols(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> None:

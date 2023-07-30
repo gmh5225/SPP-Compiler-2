@@ -1,21 +1,70 @@
 mod my_module_root.some_folder.inner_folder.module_name
 
+use std.vec3.Vec3
+
 cls Tup[...Ts] {}
 
 cls Str {
     c: Num
+    f: Bool
+}
+
+cls Bool {
+    b: Num
 }
 
 cls SomeType {}
 
 cls Num {
     b: Str
+    d: Num
+    e: Str
+}
+
+cls Vec[T] {}
+
+sup std.Default for Num {
+    fn default() -> Num {
+        ret Num {
+            b="",
+            d=0,
+            e="false"
+        }
+    }
+}
+
+sup std.Default for Str {
+    fn default() -> Str {
+        ret Str {
+            c=0,
+            f=false
+        }
+    }
+}
+
+sup std.ops.BitOr for Bool {
+    fn bit_or(self: &Bool, other: Bool) -> Bool {
+        ret Bool {
+            b=self.b | other.b
+        }
+    }
+}
+
+sup std.ops.Add for Str {
+    fn add(self: &Str, other: Str) -> Str {
+        ret Str {
+            c=self.c + other.c,
+            f=self.f | other.f
+        }
+    }
 }
 
 sup std.ops.Add for Num {
     fn add(self: &Num, other: Num) -> Num {
         ret Num {
-            b=self.b + other.b
+            b=self.b + other.b,
+            e=self.e + other.e,
+            d=self.d + other.d
         }
     }
 }
@@ -23,7 +72,7 @@ sup std.ops.Add for Num {
 sup std.ops.BitXor for Num {
     fn bit_xor(self: &Num, other: Num) -> Num {
         ret Num {
-            b=self.b ^ other.b
+            else=Num.default()
         }
     }
 }
@@ -31,7 +80,8 @@ sup std.ops.BitXor for Num {
 sup std.ops.BitOr for Num {
     fn bit_or(self: &Num, other: Num) -> Num {
         ret Num {
-            b=self.b | other.b
+            b=self.b,
+            else=Num.default()
         }
     }
 }
@@ -39,22 +89,29 @@ sup std.ops.BitOr for Num {
 sup std.ops.Or for Num {
     fn or(self: &Num, other: Num) -> Num {
         ret Num {
-            b=self.b || other.b
+            else=Num.default()
         }
     }
 }
 
 cls ClassA {
-    a: Vec[Num]
+    a: std.Vec3[Num]
     b: Str
     c: Map[Str, Set[Num]]
 }
 
 sup ClassA {
     fn new() -> ClassA {
+        let p = 1
+        let q = p
+        let r = p
+
+        let a = Vec3.new()
         let a = 1
         let x = function_test_1(a)
-        let y = a.b.c
+        let y = a.b.c.e
+
+        let z = 123_124_999
 
         ret ClassA {
             a=Vec.new(),
@@ -65,7 +122,7 @@ sup ClassA {
 }
 
 sup std.ops.Add for ClassA {
-    fn add(self: &Self, other: ClassA) -> Self {
+    fn add(self: &ClassA, other: ClassA) -> ClassA {
         ret ClassA {
             a=self.a + other.a,
             b=self.b + other.b,
@@ -80,21 +137,25 @@ enum EnumType {
     variantC
 }
 
-@meta.public
+
 fn function_test_1(a: Num, b: Num, c: Num = 0, ...d: Num) -> Num {
     let x = function_test_1(400, 500, c=200)
+    ret x
 }
 
-
-@meta.private[T](900)
-@meta.other_decorator(100, "test")
-fn function_test_2[T, U=T, ...V](a: Num, ...args: V) -> Num where [T, U: Default, T: Vec, T.Item: Copy, V: Num] if a > 0 {
-    fn some_value() -> Num {}
+fn function_test_2[T, U=T, ...V](a: T, b: U, ...args: V) -> Num where [T, U: Default, T: Vec, T.Item: Copy, V: Num] if a > 0 {
+    fn some_value() -> Void {}
 
     let x = function_test_2(400, 500)
     let y = 1 + 2 * 3 - 4 / 5 % 6 ^ 7 & 8 | 9 || 10 && 11 == 12 != 13 < 14 > 15 <= 16 >= 17 |> 18 <| 19
 
     let a = y
+
+    let qq = (0, 1)
+    let ww = 0
+    let ss = 0
+    qq, ww, ss = ((2, 3), 3, 5)
+
     let b = 1 || "hello" || false || true || (1, 2, 3)
     let c = [&x](x, y) => { x + y }
     let d = SomeType{a, b}
@@ -109,6 +170,7 @@ fn function_test_2[T, U=T, ...V](a: Num, ...args: V) -> Num where [T, U: Default
         let y = 2
         x + y
     }
+    ret b
 }
 
 cls Output {
@@ -120,12 +182,16 @@ cls Output {
     f: Num
 }
 
+sup Output {
+    use Inner[T, U] as Map[T, U]
+}
+
 cls OtherType {
     a: Num
     b: Num
 }
 
-fn function_test_3(mut a: &mut Output, mut b: std.ns.detail.Type[T].Inner[U, T=Num], c: (T, std.Other.Inner[T].Output, U)) -> Str {
+fn function_test_3[T](mut a: &mut Num, mut b: Str, c: Vec) -> Str {
     let x = function_test_3[T](400, 500)
 
     while true {
@@ -167,7 +233,5 @@ fn function_test_3(mut a: &mut Output, mut b: std.ns.detail.Type[T].Inner[U, T=N
 
     let z = (0, 1, 2, 3)
     let y = z.0
-
-    use T as (Num, Str, Bool)
-    use U as T.0
+    ret Str {}
 }

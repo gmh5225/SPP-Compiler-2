@@ -36,7 +36,7 @@ ERRS = []
 CUR_ERR_IND = 0
 
 
-class ErrorFormatter:
+class ErrFmt:
     TOKENS: list[Token] = []
 
     @staticmethod
@@ -45,8 +45,8 @@ class ErrorFormatter:
         return ansi_escape.sub('', line)
     
     @staticmethod
-    def error(start_token_index: int, end_token_index = -1) -> str:
-        while ErrorFormatter.TOKENS[start_token_index].token_type in [TokenType.TkNewLine, TokenType.TkWhitespace]:
+    def err(start_token_index: int, end_token_index = -1) -> str:
+        while ErrFmt.TOKENS[start_token_index].token_type in [TokenType.TkNewLine, TokenType.TkWhitespace]:
             start_token_index += 1
 
         # The error position for the ("^") will be from the provisional start token index. If the error position is end
@@ -54,30 +54,30 @@ class ErrorFormatter:
         # to the EOF token. The start token index has to be moved back to that the newline behind the EOF is skipped (if
         # there is one).
         error_position = start_token_index
-        if ErrorFormatter.TOKENS[error_position].token_type == TokenType.TkEOF:
+        if ErrFmt.TOKENS[error_position].token_type == TokenType.TkEOF:
             error_position -= 1
-        if ErrorFormatter.TOKENS[error_position].token_type == TokenType.TkEOF and ErrorFormatter.TOKENS[error_position - 1] == TokenType.TkNewLine:
+        if ErrFmt.TOKENS[error_position].token_type == TokenType.TkEOF and ErrFmt.TOKENS[error_position - 1] == TokenType.TkNewLine:
             start_token_index -= 1 # todo : not -1, need to minus off the number of newlines before the EOF
 
         # If the start index is on a newline token, then move it back until it is not on a newline, so that the correct
         # line can be tracked over in reverse to fin the start of it. Once a non-newline has been found, move the
         # counter back until another newline is found - this will be the start of the line.
-        while start_token_index > 0 and ErrorFormatter.TOKENS[start_token_index].token_type == TokenType.TkNewLine:
+        while start_token_index > 0 and ErrFmt.TOKENS[start_token_index].token_type == TokenType.TkNewLine:
             start_token_index -= 1
-        while start_token_index > 0 and ErrorFormatter.TOKENS[start_token_index].token_type != TokenType.TkNewLine:
+        while start_token_index > 0 and ErrFmt.TOKENS[start_token_index].token_type != TokenType.TkNewLine:
             start_token_index -= 1
 
         # The end of the line is the first newline after the start of the line. If The re-scan forward is required
         # because there could have been multiple newlines after the current line, so only go to the first one.
         end_token_index = start_token_index + 1
-        if end_token_index < len(ErrorFormatter.TOKENS) and ErrorFormatter.TOKENS[end_token_index].token_type == TokenType.TkNewLine:
+        if end_token_index < len(ErrFmt.TOKENS) and ErrFmt.TOKENS[end_token_index].token_type == TokenType.TkNewLine:
             end_token_index += 1
-        while end_token_index < len(ErrorFormatter.TOKENS) and ErrorFormatter.TOKENS[end_token_index].token_type != TokenType.TkNewLine:
+        while end_token_index < len(ErrFmt.TOKENS) and ErrFmt.TOKENS[end_token_index].token_type != TokenType.TkNewLine:
             end_token_index += 1
 
         # Get the tokens on the current line by slicing the tokens between the start and end indexes just found from
         # backwards and forward newline-scanning
-        tokens = ErrorFormatter.TOKENS[start_token_index:end_token_index]
+        tokens = ErrFmt.TOKENS[start_token_index:end_token_index]
 
         # The number of spaces before the "^" characters is the error message position variable from the start - this
         # hasn't been altered
@@ -88,7 +88,7 @@ class ErrorFormatter:
         # Format the line number into the error message string
         line_number = "".join([
             f"{colorama.Fore.WHITE}{colorama.Style.BRIGHT}",
-            str([t.token_type for t in ErrorFormatter.TOKENS[:end_token_index]].count(TokenType.TkNewLine) + 1),
+            str([t.token_type for t in ErrFmt.TOKENS[:end_token_index]].count(TokenType.TkNewLine) + 1),
             f" | {colorama.Style.RESET_ALL}"])
 
         line_containing_error_string = "".join([
@@ -100,8 +100,8 @@ class ErrorFormatter:
 
         # The number of "^" characters is the length of the current tokens metadata (ie the symbol or length of keyword
         # / lexeme). Append the repeated "^" characters to the spaces, and then add the error message to the string.
-        error_length = max(1, len(ErrorFormatter.TOKENS[error_position].token_metadata))
-        number_margin_len = len(ErrorFormatter.escape_ansi(line_number)) - 2
+        error_length = max(1, len(ErrFmt.TOKENS[error_position].token_metadata))
+        number_margin_len = len(ErrFmt.escape_ansi(line_number)) - 2
 
         top_line_padding_string = "".join([
             " " * number_margin_len,
@@ -274,7 +274,7 @@ class Parser:
         self._tokens = tokens
         self._current = 0
         
-        ErrorFormatter.TOKENS = self._tokens
+        ErrFmt.TOKENS = self._tokens
 
     def parse(self) -> Ast.ProgramAst:
         try:
@@ -287,11 +287,11 @@ class Parser:
 
             for error in ERRS:
                 error_where, error = error.split(" ", 1)
-                error = ErrorFormatter.error(int(error_where)) + error
+                error = ErrFmt.err(int(error_where)) + error
 
-                current_error = ErrorFormatter.escape_ansi(error.split("\n")[2])
+                current_error = ErrFmt.escape_ansi(error.split("\n")[2])
                 current_error_line_number = int(current_error[:current_error.index(" ")])
-                current_error_where_on_line = ErrorFormatter.escape_ansi(error.split("\n")[-1]).index("^") + 1
+                current_error_where_on_line = ErrFmt.escape_ansi(error.split("\n")[-1]).index("^") + 1
 
                 if (current_error_line_number > final_error_line_number) or (current_error_line_number == final_error_line_number and current_error_where_on_line > final_error_where_on_line):
                     final_error = error
