@@ -164,7 +164,9 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_identifier(ast: Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
-        if not s.current_scope.get_symbol(ast.identifier).defined:
+        # If in a local scope, only symbols defined after the current line can be used. Anything defined in the global
+        # scope is fine to use.
+        if not s.current_scope.get_symbol(ast.identifier).defined and not s.global_scope.has_symbol(ast.identifier):
             raise SystemExit(ErrFmt.err(ast._tok) + f"Variable '{ast.identifier}' is not defined.")
         return s.current_scope.get_symbol(ast.identifier).type
 
