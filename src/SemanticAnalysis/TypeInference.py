@@ -95,6 +95,7 @@ class TypeInference:
         # has a matching signature. This is done by checking the signature of each function with the same name, and
         # selecting the first one that matches. No matches => error.
 
+
         s.next_scope()
         # Run semantic checks for each parameter in the function prototype. This will handle type-checking and default
         # expression checking.
@@ -304,8 +305,6 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_with_statement(ast: Ast.WithStatementAst, s: ScopeHandler) -> Ast.TypeAst:
-        # todo : issue with the aliased variable? might need type-inferring too
-
         s.next_scope()
 
         if ast.alias:
@@ -466,10 +465,12 @@ class TypeInference:
                 raise SystemExit(error) from None
 
         for given, actual in zip(sorted(given_fields), sorted(actual_fields)):
+            # todo : incorrect type -> should "^" sit under the "=" or the value (value not always given)
             given_value_type = TypeInference.infer_type_of_expression(ast.op.fields[given_fields.index(given)].value or s.current_scope.get_symbol(given).type, s)
             actual_value_type = s.global_scope.get_child_scope_for_cls(struct_type.parts[-1].identifier).get_symbol(actual).type
+            wrong_type_value = ast.op.fields[given_fields.index(given)].value if ast.op.fields[given_fields.index(given)].value else ast.op.fields[given_fields.index(given)]
             if given_value_type != actual_value_type:
-                raise SystemExit(ErrFmt.err(ast.op.fields[given_fields.index(given)]._tok) + f"Cannot assign {convert_type_to_string(given_value_type)} to {convert_type_to_string(actual_value_type)}.")
+                raise SystemExit(ErrFmt.err(wrong_type_value._tok) + f"Cannot assign {convert_type_to_string(given_value_type)} to {convert_type_to_string(actual_value_type)}.")
 
         return struct_type
 
