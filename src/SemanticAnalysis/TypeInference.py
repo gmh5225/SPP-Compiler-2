@@ -9,20 +9,23 @@ from src.SemanticAnalysis.SymbolGeneration import ScopeHandler, convert_type_to_
 from src.SyntacticAnalysis.Parser import ErrFmt
 
 
-# todo : base class auto upcast? maybe make it explicit
+# todo : incorrect function signature needs to take references into account too ie f(Num) doesn't exist => f(&Num) doesn't exist etc
+# todo : optional and variadic parameters
+# todo : check module identifier is correct (matches file name & path/directory)
+# todo : base class auto upcast? maybe make it explicit => std.upcast[T](...)
 # todo : type inference for lambdas
 # todo : all things "type generics"
 # todo : mutability checks
 # todo : visibility checks
 # todo : builtin decorators
 # todo : "self" automatic parameter
+#   - also for operators need to pass lhs as self automatically
 # todo : memory checks
 #   - mutable references from mutable variables (required mutability)
 #   - enforce the law of exclusivity for member-access-attributes (locals done)
 #   - consuming self (will require function selection)
 # todo : "partial moves"
 # todo : symbol initialization for tuple types
-# todo : symbols defined after current line still discovered as valid - add "defined" flag?
 # todo : all things lambdas => maybe convert into a function prototype?
 # todo : sup methods can only override methods defined in the base class that are virtual or abstract (overrideable)
 # todo : exhaustion or default for "if comparisons" that are for assignment => add optional param to "check-if"...
@@ -170,6 +173,10 @@ class TypeInference:
     @staticmethod
     def infer_type_of_sup_prototype(ast: Ast.SupPrototypeNormalAst | Ast.SupPrototypeInheritanceAst, s: ScopeHandler) -> None:
         s.next_scope()
+
+        if isinstance(ast, Ast.SupPrototypeInheritanceAst):
+            TypeInference.infer_type_of_type(ast.super_class, s)
+
         for statement in ast.body.members:
             match statement:
                 case Ast.SupMethodPrototypeAst(): TypeInference.infer_type_of_function_prototype(statement, s)
@@ -595,9 +602,7 @@ class TypeInference:
         # Handle the "else" clause for the let statement. If the "else" clause is present, then the type of the "else"
         # clause must match the type of the variable being assigned to.
         if ast.if_null:
-            t = CommonTypes.void()
-            for statement in ast.if_null.body:
-                t = TypeInference.infer_type_of_statement(statement, s)
+            t = TypeInference.infer_type_of_inner_scope(ast.if_null, s)
 
             # The returning expression from the "else" clause must be the same type as the variable being assigned to.
             # This is done by checking the type of the returning expression against the type of the variable.
@@ -695,6 +700,8 @@ class TypeInference:
     @staticmethod
     def infer_type_of_lambda(ast: Ast.LambdaAst, s: ScopeHandler) -> Ast.TypeAst:
         # todo
+
+        TypeInference.infer_type_of_expression(ast.body, s)
 
         s.next_scope()
         t = CommonTypes.unknown()

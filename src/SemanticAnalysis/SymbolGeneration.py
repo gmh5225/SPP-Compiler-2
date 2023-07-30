@@ -306,6 +306,8 @@ class SymbolTableBuilder:
         for i, variable in enumerate(ast.variables):
             s.current_scope.add_symbol(Symbol(convert_identifier_to_string(variable.identifier), ast.type_annotation, ast.value, i))
             if ast.value: SymbolTableBuilder.build_expression_symbols(ast.value, s)
+        if ast.if_null:
+            SymbolTableBuilder.build_inner_scope_symbols(ast.if_null, s)
 
     @staticmethod
     def build_expression_symbols(ast: Ast.ExpressionAst, s: ScopeHandler) -> None:
@@ -391,7 +393,7 @@ class SymbolTableBuilder:
     @staticmethod
     def build_sup_prototype_symbols(ast: Ast.SupPrototypeNormalAst | Ast.SupPrototypeInheritanceAst, s: ScopeHandler) -> None:
         if isinstance(ast, Ast.SupPrototypeInheritanceAst):
-            s.global_scope.get_type(convert_type_to_string(ast.identifier)).bases.append(convert_identifier_to_string(ast.super_class))
+            s.global_scope.get_type(convert_type_to_string(ast.identifier)).bases.append(convert_type_to_string(ast.super_class))
 
         s.enter_scope("SupPrototype")
         for typedef in filter(lambda member: isinstance(member, Ast.SupTypedefAst), ast.body.members):
