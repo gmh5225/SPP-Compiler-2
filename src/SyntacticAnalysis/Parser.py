@@ -569,7 +569,7 @@ class Parser:
             p6 = self._parse_token(TokenType.TkBraceL).parse_once()
             p7 = self._parse_sup_implementation().parse_once()
             p8 = self._parse_token(TokenType.TkBraceR).parse_once()
-            return Ast.SupPrototypeInheritanceAst(p1, p4, p5, p7, p2, c1)
+            return Ast.SupPrototypeInheritanceAst(p1, p4, p5, p7, c1, p2)
         return BoundParser(self, inner)
 
     def _parse_sup_implementation(self) -> BoundParser:
