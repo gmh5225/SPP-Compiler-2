@@ -115,17 +115,11 @@ class ErrFmt:
             f"{colorama.Style.RESET_ALL}",
             " <- "])
 
-        # metadata_strings = []
-        # for metadata_string in metadata:
-        #     metadata_strings.append(" " * number_margin_len)
-        #     metadata_strings.append(f"{colorama.Fore.WHITE}{colorama.Style.BRIGHT}| {colorama.Style.RESET_ALL} {metadata_string}\n")
-
         final_string = "\n".join([
             "",
             top_line_padding_string,
             line_containing_error_string,
             error_description_string])
-            # *metadata_strings])
         return final_string
 
 
@@ -291,7 +285,7 @@ class Parser:
 
                 current_error = ErrFmt.escape_ansi(error.split("\n")[2])
                 current_error_line_number = int(current_error[:current_error.index(" ")])
-                current_error_where_on_line = ErrFmt.escape_ansi(error.split("\n")[-1]).index("^") + 1
+                current_error_where_on_line = ErrFmt.escape_ansi(error.replace('\n', '\\n').split("\n")[-1]).index("^") + 1
 
                 if (current_error_line_number > final_error_line_number) or (current_error_line_number == final_error_line_number and current_error_where_on_line > final_error_where_on_line):
                     final_error = error
