@@ -27,6 +27,12 @@ class IdentifierAst:
     identifier: str
     _tok: int
 
+    def __hash__(self):
+        return hash(self.identifier)
+
+    def __eq__(self, other):
+        return isinstance(other, IdentifierAst) and self.identifier == other.identifier
+
 @dataclass
 class ModuleIdentifierAst:
     parts: list[IdentifierAst]

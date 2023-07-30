@@ -76,7 +76,6 @@ class TypeInference:
     @staticmethod
     def infer_type_of_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> None:
         s.next_scope()
-
         # Run semantic checks for each parameter in the function prototype. This will handle type-checking and default
         # expression checking.
         for parameter in ast.parameters:
@@ -285,11 +284,32 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+        ref_args = set()
+        mut_args = set()
+
         for a in ast.op.arguments:
-            # todo : check
             TypeInference.infer_type_of_expression(a.value, s)
-            if isinstance(a.value, Ast.IdentifierAst):
-                s.current_scope.get_symbol(a.value.identifier).initialized = False
+
+            # Check that the value to be moved is initialized, and if so, mark it as uninitialized, as it is being
+            # moved into the function call.
+            if isinstance(a.value, Ast.IdentifierAst) and not MemoryEnforcer.get_variable_initialized(a.value, s):
+                raise SystemExit(ErrFmt.err(a.value._tok) + f"Argument '{a.value.identifier}' is not initialized or has been moved.")
+
+            if isinstance(a.value, Ast.IdentifierAst) and a.calling_convention and a.calling_convention.mutable:
+                if a.value in ref_args:
+                    raise SystemExit(ErrFmt.err(a.value._tok) + f"Cannot take a mutable reference to a value already immutably referenced.")
+                if a.value in mut_args:
+                    raise SystemExit(ErrFmt.err(a.value._tok) + f"Cannot take a mutable reference to a value already mutably referenced.")
+                mut_args |= {a.value}
+            elif isinstance(a.value, Ast.IdentifierAst) and a.calling_convention:
+                if a.value in mut_args:
+                    raise SystemExit(ErrFmt.err(a.value._tok) + f"Cannot take an immutable reference to a value already mutably referenced.")
+                ref_args |= {a.value}
+
+            # Any argument that isn't being passed by reference is being moved, so mark the symbol (on the caller side)
+            # as uninitialized, so that it can't be used again, unless it is re-initialized.
+            if isinstance(a.value, Ast.IdentifierAst) and not a.calling_convention:
+                MemoryEnforcer.set_variable_initialized([a.value], s, False)
 
         lhs_type = TypeInference.infer_type_of_expression(ast.lhs, s)
         # lhs_type = s.current_scope.get_type(lhs_type.parts[-1].identifier).type
@@ -350,12 +370,13 @@ class TypeInference:
             if ast.type_annotation == CommonTypes.void():
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot annotate a variable as Void.")
 
-            s.current_scope.get_symbol(ast.variables[0].identifier.identifier).initialized = False
+            MemoryEnforcer.set_variable_initialized(ast.variables, s, False)
             return CommonTypes.void()
 
         # If the variable is provided a value, but the result of the value expression is a Void type, then throw an
         # error, as the variables inferred type would be Void, but Void is the only invalid type for a variable.
-        if TypeInference.infer_type_of_expression(ast.value, s) == CommonTypes.void():
+        rhs_type = TypeInference.infer_type_of_expression(ast.value, s)
+        if rhs_type == CommonTypes.void():
             raise SystemExit(ErrFmt.err(ast.value._tok) + f"Cannot assign Void to a variable.")
 
         # If this step is reached, then a value has been provided, as providing a type annotation or a value is mutually
@@ -367,49 +388,47 @@ class TypeInference:
         # variable, then is a violation of linear types - a value can only be used exactly once.
         # todo : differentiate between uninitialized and moved -- and for moved show where it was moved by using 2
         #  ErrorFormatting.error() calls concatenated
-        if isinstance(ast.value, Ast.IdentifierAst) and not s.current_scope.get_symbol(ast.value.identifier).initialized:
+        if isinstance(ast.value, Ast.IdentifierAst) and not MemoryEnforcer.get_variable_initialized(ast.value, s):
             raise SystemExit(ErrFmt.err(ast.value._tok) + f"Variable '{ast.value.identifier}' is not initialized or has been moved.")
 
         MemoryEnforcer.set_variable_initialized([ast.value], s, False)
 
         # For a single variable being defined, set its type by inferring the expression value being assigned to it.
         if len(ast.variables) == 1:
-            inferred_type = ast.type_annotation or TypeInference.infer_type_of_expression(ast.value, s)
-            s.current_scope.get_symbol(ast.variables[0].identifier.identifier).type = inferred_type
+            rhs_type = ast.type_annotation or rhs_type
+            s.current_scope.get_symbol(ast.variables[0].identifier.identifier).type = rhs_type
 
         # Otherwise, destructure a tuple into the variables being defined. The tuple type will be inferred, but is
         # subject to a number of checks / constraints to ensure type-safety.
         else:
-            # Infer the tuple type from the expression value being assigned to the variables.
-            inferred_type = TypeInference.infer_type_of_expression(ast.value, s)
-
             # Firstly ensure that the inferred type is a tuple type, as a tuple is being destructured. This is done by
             # checking the AST type.
-            if not isinstance(inferred_type, Ast.TypeTupleAst):
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Expected a tuple type to destructure, but found {inferred_type}.")
+            if not isinstance(rhs_type, Ast.TypeTupleAst):
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Expected a tuple type to destructure, but found {rhs_type}.")
 
             # Secondly, ensure that the length of the tuple type matches the number of variables being defined. This is
             # done by checking the length of the tuple AST node. This ensures that all variables are handled.
-            if len(inferred_type.types) != len(ast.variables):
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a {len(inferred_type.types)}-tuple into {len(ast.variables)} variables.")
+            if len(rhs_type.types) != len(ast.variables):
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a {len(rhs_type.types)}-tuple into {len(ast.variables)} variables.")
 
             # Finally, ensure that the type of each variable matches the type of the corresponding tuple element. This
             # is done by checking the type of each variable against the type of the corresponding tuple element.
             for i in range(len(ast.variables)):
-                s.current_scope.get_symbol(ast.variables[i].identifier.identifier).type = inferred_type.types[i]
+                s.current_scope.get_symbol(ast.variables[i].identifier.identifier).type = rhs_type.types[i]
 
         return CommonTypes.void()
 
     @staticmethod
     def infer_type_of_assignment_expression(ast: Ast.AssignmentExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        if TypeInference.infer_type_of_expression(ast.rhs, s) == CommonTypes.void():
+        rhs_type = TypeInference.infer_type_of_expression(ast.rhs, s)
+        if rhs_type == CommonTypes.void():
             raise SystemExit(ErrFmt.err(ast.rhs._tok) + f"Cannot assign Void to a variable.")
 
         # Any variables on the left hand side of the assignment are now initialized. Mark them as such, so that they can
         # be checked later.
         MemoryEnforcer.set_variable_initialized(ast.lhs, s, True)
 
-        if isinstance(ast.rhs, Ast.IdentifierAst) and not s.current_scope.get_symbol(ast.rhs.identifier).initialized:
+        if isinstance(ast.rhs, Ast.IdentifierAst) and not MemoryEnforcer.get_variable_initialized(ast.rhs, s):
             raise SystemExit(ErrFmt.err(ast.rhs._tok) + f"Variable '{ast.rhs.identifier}' is not initialized or has been moved.")
 
         MemoryEnforcer.set_variable_initialized([ast.rhs], s, False)
@@ -418,7 +437,6 @@ class TypeInference:
         # that the number of elements in the tuple matches the number of variables on the LHS, and that the type of
         # each element matches the type of the corresponding variable on the LHS.
         lhs_types = [TypeInference.infer_type_of_expression(l, s) for l in ast.lhs]
-        rhs_type = TypeInference.infer_type_of_expression(ast.rhs, s)
         if len(lhs_types) == 1 and lhs_types[0] != rhs_type:
             raise SystemExit(ErrFmt.err(ast.op._tok) + f"Cannot assign {convert_type_to_string(rhs_type)} to {convert_type_to_string(lhs_types[0])}.")
 
@@ -529,3 +547,18 @@ class MemoryEnforcer:
             elif isinstance(ast, Ast.TupleLiteralAst):
                 for item in ast.values:
                     MemoryEnforcer.set_variable_initialized([item], s, initialized)
+
+    @staticmethod
+    def get_variable_initialized(ast, s: ScopeHandler) -> bool:
+        if isinstance(ast, Ast.IdentifierAst):
+            return s.current_scope.get_symbol(ast.identifier).initialized
+        elif isinstance(ast, Ast.LocalVariableAst):
+            return s.current_scope.get_symbol(ast.identifier.identifier).initialized
+        elif isinstance(ast, Ast.TupleLiteralAst):
+            # todo : check this tuple one
+            for item in ast.values:
+                if not MemoryEnforcer.get_variable_initialized(item, s):
+                    return False
+            return True
+        else:
+            raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot check if {ast} is initialized.")
