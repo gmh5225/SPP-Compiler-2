@@ -16,9 +16,10 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : builtin decorators
 # todo : memory checks
 #   - mutable references from mutable variables (required mutability)
-#   - enforce the law of exclusivity
+#   - enforce the law of exclusivity for attributes (locals done)
 # todo : "partial moves"
 # todo : symbol initialization for tuple types
+# todo : symbols defined after current line still discovered as valid - add "defined" flag?
 
 
 BIN_FUNCTION_NAMES = {
