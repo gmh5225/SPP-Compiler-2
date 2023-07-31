@@ -147,6 +147,11 @@ class Scope:
         while current is not None:
             symbols += current.symbols.symbols.keys()
             current = current.parent
+
+        # next check linked sup-scopes
+        for sup_scope in self.sup_scopes:
+            symbols += sup_scope.symbols.symbols.keys()
+
         return symbols
 
     def all_exclusive_symbols(self) -> list[str]:

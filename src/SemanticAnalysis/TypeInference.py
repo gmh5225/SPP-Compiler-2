@@ -17,16 +17,15 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : type inference for lambdas
 # todo : all things "type generics"
 # todo : mutability checks
+#   - calling mutable functions on immutable references
 # todo : visibility checks
 # todo : builtin decorators
 # todo : "self" automatic parameter
 #   - also for operators need to pass lhs as self automatically
 # todo : memory checks
-#   - mutable references from mutable variables (required mutability)
 #   - enforce the law of exclusivity for member-access-attributes (locals done)
 #   - consuming self (will require function selection)
 #   - cannot move from a borrowed context
-#   - match parameter and argument calling conventions
 # todo : "partial moves"
 # todo : symbol initialization for tuple types
 # todo : all things lambdas => maybe convert into a function prototype?
@@ -295,10 +294,6 @@ class TypeInference:
             # Raise the unknown symbol error, and suggest the most likely match. This is when a non-function type is
             # being called.
             if not call:
-                import inspect
-                print("normal")
-                print(inspect.stack()[1].function)
-
                 if most_likely[1]:
                     raise SystemExit(ErrFmt.err(ast._tok) + f"Identifier '{ast.identifier}' not defined. Did you mean '{most_likely[1]}'?")
                 else:
@@ -307,12 +302,6 @@ class TypeInference:
             # For functions, change the output slightly -- firstly, offer alternative signature suggestions, and
             # secondly, offset alternative function names.
             else:
-                #temp: print caller function
-                import inspect
-                print("call")
-                print(inspect.stack()[1].function)
-
-                # todo : methods in "sup" blocks are not found as matching function signatures
                 # Get all functions in the scope that have the same identifier as the one being called, but keep
                 # searching the entire scope so that every overload is discovered.
                 matching_functions_dif_signatures = [s for s in s.current_scope.all_symbols() if "#" in s and s.split("#")[0] == ast.identifier.split("#")[0]]
@@ -330,7 +319,7 @@ class TypeInference:
                 # If there are no matching function names, then the symbol doesn't exist -- offer the most likely
                 # alternative match.
                 most_likely = function_identifier_strip_signature(most_likely[1])
-                bad_function_identifier = function_identifier_strip_signature(ast.identifier)
+                bad_function_identifier = function_identifier_strip_signature(ast.identifier, string_ref=True)
                 if most_likely != ")":
                     raise SystemExit(ErrFmt.err(ast._tok) + f"Function '{bad_function_identifier}' not defined. Did you mean '{most_likely}'?")
                 else:
