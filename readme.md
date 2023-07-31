@@ -13,3 +13,4 @@
 - Once the compiler in Python is complete, I will either rewrite it in Rust, or do the STL and self-host the compiler.
 - Semantic Analyzer is horrible at the moment, written awfully, duplicated code etc -- will rewrite once all the features and checks are in place.
 - Importing currently imports into global namespace like Python, but in the end it will import as its qualified name.
+- The `SPP` repo is used for docs -- the BNF file is not upto date
