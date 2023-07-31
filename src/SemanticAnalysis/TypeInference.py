@@ -40,6 +40,7 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : allow parameters in override to be a more specific derived class
 # todo : alternative signatures in classes not found? check for [self. ...]
 # todo : some errors say "identifier ... not found", should say "attribute ... not found"
+# todo : assignment needs to allow assigning a more derived class onto a base class type
 
 
 BIN_FUNCTION_NAMES = {
