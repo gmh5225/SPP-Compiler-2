@@ -24,6 +24,7 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 #   - mutable references from mutable variables (required mutability)
 #   - enforce the law of exclusivity for member-access-attributes (locals done)
 #   - consuming self (will require function selection)
+#   - cannot move from a borrowed context
 # todo : "partial moves"
 # todo : symbol initialization for tuple types
 # todo : all things lambdas => maybe convert into a function prototype?
@@ -32,7 +33,9 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : fold expressions
 # todo : partial functions with underscore placeholder -> make a new type, also memory rules
 # todo : allow parameters in override to be a more specific derived class
-#   - probably required "Self" to be inferred properly then the derived check works elegantly too
+
+
+CURRENT_MODULE_MEMBER: Optional[Ast.TypeAst] = None
 
 
 BIN_FUNCTION_NAMES = {
@@ -74,10 +77,13 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_program(ast: Ast.ProgramAst, s: ScopeHandler) -> None:
+        global CURRENT_MODULE_MEMBER
+
         for decorator in ast.module.decorators:
             TypeInference.infer_type_of_decorator(decorator, s)
 
         for module_member in ast.module.body.members:
+            CURRENT_MODULE_MEMBER = None
             match module_member:
                 case Ast.FunctionPrototypeAst(): TypeInference.infer_type_of_function_prototype(module_member, s)
                 case Ast.ClassPrototypeAst(): TypeInference.infer_type_of_class_prototype(module_member, s)
@@ -101,6 +107,10 @@ class TypeInference:
         # expression checking.
         for parameter in ast.parameters:
             TypeInference.infer_type_of_parameter(parameter, s)
+
+        # Run a type-infer on the return type so the Self type can be inferred prior to any return statement's type
+        # check
+        TypeInference.infer_type_of_type(ast.return_type, s)
 
         # Default the discovered returning type of the function to the Void type. For each statement inferred, get the
         # type of the statement and set the returning type to that type. The final statement's type will be the
@@ -136,6 +146,9 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeHandler) -> None:
+        global CURRENT_MODULE_MEMBER
+        CURRENT_MODULE_MEMBER = Ast.TypeSingleAst([Ast.GenericIdentifierAst(ast.identifier.identifier, [], ast.identifier._tok)], ast.identifier._tok)
+
         for decorator in ast.decorators:
             TypeInference.infer_type_of_decorator(decorator, s)
 
@@ -174,6 +187,9 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_sup_prototype(ast: Ast.SupPrototypeNormalAst | Ast.SupPrototypeInheritanceAst, s: ScopeHandler) -> None:
+        global CURRENT_MODULE_MEMBER
+        CURRENT_MODULE_MEMBER = ast.identifier
+
         s.next_scope()
 
         if isinstance(ast, Ast.SupPrototypeInheritanceAst):
@@ -679,15 +695,14 @@ class TypeInference:
         # scope is the class scope, and then getting the type of the class.
         # todo : infer Self for a "sup" scope
         if isinstance(ast.parts[0], Ast.SelfTypeAst):
-            scope = s.current_scope
-            while not scope.name.startswith("ClsPrototype"):
-                scope = scope.parent
-                if not scope:
-                    raise SystemExit(ErrFmt.err(ast._tok) + f"Found 'Self' in a non-class scope.")
+            if not CURRENT_MODULE_MEMBER:
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot use 'Self' outside of a class.")
 
             # Change the "Self" to the actual class name. The "Self" is only able to be the first part of a type, so
             # only "ast.part[0]" has to be inspected and changed.
-            ast.parts[0] = s.current_scope.get_type(scope.name).type
+            ast.parts = ast.parts[1:]
+            for p in reversed(CURRENT_MODULE_MEMBER.parts):
+                ast.parts.insert(0, p)
 
         # Check if the type exists, by checking the string representation of the type against the types in the current
         # scope (and its parent scopes). If the type doesn't exist, throw an error.
