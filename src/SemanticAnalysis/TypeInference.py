@@ -22,13 +22,10 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 #   - calling mutable functions on immutable references
 # todo : visibility checks
 # todo : builtin decorators
-# todo : "self" automatic parameter
-#   - also for operators need to pass lhs as self automatically
 # todo : memory checks
 #   - enforce the law of exclusivity for member-access-attributes (locals done)
 #   - consuming self (will require function selection)
 #   - partial moves
-#   - the move checks in function calls -> also perform in struct initialization
 #   - fix "self" being &Self but passing to a &mut Self method etc
 #   - convention matching issues => if a variable is a reference, then the "&" isn't required in the function call
 #       - or just make is so that it is?
