@@ -25,19 +25,19 @@ class Symbol:
     # borrowed_ref: bool
     # borrowed_mut: bool
 
-    def __init__(self, name: str, type_: Optional[Ast.TypeAst], value: Optional[Ast.ExpressionAst], index: int = 0, mutable: bool = False):
+    def __init__(self, name: str, type_: Optional[Ast.TypeAst], value: Optional[Ast.ExpressionAst], **kwargs):
         self.name = name
         self.type = type_
         self.value = value
 
-        self.index = index
+        self.index = kwargs.get("index", 0)
         self.bases = []
 
         self.initialized = self.value is not None
         self.defined = False
-        self.mutable = mutable
-        # self.borrowed_ref = False
-        # self.borrowed_mut = False
+        self.mutable = kwargs.get("mutable", False)
+        self.borrowed_ref = kwargs.get("borrowed_ref", False)
+        self.borrowed_mut = kwargs.get("borrowed_mut", False)
 
     def json(self) -> dict[str, any]:
         d = {
@@ -332,7 +332,11 @@ class SymbolTableBuilder:
         # symbol. Add the generic type parameters as types. Finally, recursively visit each statement in the function
         # body to build symbols for nested members.
         for param in ast.parameters:
-            s.current_scope.add_symbol(Symbol(convert_identifier_to_string(param.identifier), normalize_type(param.type_annotation), None, mutable=param.is_mutable))
+            s.current_scope.add_symbol(Symbol(
+                convert_identifier_to_string(param.identifier), normalize_type(param.type_annotation), None,
+                mutable=param.is_mutable,
+                borrowed_ref=param.calling_convention and not param.calling_convention.is_mutable,
+                borrowed_mut=param.calling_convention and param.calling_convention.is_mutable))
         for generic in ast.generic_parameters:
             s.current_scope.add_type(Symbol(convert_identifier_to_string(generic.identifier), None, None))
         for statement in ast.body.statements:

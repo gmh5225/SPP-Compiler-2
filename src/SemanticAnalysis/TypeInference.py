@@ -482,15 +482,18 @@ class TypeInference:
                 symbol = s.current_scope.get_symbol(a.value.identifier)
                 if not symbol.mutable:
                     raise SystemExit(ErrFmt.err(a.value._tok) + f"Cannot take a mutable reference to an immutable value.")
+                if symbol.borrowed_ref:
+                    raise SystemExit(ErrFmt.err(a.value._tok) + f"Cannot take a mutable reference to an immutable reference.")
 
                 if a.value in ref_args:
-                    raise SystemExit(ErrFmt.err(a.value._tok) + f"Cannot take a mutable reference to a value already immutably referenced.")
+                    raise SystemExit(ErrFmt.err(a.value._tok) + f"Cannot hold a mutable an immutable reference to the same value at once.")
                 if a.value in mut_args:
-                    raise SystemExit(ErrFmt.err(a.value._tok) + f"Cannot take a mutable reference to a value already mutably referenced.")
+                    raise SystemExit(ErrFmt.err(a.value._tok) + f"Cannot hold > 1 mutable references to the same value at once.")
                 mut_args |= {a.value}
+
             elif isinstance(a.value, Ast.IdentifierAst) and a.calling_convention:
                 if a.value in mut_args:
-                    raise SystemExit(ErrFmt.err(a.value._tok) + f"Cannot take an immutable reference to a value already mutably referenced.")
+                    raise SystemExit(ErrFmt.err(a.value._tok) + f"Cannot hold a mutable an immutable reference to the same value at once.")
                 ref_args |= {a.value}
 
             # Any argument that isn't being passed by reference is being moved, so mark the symbol (on the caller side)
