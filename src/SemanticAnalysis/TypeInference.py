@@ -30,6 +30,8 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 #   - cannot move from a borrowed context & partial moves
 #   - the move checks in function calls -> also perform in struct initialization
 #   - fix "self" being &Self but passing to a &mut Self method etc
+#   - convention matching issues => if a variable is a reference, then the "&" isn't required in the function call
+#       - or just make is so that it is?
 # todo : symbol initialization for tuple types
 # todo : all things lambdas => maybe convert into a function prototype?
 # todo : sup methods can only override methods defined in the base class that are virtual or abstract (overrideable)
@@ -473,6 +475,31 @@ class TypeInference:
         for i, a in enumerate(ast.op.arguments):
             arg_types.append(TypeInference.infer_type_of_expression(a.value, s))
 
+            """
+            if isinstance(a.value, Ast.IdentifierAst):
+                symbol = s.current_scope.get_symbol(a.value.identifier)
+            else:
+                lhs_type = TypeInference.infer_type_of_expression(ast.lhs, s, call=True)
+                scope = s.global_scope.get_child_scope_for_cls(lhs_type.parts[-1].identifier)
+                symbol = scope.get_symbol(a.value.identifier)
+            """
+
+            # todo -> double use of an identifier => moved/uninit so won't work
+            # todo -> double use of attribute
+            #   - check not moving from borrowed context (from borrowed object)
+            #   - check not using a partialy-moved value (from owned object)
+
+            # Prevent moving from a borrowed context by checking if there is no calling convention, and that the
+            # expression is an attribute access from a symbol currently being borrowed.
+            v = a.value
+            if isinstance(v, Ast.PostfixExpressionAst) and isinstance(v.op, Ast.PostfixMemberAccessAst) and not a.calling_convention:
+                r = v
+                while isinstance(v, Ast.PostfixExpressionAst) and isinstance(v.op, Ast.PostfixMemberAccessAst):
+                    r, v = v, v.lhs
+                symbol = s.current_scope.get_symbol(v.identifier)
+                if isinstance(v, Ast.IdentifierAst) and (symbol.borrowed_ref or symbol.borrowed_mut):
+                    raise SystemExit(ErrFmt.err(r.op.identifier._tok) + f"Cannot move from a borrowed context.")
+
             # Check that the value to be moved is initialized, and if so, mark it as uninitialized, as it is being
             # moved into the function call.
             if isinstance(a.value, Ast.IdentifierAst) and not MemoryEnforcer.get_variable_initialized(a.value, s):
@@ -607,6 +634,16 @@ class TypeInference:
         if rhs_type == CommonTypes.void():
             raise SystemExit(ErrFmt.err(ast.value._tok) + f"Cannot assign Void to a variable.")
 
+        # Prevent moving from a borrowed context
+        v = ast.value
+        if isinstance(v, Ast.PostfixExpressionAst) and isinstance(v.op, Ast.PostfixMemberAccessAst):
+            r = v
+            while isinstance(v, Ast.PostfixExpressionAst) and isinstance(v.op, Ast.PostfixMemberAccessAst):
+                r, v = v, v.lhs
+            symbol = s.current_scope.get_symbol(v.identifier)
+            if isinstance(v, Ast.IdentifierAst) and (symbol.borrowed_ref or symbol.borrowed_mut):
+                raise SystemExit(ErrFmt.err(r.op.identifier._tok) + f"Cannot move from a borrowed context.")
+
         # If this step is reached, then a value has been provided, as providing a type annotation or a value is mutually
         # exclusive. As a value has been provided, the variable is initialized. Mark the symbol as initialized. Mark the
         # RHS identifiers as uninitialized, as they are "moved" into the LHS identifiers.
@@ -676,6 +713,16 @@ class TypeInference:
         rhs_type = TypeInference.infer_type_of_expression(ast.rhs, s)
         if rhs_type == CommonTypes.void():
             raise SystemExit(ErrFmt.err(ast.rhs._tok) + f"Cannot assign Void to a variable.")
+
+        # Prevent moving from a borrowed context
+        v = ast.rhs
+        if isinstance(v, Ast.PostfixExpressionAst) and isinstance(v.op, Ast.PostfixMemberAccessAst):
+            r = v
+            while isinstance(v, Ast.PostfixExpressionAst) and isinstance(v.op, Ast.PostfixMemberAccessAst):
+                r, v = v, v.lhs
+            symbol = s.current_scope.get_symbol(v.identifier)
+            if isinstance(v, Ast.IdentifierAst) and (symbol.borrowed_ref or symbol.borrowed_mut):
+                raise SystemExit(ErrFmt.err(r.op.identifier._tok) + f"Cannot move from a borrowed context.")
 
         # Any variables on the left hand side of the assignment are now initialized. Mark them as such, so that they can
         # be checked later.

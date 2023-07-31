@@ -22,8 +22,8 @@ class Symbol:
     initialized: bool
     defined: bool # ie exists but not initialized
     mutable: bool
-    # borrowed_ref: bool
-    # borrowed_mut: bool
+    borrowed_ref: bool
+    borrowed_mut: bool
 
     def __init__(self, name: str, type_: Optional[Ast.TypeAst], value: Optional[Ast.ExpressionAst], **kwargs):
         self.name = name
