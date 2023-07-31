@@ -269,7 +269,7 @@ class SymbolTableBuilder:
     @staticmethod
     def build_function_prototype_symbols(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> None:
         # Add the function prototype to the current scope, and enter a new scope for the function body.
-        ast.identifier.identifier += f"#{','.join([convert_type_to_string(p.type_annotation) for p in ast.parameters])}"
+        ast.identifier.identifier += f"#{','.join([convert_convention_to_string(p.calling_convention) + '|' + convert_type_to_string(p.type_annotation) for p in ast.parameters])}"
 
         s.current_scope.add_symbol(Symbol(convert_identifier_to_string(ast.identifier), get_function_type(ast), None))
         s.enter_scope(f"FnPrototype__{convert_identifier_to_string(ast.identifier)}")
@@ -470,3 +470,8 @@ def get_function_type(ast: Ast.FunctionPrototypeAst) -> Ast.TypeAst:
 
 def convert_module_name_to_file_name(ast: Ast.ModuleIdentifierAst | Ast.ImportIdentifierAst) -> str:
     return "/".join(map(lambda x: x.identifier, ast.parts))
+
+def convert_convention_to_string(ast: Ast.ParameterPassingConventionReferenceAst) -> str:
+    if not ast: return "one"
+    if ast.is_mutable: return "mut"
+    return "ref"

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import re
 from typing import Optional
 import difflib
 
 from src.LexicalAnalysis.Tokens import Token, TokenType
 from src.SyntacticAnalysis import Ast
-from src.SemanticAnalysis.SymbolGeneration import ScopeHandler, convert_type_to_string, convert_multi_identifier_to_string
+from src.SemanticAnalysis.SymbolGeneration import ScopeHandler, convert_type_to_string, convert_multi_identifier_to_string, convert_convention_to_string
 from src.SyntacticAnalysis.Parser import ErrFmt
 
 
@@ -34,6 +35,8 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : fold expressions
 # todo : partial functions with underscore placeholder -> make a new type, also memory rules
 # todo : allow parameters in override to be a more specific derived class
+# todo : alternative signatures in classes not found? check for [self. ...]
+# todo : some errors say "identifier ... not found", should say "attribute ... not found"
 
 
 CURRENT_MODULE_MEMBER: Optional[Ast.TypeAst] = None
@@ -171,6 +174,7 @@ class TypeInference:
         # expression will actually be evaluated per call at runtime, so only type info is needed here.
         TypeInference.infer_type_of_type(ast.type_annotation, s)
         TypeInference.infer_type_of_expression(ast.default_value, s) if ast.default_value else None
+        MemoryEnforcer.set_variable_initialized([ast.identifier], s, True)
         s.current_scope.get_symbol(ast.identifier.identifier).defined = True
 
     @staticmethod
@@ -207,7 +211,7 @@ class TypeInference:
         if isinstance(sup_block, Ast.SupPrototypeInheritanceAst):
             super_class_scope = s.global_scope.get_child_scope_for_cls(convert_type_to_string(sup_block.super_class))
             if not super_class_scope.has_symbol(ast.identifier.identifier):
-                bad_function_identifier = ast.identifier.identifier.replace("#", "(").replace(",", ", ") + ")"
+                bad_function_identifier = function_identifier_strip_signature(ast.identifier.identifier)
                 raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{bad_function_identifier}' not found in super class '{convert_type_to_string(sup_block.super_class)}'.")
 
         TypeInference.infer_type_of_function_prototype(ast, s)
@@ -291,11 +295,23 @@ class TypeInference:
             # Raise the unknown symbol error, and suggest the most likely match. This is when a non-function type is
             # being called.
             if not call:
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Identifier '{ast.identifier}' not found in scope. Did you mean '{most_likely[1]}'?")
+                import inspect
+                print("normal")
+                print(inspect.stack()[1].function)
+
+                if most_likely[1]:
+                    raise SystemExit(ErrFmt.err(ast._tok) + f"Identifier '{ast.identifier}' not defined. Did you mean '{most_likely[1]}'?")
+                else:
+                    raise SystemExit(ErrFmt.err(ast._tok) + f"Identifier '{ast.identifier}' not defined.")
 
             # For functions, change the output slightly -- firstly, offer alternative signature suggestions, and
             # secondly, offset alternative function names.
             else:
+                #temp: print caller function
+                import inspect
+                print("call")
+                print(inspect.stack()[1].function)
+
                 # todo : methods in "sup" blocks are not found as matching function signatures
                 # Get all functions in the scope that have the same identifier as the one being called, but keep
                 # searching the entire scope so that every overload is discovered.
@@ -304,18 +320,22 @@ class TypeInference:
                 # If there are any matching function names, then multiple overloads have been provided -- convert them
                 # into strings for the error message.
                 if matching_functions_dif_signatures:
-                    bad_function_identifier = ast.identifier.replace("#", "(").replace(",", ", ") + ")"
-                    string = f"Matching signature for '{bad_function_identifier}' not found in scope. Available signatures:\n"
+                    bad_function_identifier = function_identifier_strip_signature(ast.identifier, string_ref=True)
+                    string = f"Matching signature for '{bad_function_identifier}' not defined. Available signatures:\n"
                     for f in matching_functions_dif_signatures:
-                        f = f.replace("#", "(").replace(",", ", ") + ")"
+                        f = function_identifier_strip_signature(f, string_ref=True)
                         string += f"    - {f}\n"
                     raise SystemExit(ErrFmt.err(ast._tok) + string)
 
                 # If there are no matching function names, then the symbol doesn't exist -- offer the most likely
                 # alternative match.
-                most_likely = most_likely[1].replace("#", "(").replace(",", ", ") + ")"
-                bad_function_identifier = ast.identifier.replace("#", "(").replace(",", ", ") + ")"
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Function '{bad_function_identifier}' not found in scope. Did you mean '{most_likely}'?")
+                most_likely = function_identifier_strip_signature(most_likely[1])
+                bad_function_identifier = function_identifier_strip_signature(ast.identifier)
+                if most_likely != ")":
+                    raise SystemExit(ErrFmt.err(ast._tok) + f"Function '{bad_function_identifier}' not defined. Did you mean '{most_likely}'?")
+                else:
+                    raise SystemExit(ErrFmt.err(ast._tok) + f"Function '{bad_function_identifier}' not defined.")
+
 
         # Return the type of the symbol, which is found in the current scope, or a parent scope. This symbol must exist,
         # as prior checks have guaranteed this.
@@ -462,7 +482,7 @@ class TypeInference:
             # todo : scope is correct but error not so much
             restore_scope = s.current_scope
             s.current_scope = class_scope
-            TypeInference.infer_type_of_identifier(ast.op.identifier, s, True)
+            TypeInference.infer_type_of_identifier(ast.op.identifier, s, "#" in ast.op.identifier.identifier)
             s.current_scope = restore_scope
 
     @staticmethod
@@ -473,12 +493,17 @@ class TypeInference:
 
         for i, a in enumerate(ast.op.arguments):
             arg_types.append(TypeInference.infer_type_of_expression(a.value, s))
+
             # Check that the value to be moved is initialized, and if so, mark it as uninitialized, as it is being
             # moved into the function call.
             if isinstance(a.value, Ast.IdentifierAst) and not MemoryEnforcer.get_variable_initialized(a.value, s):
                 raise SystemExit(ErrFmt.err(a.value._tok) + f"Argument '{a.value.identifier}' is not initialized or has been moved.")
 
             if isinstance(a.value, Ast.IdentifierAst) and a.calling_convention and a.calling_convention.is_mutable:
+                symbol = s.current_scope.get_symbol(a.value.identifier)
+                if not symbol.mutable:
+                    raise SystemExit(ErrFmt.err(a.value._tok) + f"Cannot take a mutable reference to an immutable value.")
+
                 if a.value in ref_args:
                     raise SystemExit(ErrFmt.err(a.value._tok) + f"Cannot take a mutable reference to a value already immutably referenced.")
                 if a.value in mut_args:
@@ -498,15 +523,16 @@ class TypeInference:
         # of the function is called.
         # todo : other Ast types that need to be inspected in order to modify the underlying fn-call name?
         lhs = ast.lhs
+        arg_conventions = [arg.calling_convention for arg in ast.op.arguments]
         while isinstance(lhs, Ast.PostfixExpressionAst) and isinstance(lhs.op, Ast.PostfixMemberAccessAst):
             lhs = lhs.op
             if isinstance(lhs.identifier, Ast.IdentifierAst):
                 lhs = lhs.identifier
-                lhs.identifier += f"#{','.join([convert_type_to_string(arg_type) for arg_type in arg_types])}"
+                lhs.identifier += f"#{','.join([convert_convention_to_string(conv) + '|' + convert_type_to_string(arg_type) for conv, arg_type in zip(arg_conventions, arg_types)])}"
                 break
         else:
             if isinstance(lhs, Ast.IdentifierAst):
-                lhs.identifier += f"#{','.join([convert_type_to_string(arg_type) for arg_type in arg_types])}"
+                lhs.identifier += f"#{','.join([convert_convention_to_string(conv) + '|' + convert_type_to_string(arg_type) for conv, arg_type in zip(arg_conventions, arg_types)])}"
 
         # Get the function type from the symbol table, and return the return type of the function, from the generic
         # type of the function ie FnRef[Output, (Args)]. The return type is the first generic argument.
@@ -813,3 +839,20 @@ class MemoryEnforcer:
 
 class CompiletimeDecorators:
     ...
+
+
+def function_identifier_strip_signature(identifier: str, string_ref: bool = False) -> str:
+    stripped = identifier.replace("#", "(").replace(",", ", ") + ")"
+    if not string_ref:
+        stripped = re.sub(r"(one|ref|mut)\|", "", stripped)
+    else:
+        while True:
+            if "one|" in stripped:
+                stripped = stripped.replace("one|", "")
+            elif "ref|" in stripped:
+                stripped = stripped.replace("ref|", "&")
+            elif "mut|" in stripped:
+                stripped = stripped.replace("mut|", "&mut ")
+            else:
+                break
+    return stripped
