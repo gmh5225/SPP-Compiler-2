@@ -171,7 +171,7 @@ class TypeInference:
     def infer_type_of_parameter(ast: Ast.FunctionParameterAst, s: ScopeHandler) -> None:
         # Check the type of parameter exists, and if the parameter has a default value, check the expression. This
         # expression will actually be evaluated per call at runtime, so only type info is needed here.
-        TypeInference.infer_type_of_type(ast.type_annotation, s)
+        ast.type_annotation = TypeInference.infer_type_of_type(ast.type_annotation, s)
         TypeInference.infer_type_of_expression(ast.default_value, s) if ast.default_value else None
         MemoryEnforcer.set_variable_initialized([ast.identifier], s, True)
         s.current_scope.get_symbol(ast.identifier.identifier).defined = True
