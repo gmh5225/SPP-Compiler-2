@@ -27,7 +27,7 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : memory checks
 #   - enforce the law of exclusivity for member-access-attributes (locals done)
 #   - consuming self (will require function selection)
-#   - cannot move from a borrowed context & partial moves
+#   - partial moves
 #   - the move checks in function calls -> also perform in struct initialization
 #   - fix "self" being &Self but passing to a &mut Self method etc
 #   - convention matching issues => if a variable is a reference, then the "&" isn't required in the function call
@@ -573,7 +573,15 @@ class TypeInference:
         # the provided value for the field, or the variable with an equivalent identifier to the field.
         given_fields = [f.identifier.identifier for f in ast.op.fields if isinstance(f.identifier, Ast.IdentifierAst)]
         for given_field in ast.op.fields:
-            TypeInference.infer_type_of_expression(given_field.value or given_field.identifier, s)
+            given_field = given_field.value or given_field.identifier
+            TypeInference.infer_type_of_expression(given_field, s)
+
+            # Check that the value to be moved is initialized, and if so, mark it as uninitialized, as it is being
+            # moved into the function call.
+            if isinstance(given_field, Ast.IdentifierAst) and not MemoryEnforcer.get_variable_initialized(given_field, s):
+                raise SystemExit(ErrFmt.err(given_field._tok) + f"Argument '{given_field.identifier}' is not initialized or has been moved.")
+            else:
+                MemoryEnforcer.set_variable_initialized([given_field], s, False)
 
         # The "default_obj_given" field is a special field that is used to provide a default value for all fields not
         # given explicitly. If this field is present, then all fields not given explicitly are moved from the default
