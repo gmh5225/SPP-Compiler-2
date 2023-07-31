@@ -390,7 +390,7 @@ class TypeInference:
         function_name = Ast.IdentifierAst(BIN_FUNCTION_NAMES[ast.op.tok.token_type], idx)
         member_access = Ast.PostfixMemberAccessAst(Ast.TokenAst(Token(".", TokenType.TkDot), idx), function_name, idx)
         member_access = Ast.PostfixExpressionAst(ast.lhs, member_access, idx)
-        function_call = Ast.PostfixFunctionCallAst([], [Ast.FunctionArgumentAst(None, ast.rhs, None, False, idx)], idx) # todo : convention
+        function_call = Ast.PostfixFunctionCallAst([], [Ast.FunctionArgumentAst(None, ast.rhs, Ast.ParameterPassingConventionReferenceAst(False, idx), False, idx)], idx) # todo : convention
         function_call = Ast.PostfixExpressionAst(member_access, function_call, idx)
         return TypeInference.infer_type_of_expression(function_call, s)
 
