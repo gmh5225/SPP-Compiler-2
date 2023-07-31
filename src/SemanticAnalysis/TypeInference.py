@@ -31,6 +31,8 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : exhaustion or default for "if comparisons" that are for assignment => add optional param to "check-if"...
 # todo : fold expressions
 # todo : partial functions with underscore placeholder -> make a new type, also memory rules
+# todo : allow parameters in override to be a more specific derived class
+#   - probably required "Self" to be inferred properly then the derived check works elegantly too
 
 
 BIN_FUNCTION_NAMES = {
