@@ -6,17 +6,16 @@ import difflib
 
 from src.LexicalAnalysis.Tokens import Token, TokenType
 from src.SyntacticAnalysis import Ast
-from src.SemanticAnalysis.SymbolGeneration import ScopeHandler, convert_type_to_string, convert_multi_identifier_to_string, convert_convention_to_string
+from src.SemanticAnalysis.SymbolGeneration import ScopeHandler, convert_type_to_string, convert_multi_identifier_to_string, convert_convention_to_string, function_identifier_strip_signature
 from src.SyntacticAnalysis.Parser import ErrFmt
 
 
-# todo : make types equal their base types
+# todo : document that overloading cannot be done my mutability of parameters
+
 # todo : where block (requires generics)
 # todo : value guards
-# todo : incorrect function signature needs to take references into account too ie f(Num) doesn't exist => f(&Num) doesn't exist etc
 # todo : optional and variadic parameters
 # todo : check module identifier is correct (matches file name & path/directory)
-# todo : base class auto upcast? maybe make it explicit => std.upcast[T](...)
 # todo : type inference for lambdas
 # todo : all things "type generics"
 # todo : mutability checks
@@ -28,17 +27,15 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : memory checks
 #   - enforce the law of exclusivity for member-access-attributes (locals done)
 #   - consuming self (will require function selection)
-#   - cannot move from a borrowed context
+#   - cannot move from a borrowed context & partial moves
 #   - the move checks in function calls -> also perform in struct initialization
-# todo : "partial moves"
+#   - fix "self" being &Self but passing to a &mut Self method etc
 # todo : symbol initialization for tuple types
 # todo : all things lambdas => maybe convert into a function prototype?
 # todo : sup methods can only override methods defined in the base class that are virtual or abstract (overrideable)
 # todo : exhaustion or default for "if comparisons" that are for assignment => add optional param to "check-if"...
 # todo : fold expressions
 # todo : partial functions with underscore placeholder -> make a new type, also memory rules
-# todo : allow parameters in override to be a more specific derived class
-# todo : alternative signatures in classes not found? check for [self. ...]
 # todo : some errors say "identifier ... not found", should say "attribute ... not found"
 # todo : assignment needs to allow assigning a more derived class onto a base class type
 
@@ -167,7 +164,7 @@ class TypeInference:
     def infer_type_of_parameter(ast: Ast.FunctionParameterAst, s: ScopeHandler) -> None:
         # Check the type of parameter exists, and if the parameter has a default value, check the expression. This
         # expression will actually be evaluated per call at runtime, so only type info is needed here.
-        ast.type_annotation = TypeInference.infer_type_of_type(ast.type_annotation, s)
+        TypeInference.infer_type_of_type(ast.type_annotation, s)
         TypeInference.infer_type_of_expression(ast.default_value, s) if ast.default_value else None
         MemoryEnforcer.set_variable_initialized([ast.identifier], s, True)
         s.current_scope.get_symbol(ast.identifier.identifier).defined = True
@@ -507,17 +504,27 @@ class TypeInference:
         lhs = ast.lhs
         arg_conventions = [arg.calling_convention for arg in ast.op.arguments]
         while isinstance(lhs, Ast.PostfixExpressionAst) and isinstance(lhs.op, Ast.PostfixMemberAccessAst):
+            self_type = TypeInference.infer_type_of_expression(lhs.lhs, s)
             lhs = lhs.op
             if isinstance(lhs.identifier, Ast.IdentifierAst):
                 lhs = lhs.identifier
                 lhs.identifier += f"#{','.join([convert_convention_to_string(conv) + '|' + convert_type_to_string(arg_type) for conv, arg_type in zip(arg_conventions, arg_types)])}"
+
+                # todo : this allows an &Self to be used for &mut Self, and other memory violations
+                # todo : also allows things like &Self to be used as Self - obviously wrong
+                if not lhs.identifier.split("#")[1]:
+                    lhs.identifier += f"???|{convert_type_to_string(self_type)}"
+                else:
+                    lhs.identifier = lhs.identifier.split("#")[0] + f"#???|{convert_type_to_string(self_type)}," + lhs.identifier.split("#")[1]
                 break
         else:
             if isinstance(lhs, Ast.IdentifierAst):
                 lhs.identifier += f"#{','.join([convert_convention_to_string(conv) + '|' + convert_type_to_string(arg_type) for conv, arg_type in zip(arg_conventions, arg_types)])}"
+            else:
+                print("???")
 
-        # Get the function type from the symbol table, and return the return type of the function, from the generic
-        # type of the function ie FnRef[Output, (Args)]. The return type is the first generic argument.
+        # Get the function type from the symbol table, and return the return type of the function, from the generic type
+        # of the function ie FnRef[Output, (Args)]. The return type is the first generic argument.
         lhs_type = TypeInference.infer_type_of_expression(ast.lhs, s, call=True)
         lhs.identifier = lhs.identifier.split("#")[0]
         lhs_type = lhs_type.parts[-1].generic_arguments[0].value
@@ -805,20 +812,3 @@ class MemoryEnforcer:
 
 class CompiletimeDecorators:
     ...
-
-
-def function_identifier_strip_signature(identifier: str, string_ref: bool = False) -> str:
-    stripped = identifier.replace("#", "(").replace(",", ", ") + ")"
-    if not string_ref:
-        stripped = re.sub(r"(one|ref|mut)\|", "", stripped)
-    else:
-        while True:
-            if "one|" in stripped:
-                stripped = stripped.replace("one|", "")
-            elif "ref|" in stripped:
-                stripped = stripped.replace("ref|", "&")
-            elif "mut|" in stripped:
-                stripped = stripped.replace("mut|", "&mut ")
-            else:
-                break
-    return stripped

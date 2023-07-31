@@ -5,6 +5,8 @@ from src.SyntacticAnalysis import Ast
 from src.SyntacticAnalysis.Parser import Parser, ErrFmt
 from src.LexicalAnalysis.Lexer import Lexer
 
+import re
+
 CURRENT_MODULE_MEMBER: Optional[Ast.TypeAst] = None
 
 class Symbol:
@@ -20,6 +22,8 @@ class Symbol:
     initialized: bool
     defined: bool # ie exists but not initialized
     mutable: bool
+    # borrowed_ref: bool
+    # borrowed_mut: bool
 
     def __init__(self, name: str, type_: Optional[Ast.TypeAst], value: Optional[Ast.ExpressionAst], index: int = 0, mutable: bool = False):
         self.name = name
@@ -32,6 +36,8 @@ class Symbol:
         self.initialized = self.value is not None
         self.defined = False
         self.mutable = mutable
+        # self.borrowed_ref = False
+        # self.borrowed_mut = False
 
     def json(self) -> dict[str, any]:
         d = {
@@ -91,6 +97,22 @@ class Scope:
         self.sup_scopes = []
 
     def add_symbol(self, symbol: Symbol):
+        if "#" in (name := symbol.name):
+            params_a = name.split("#")[1].split(",")
+            params_a = [p.split("|")[1] for p in params_a]
+
+            for symbol_name in self.all_symbols():
+                if "#" not in symbol_name: continue
+                if symbol_name.split("#")[0] != name.split("#")[0]: continue
+
+                symbol_b = self.get_symbol(symbol_name)
+                params_b = symbol_b.name.split("#")[1].split(",")
+                params_b = [p.split("|")[1] for p in params_b]
+
+                if len(params_a) != len(params_b): continue
+                if all([p_a == p_b for p_a, p_b in zip(params_a, params_b)]):
+                    raise SystemExit(ErrFmt.err(symbol.type._tok) + f"Invalid function overload '{function_identifier_strip_signature(name, string_ref=True)}'")
+
         self.symbols.add(symbol)
 
     def add_type(self, symbol: Symbol):
@@ -119,6 +141,7 @@ class Scope:
 
                 if "#" not in symbol_name: continue
                 if symbol_name.split("#")[0] != name.split("#")[0]: continue
+
                 symbol = self.get_symbol(symbol_name)
                 params_b = symbol.name.split("#")[1].split(",")
                 conv_b = [p.split("|")[0] for p in params_b]
@@ -126,7 +149,8 @@ class Scope:
 
                 if len(params_a) != len(params_b): continue
                 for p_a, p_b, c_a, c_b in zip(params_a, params_b, conv_a, conv_b):
-                    if c_a == c_b:
+                    if c_a == c_b or c_a == "???":
+
                         if p_a == p_b: continue
 
                         # get the base classes of p_a
@@ -346,7 +370,7 @@ class SymbolTableBuilder:
     @staticmethod
     def build_let_statement_symbols(ast: Ast.LetStatementAst, s: ScopeHandler) -> None:
         for i, variable in enumerate(ast.variables):
-            s.current_scope.add_symbol(Symbol(convert_identifier_to_string(variable.identifier), normalize_type(ast.type_annotation), ast.value, index=i, mutable=variable.is_mutable))
+            s.current_scope.add_symbol(Symbol(convert_identifier_to_string(variable.identifier), normalize_type(ast.type_annotation) if ast.type_annotation else None, ast.value, index=i, mutable=variable.is_mutable))
             if ast.value: SymbolTableBuilder.build_expression_symbols(ast.value, s)
         if ast.if_null:
             SymbolTableBuilder.build_inner_scope_symbols(ast.if_null, s)
@@ -539,3 +563,21 @@ def normalize_type(ast: Ast.TypeAst) -> Ast.TypeAst:
             ast.parts.insert(0, p)
 
     return ast
+
+def function_identifier_strip_signature(identifier: str, string_ref: bool = False) -> str:
+    stripped = identifier.replace("#", "(").replace(",", ", ") + ")"
+    if not string_ref:
+        stripped = re.sub(r"(one|ref|mut)\|", "", stripped)
+    else:
+        while True:
+            if "one|" in stripped:
+                stripped = stripped.replace("one|", "")
+            elif "ref|" in stripped:
+                stripped = stripped.replace("ref|", "&")
+            elif "mut|" in stripped:
+                stripped = stripped.replace("mut|", "&mut ")
+            elif "???" in stripped:
+                stripped = stripped.replace("???|", "[infer]")
+            else:
+                break
+    return stripped
