@@ -18,8 +18,9 @@ class Symbol:
     # memory
     initialized: bool
     defined: bool # ie exists but not initialized
+    mutable: bool
 
-    def __init__(self, name: str, type_: Optional[Ast.TypeAst], value: Optional[Ast.ExpressionAst], index: int = 0):
+    def __init__(self, name: str, type_: Optional[Ast.TypeAst], value: Optional[Ast.ExpressionAst], index: int = 0, mutable: bool = False):
         self.name = name
         self.type = type_
         self.value = value
@@ -29,6 +30,7 @@ class Symbol:
 
         self.initialized = self.value is not None
         self.defined = False
+        self.mutable = mutable
 
     def json(self) -> dict[str, any]:
         d = {
@@ -276,7 +278,7 @@ class SymbolTableBuilder:
         # symbol. Add the generic type parameters as types. Finally, recursively visit each statement in the function
         # body to build symbols for nested members.
         for param in ast.parameters:
-            s.current_scope.add_symbol(Symbol(convert_identifier_to_string(param.identifier), param.type_annotation, None))
+            s.current_scope.add_symbol(Symbol(convert_identifier_to_string(param.identifier), param.type_annotation, None, mutable=param.is_mutable))
         for generic in ast.generic_parameters:
             s.current_scope.add_type(Symbol(convert_identifier_to_string(generic.identifier), None, None))
         for statement in ast.body.statements:
@@ -309,7 +311,7 @@ class SymbolTableBuilder:
     @staticmethod
     def build_let_statement_symbols(ast: Ast.LetStatementAst, s: ScopeHandler) -> None:
         for i, variable in enumerate(ast.variables):
-            s.current_scope.add_symbol(Symbol(convert_identifier_to_string(variable.identifier), ast.type_annotation, ast.value, i))
+            s.current_scope.add_symbol(Symbol(convert_identifier_to_string(variable.identifier), ast.type_annotation, ast.value, index=i, mutable=variable.is_mutable))
             if ast.value: SymbolTableBuilder.build_expression_symbols(ast.value, s)
         if ast.if_null:
             SymbolTableBuilder.build_inner_scope_symbols(ast.if_null, s)
@@ -374,7 +376,7 @@ class SymbolTableBuilder:
     @staticmethod
     def build_with_statement_symbols(ast: Ast.WithStatementAst, s: ScopeHandler) -> None:
         s.enter_scope("WithStatement")
-        s.current_scope.add_symbol(Symbol(convert_identifier_to_string(ast.alias.identifier), None, None))
+        s.current_scope.add_symbol(Symbol(convert_identifier_to_string(ast.alias.identifier), None, None, mutable=ast.alias.is_mutable))
         for statement in ast.body:
             SymbolTableBuilder.build_statement_symbols(statement, s)
         s.exit_scope()
@@ -384,7 +386,7 @@ class SymbolTableBuilder:
         s.current_scope.add_type(Symbol(convert_identifier_to_string(ast.identifier), None, None))
         s.enter_scope(f"ClsPrototype__{convert_identifier_to_string(ast.identifier)}")
         for member in ast.body.members:
-            s.current_scope.add_symbol(Symbol(convert_identifier_to_string(member.identifier), member.type_annotation, None))
+            s.current_scope.add_symbol(Symbol(convert_identifier_to_string(member.identifier), member.type_annotation, None, mutable=member.is_mutable))
         s.exit_scope()
 
     @staticmethod

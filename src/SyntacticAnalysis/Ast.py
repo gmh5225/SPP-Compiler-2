@@ -18,7 +18,7 @@ class TokenAst:
 
 @dataclass
 class ParameterPassingConventionReferenceAst:
-    mutable: bool
+    is_mutable: bool
     _tok: int
 
 
@@ -104,7 +104,7 @@ class ModulePrototypeAst:
 @dataclass
 class ClassAttributeAst:
     decorators: list[DecoratorAst]
-    mutable: bool
+    is_mutable: bool
     identifier: IdentifierAst
     type_annotation: TypeAst
     _tok: int

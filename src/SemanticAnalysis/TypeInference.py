@@ -25,6 +25,7 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 #   - enforce the law of exclusivity for member-access-attributes (locals done)
 #   - consuming self (will require function selection)
 #   - cannot move from a borrowed context
+#   - match parameter and argument calling conventions
 # todo : "partial moves"
 # todo : symbol initialization for tuple types
 # todo : all things lambdas => maybe convert into a function prototype?
@@ -470,14 +471,14 @@ class TypeInference:
         mut_args = set()
         arg_types = []
 
-        for a in ast.op.arguments:
+        for i, a in enumerate(ast.op.arguments):
             arg_types.append(TypeInference.infer_type_of_expression(a.value, s))
             # Check that the value to be moved is initialized, and if so, mark it as uninitialized, as it is being
             # moved into the function call.
             if isinstance(a.value, Ast.IdentifierAst) and not MemoryEnforcer.get_variable_initialized(a.value, s):
                 raise SystemExit(ErrFmt.err(a.value._tok) + f"Argument '{a.value.identifier}' is not initialized or has been moved.")
 
-            if isinstance(a.value, Ast.IdentifierAst) and a.calling_convention and a.calling_convention.mutable:
+            if isinstance(a.value, Ast.IdentifierAst) and a.calling_convention and a.calling_convention.is_mutable:
                 if a.value in ref_args:
                     raise SystemExit(ErrFmt.err(a.value._tok) + f"Cannot take a mutable reference to a value already immutably referenced.")
                 if a.value in mut_args:
@@ -507,9 +508,9 @@ class TypeInference:
             if isinstance(lhs, Ast.IdentifierAst):
                 lhs.identifier += f"#{','.join([convert_type_to_string(arg_type) for arg_type in arg_types])}"
 
-
+        # Get the function type from the symbol table, and return the return type of the function, from the generic
+        # type of the function ie FnRef[Output, (Args)]. The return type is the first generic argument.
         lhs_type = TypeInference.infer_type_of_expression(ast.lhs, s, call=True)
-        assert isinstance(lhs, Ast.IdentifierAst), f"{type(lhs)}"
         lhs.identifier = lhs.identifier.split("#")[0]
         lhs_type = lhs_type.parts[-1].generic_arguments[0].value
         return lhs_type
@@ -641,6 +642,19 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_assignment_expression(ast: Ast.AssignmentExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+        for lhs in ast.lhs:
+            symbol = None
+            if isinstance(lhs, Ast.IdentifierAst):
+                symbol = s.current_scope.get_symbol(lhs.identifier)
+            else:
+                # Get the LHS but not the innermost member access, because the innermost member access is the actual
+                # variable being assigned to, and the outer member accesses are just for accessing the variable.
+                lhs_type = TypeInference.infer_type_of_expression(lhs.lhs, s)
+                lhs_type_scope = s.global_scope.get_child_scope_for_cls(lhs_type.parts[-1].identifier)
+                symbol = lhs_type_scope.get_symbol(lhs.op.identifier.identifier)
+            if not symbol.mutable:
+                raise SystemExit(ErrFmt.err(ast.op._tok) + f"Cannot assign to immutable variable.")
+
         rhs_type = TypeInference.infer_type_of_expression(ast.rhs, s)
         if rhs_type == CommonTypes.void():
             raise SystemExit(ErrFmt.err(ast.rhs._tok) + f"Cannot assign Void to a variable.")
