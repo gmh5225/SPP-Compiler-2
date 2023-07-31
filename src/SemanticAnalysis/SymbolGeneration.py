@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from src.SyntacticAnalysis import Ast
 from src.SyntacticAnalysis.Parser import Parser, ErrFmt
@@ -24,6 +24,7 @@ class Symbol:
     mutable: bool
     borrowed_ref: bool
     borrowed_mut: bool
+    meta: dict[str, Any]
 
     def __init__(self, name: str, type_: Optional[Ast.TypeAst], value: Optional[Ast.ExpressionAst], **kwargs):
         self.name = name
@@ -38,6 +39,7 @@ class Symbol:
         self.mutable = kwargs.get("mutable", False)
         self.borrowed_ref = kwargs.get("borrowed_ref", False)
         self.borrowed_mut = kwargs.get("borrowed_mut", False)
+        self.meta = {}
 
     def json(self) -> dict[str, any]:
         d = {

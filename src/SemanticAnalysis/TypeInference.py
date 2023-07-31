@@ -37,6 +37,12 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : partial functions with underscore placeholder -> make a new type, also memory rules
 # todo : some errors say "identifier ... not found", should say "attribute ... not found"
 # todo : assignment needs to allow assigning a more derived class onto a base class type
+# todo : all things "yielding"
+
+# todo : unify behaviour for "let", "=" and func-call()
+#   - change "let x = 3" to "let x: Num", "x=3"
+#   - change "x = 3" to x.assign(3)
+#   - so "let x = 3" becomes "let x: Num; x.assign(3)"
 
 
 BIN_FUNCTION_NAMES = {
@@ -79,7 +85,7 @@ class TypeInference:
     @staticmethod
     def infer_type_of_program(ast: Ast.ProgramAst, s: ScopeHandler) -> None:
         for decorator in ast.module.decorators:
-            TypeInference.infer_type_of_decorator(decorator, s)
+            TypeInference.infer_type_of_decorator(ast, decorator, s)
 
         for module_member in ast.module.body.members:
             match module_member:
@@ -98,7 +104,7 @@ class TypeInference:
     def infer_type_of_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> None:
         # Handle all the decorators
         for decorator in ast.decorators:
-            TypeInference.infer_type_of_decorator(decorator, s)
+            TypeInference.infer_type_of_decorator(ast, decorator, s)
 
         s.next_scope()
         # Run semantic checks for each parameter in the function prototype. This will handle type-checking and default
@@ -125,7 +131,7 @@ class TypeInference:
         s.prev_scope()
 
     @staticmethod
-    def infer_type_of_decorator(ast: Ast.DecoratorAst, s: ScopeHandler) -> None:
+    def infer_type_of_decorator(enclosing, ast: Ast.DecoratorAst, s: ScopeHandler) -> None:
         match convert_multi_identifier_to_string(ast.identifier):
             case "private":
                 ...
@@ -134,18 +140,27 @@ class TypeInference:
             case "protected":
                 ...
             case "virtualmethod":
-                ...
+                if not isinstance(enclosing, Ast.FunctionPrototypeAst):
+                    raise SystemExit(ErrFmt.err(ast._tok) + f"Decorator '@virtualmethod' can only be used on functions.")
+                symbol = s.current_scope.get_symbol(enclosing.identifier.identifier)
+                symbol.meta["virtual"] = True
             case "abstractmethod":
-                ...
+                if not isinstance(enclosing, Ast.FunctionPrototypeAst):
+                    raise SystemExit(ErrFmt.err(ast._tok) + f"Decorator '@abstractmethod' can only be used on functions.")
+                symbol = s.current_scope.get_symbol(enclosing.identifier.identifier)
+                symbol.meta["abstract"] = True
             case "staticmethod":
-                ...
+                if not isinstance(enclosing, Ast.FunctionPrototypeAst):
+                    raise SystemExit(ErrFmt.err(ast._tok) + f"Decorator '@staticmethod' can only be used on functions.")
+                symbol = s.current_scope.get_symbol(enclosing.identifier.identifier)
+                symbol.meta["static"] = True
             case _:
                 ...
 
     @staticmethod
     def infer_type_of_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeHandler) -> None:
         for decorator in ast.decorators:
-            TypeInference.infer_type_of_decorator(decorator, s)
+            TypeInference.infer_type_of_decorator(ast, decorator, s)
 
         s.next_scope()
         for member in ast.body.members:
@@ -155,7 +170,7 @@ class TypeInference:
     @staticmethod
     def infer_type_of_class_attribute(ast: Ast.ClassAttributeAst, s: ScopeHandler) -> None:
         for decorator in ast.decorators:
-            TypeInference.infer_type_of_decorator(decorator, s)
+            TypeInference.infer_type_of_decorator(ast, decorator, s)
 
         TypeInference.infer_type_of_type(ast.type_annotation, s)
 
@@ -196,18 +211,31 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_sup_method_prototype(ast: Ast.SupMethodPrototypeAst, sup_block: Ast.SupPrototypeNormalAst | Ast.SupPrototypeInheritanceAst, s: ScopeHandler) -> None:
+        # Some extra checks for inheritance -- the method must exist in the super class, and the method must be
+        # decorated as virtual or abstract. If not, then throw an error.
         if isinstance(sup_block, Ast.SupPrototypeInheritanceAst):
             super_class_scope = s.global_scope.get_child_scope_for_cls(convert_type_to_string(sup_block.super_class))
+
+            # Check that the super class being super-imposed onto this class contains the member being overridden.
+            # Simple symbol table lookup to check if the symbol exists.
             if not super_class_scope.has_symbol(ast.identifier.identifier):
                 bad_function_identifier = function_identifier_strip_signature(ast.identifier.identifier, string_ref=True)
                 raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{bad_function_identifier}' not found in super class '{convert_type_to_string(sup_block.super_class)}'.")
+
+            # Check that the super class member being overridden is decorated as virtual or abstract. If not, then
+            # throw an error.
+            function_symbol = super_class_scope.get_symbol(ast.identifier.identifier)
+            if not function_symbol.meta.get("virtual") and not function_symbol.meta.get("abstract"):
+                bad_function_identifier = function_identifier_strip_signature(ast.identifier.identifier, string_ref=True)
+                raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{bad_function_identifier}' in super class '{convert_type_to_string(sup_block.super_class)}' is not virtual or abstract.")
+
 
         TypeInference.infer_type_of_function_prototype(ast, s)
 
     @staticmethod
     def infer_type_of_sup_typedef(ast: Ast.SupTypedefAst, s: ScopeHandler) -> None:
         for decorator in ast.decorators:
-            TypeInference.infer_type_of_decorator(decorator, s)
+            TypeInference.infer_type_of_decorator(ast, decorator, s)
         TypeInference.infer_type_of_typedef(ast, s)
 
     @staticmethod
