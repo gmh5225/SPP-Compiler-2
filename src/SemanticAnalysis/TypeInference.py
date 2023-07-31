@@ -10,6 +10,9 @@ from src.SemanticAnalysis.SymbolGeneration import ScopeHandler, convert_type_to_
 from src.SyntacticAnalysis.Parser import ErrFmt
 
 
+# todo : make types equal their base types
+# todo : where block (requires generics)
+# todo : value guards
 # todo : incorrect function signature needs to take references into account too ie f(Num) doesn't exist => f(&Num) doesn't exist etc
 # todo : optional and variadic parameters
 # todo : check module identifier is correct (matches file name & path/directory)
@@ -26,6 +29,7 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 #   - enforce the law of exclusivity for member-access-attributes (locals done)
 #   - consuming self (will require function selection)
 #   - cannot move from a borrowed context
+#   - the move checks in function calls -> also perform in struct initialization
 # todo : "partial moves"
 # todo : symbol initialization for tuple types
 # todo : all things lambdas => maybe convert into a function prototype?
@@ -36,9 +40,6 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : allow parameters in override to be a more specific derived class
 # todo : alternative signatures in classes not found? check for [self. ...]
 # todo : some errors say "identifier ... not found", should say "attribute ... not found"
-
-
-CURRENT_MODULE_MEMBER: Optional[Ast.TypeAst] = None
 
 
 BIN_FUNCTION_NAMES = {
@@ -80,13 +81,10 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_program(ast: Ast.ProgramAst, s: ScopeHandler) -> None:
-        global CURRENT_MODULE_MEMBER
-
         for decorator in ast.module.decorators:
             TypeInference.infer_type_of_decorator(decorator, s)
 
         for module_member in ast.module.body.members:
-            CURRENT_MODULE_MEMBER = None
             match module_member:
                 case Ast.FunctionPrototypeAst(): TypeInference.infer_type_of_function_prototype(module_member, s)
                 case Ast.ClassPrototypeAst(): TypeInference.infer_type_of_class_prototype(module_member, s)
@@ -149,9 +147,6 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeHandler) -> None:
-        global CURRENT_MODULE_MEMBER
-        CURRENT_MODULE_MEMBER = Ast.TypeSingleAst([Ast.GenericIdentifierAst(ast.identifier.identifier, [], ast.identifier._tok)], ast.identifier._tok)
-
         for decorator in ast.decorators:
             TypeInference.infer_type_of_decorator(decorator, s)
 
@@ -191,9 +186,6 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_sup_prototype(ast: Ast.SupPrototypeNormalAst | Ast.SupPrototypeInheritanceAst, s: ScopeHandler) -> None:
-        global CURRENT_MODULE_MEMBER
-        CURRENT_MODULE_MEMBER = ast.identifier
-
         s.next_scope()
 
         if isinstance(ast, Ast.SupPrototypeInheritanceAst):
@@ -210,7 +202,7 @@ class TypeInference:
         if isinstance(sup_block, Ast.SupPrototypeInheritanceAst):
             super_class_scope = s.global_scope.get_child_scope_for_cls(convert_type_to_string(sup_block.super_class))
             if not super_class_scope.has_symbol(ast.identifier.identifier):
-                bad_function_identifier = function_identifier_strip_signature(ast.identifier.identifier)
+                bad_function_identifier = function_identifier_strip_signature(ast.identifier.identifier, string_ref=True)
                 raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{bad_function_identifier}' not found in super class '{convert_type_to_string(sup_block.super_class)}'.")
 
         TypeInference.infer_type_of_function_prototype(ast, s)
@@ -713,31 +705,15 @@ class TypeInference:
 
     @staticmethod
     def infer_type_of_type(ast: Ast.TypeSingleAst | Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
-        # For a tuple type, check that each type in the tuple is a valid type, by recursively calling this function.
-        # Return the same ast back out, as the inference of a type node is the same as the type node itself.
-        if isinstance(ast, Ast.TypeTupleAst):
-            for type in ast.types:
-                TypeInference.infer_type_of_type(type, s)
-            return ast
-
-        # Infer the "Self" keyword to the current class type. This is done by moving up the scopes until the current
-        # scope is the class scope, and then getting the type of the class.
-        # todo : infer Self for a "sup" scope
-        if isinstance(ast.parts[0], Ast.SelfTypeAst):
-            if not CURRENT_MODULE_MEMBER:
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot use 'Self' outside of a class.")
-
-            # Change the "Self" to the actual class name. The "Self" is only able to be the first part of a type, so
-            # only "ast.part[0]" has to be inspected and changed.
-            ast.parts = ast.parts[1:]
-            for p in reversed(CURRENT_MODULE_MEMBER.parts):
-                ast.parts.insert(0, p)
-
         # Check if the type exists, by checking the string representation of the type against the types in the current
         # scope (and its parent scopes). If the type doesn't exist, throw an error.
         identifier = convert_type_to_string(ast)
-        if not s.current_scope.has_type(identifier):
-            raise SystemExit(ErrFmt.err(ast._tok) + f"Type {identifier} not found.")
+        if isinstance(ast, Ast.TypeTupleAst):
+            for t in ast.types:
+                TypeInference.infer_type_of_type(t, s)
+
+        elif not s.current_scope.has_type(identifier):
+            raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{identifier}' not found.")
 
         # If the type exists, return the type.
         return ast

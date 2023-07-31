@@ -5,6 +5,7 @@ from src.SyntacticAnalysis import Ast
 from src.SyntacticAnalysis.Parser import Parser, ErrFmt
 from src.LexicalAnalysis.Lexer import Lexer
 
+CURRENT_MODULE_MEMBER: Optional[Ast.TypeAst] = None
 
 class Symbol:
     name: str
@@ -107,6 +108,39 @@ class Scope:
             if sup_scope.symbols.has(name):
                 return sup_scope.symbols.get(name)
 
+        # base class checks for fn
+        if "#" in name:
+            # allow for params to match base types
+            params_a = name.split("#")[1].split(",")
+            conv_a = [p.split("|")[0] for p in params_a]
+            params_a = [p.split("|")[1] for p in params_a]
+            for symbol_name in self.all_symbols():
+                match = True
+
+                if "#" not in symbol_name: continue
+                if symbol_name.split("#")[0] != name.split("#")[0]: continue
+                symbol = self.get_symbol(symbol_name)
+                params_b = symbol.name.split("#")[1].split(",")
+                conv_b = [p.split("|")[0] for p in params_b]
+                params_b = [p.split("|")[1] for p in params_b]
+
+                if len(params_a) != len(params_b): continue
+                for p_a, p_b, c_a, c_b in zip(params_a, params_b, conv_a, conv_b):
+                    if c_a == c_b:
+                        if p_a == p_b: continue
+
+                        # get the base classes of p_a
+                        p_a_type = self.get_type(p_a)
+                        p_a_bases = p_a_type.bases
+                        if p_b in [convert_type_to_string(b) for b in p_a_bases]: continue
+
+                    # not a match
+                    match = False
+                    break
+
+                if match: return symbol
+
+
         raise Exception(f"Symbol '{name}' not found")
 
     def get_type(self, name: str) -> Symbol:
@@ -119,18 +153,11 @@ class Scope:
         raise Exception(f"Type '{name}' not found")
 
     def has_symbol(self, name: str) -> bool:
-        current = self
-        while current is not None:
-            if current.symbols.has(name):
-                return True
-            current = current.parent
-
-        # next check linked sup-scopes
-        for sup_scope in self.sup_scopes:
-            if sup_scope.symbols.has(name):
-                return True
-
-        return False
+        try:
+            self.get_symbol(name)
+            return True
+        except:
+            return False
 
     def has_type(self, name: str) -> bool:
         current = self
@@ -241,9 +268,11 @@ class SymbolTableBuilder:
 
     @staticmethod
     def build_program_symbols(ast: Ast.ProgramAst, s: ScopeHandler) -> None:
+        global CURRENT_MODULE_MEMBER
         # Match each module member by AST type, and call the appropriate function to build the symbols for that member.
         # This will recursively call into other functions to build symbols for nested members.
         for module_member in ast.module.body.members:
+            CURRENT_MODULE_MEMBER = None
             match module_member:
                 case Ast.FunctionPrototypeAst(): SymbolTableBuilder.build_function_prototype_symbols(module_member, s)
                 case Ast.ClassPrototypeAst(): SymbolTableBuilder.build_class_prototype_symbols(module_member, s)
@@ -273,24 +302,25 @@ class SymbolTableBuilder:
 
     @staticmethod
     def build_function_prototype_symbols(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> None:
-        # Add the function prototype to the current scope, and enter a new scope for the function body.
-        ast.identifier.identifier += f"#{','.join([convert_convention_to_string(p.calling_convention) + '|' + convert_type_to_string(p.type_annotation) for p in ast.parameters])}"
-
-        s.current_scope.add_symbol(Symbol(convert_identifier_to_string(ast.identifier), get_function_type(ast), None))
         s.enter_scope(f"FnPrototype__{convert_identifier_to_string(ast.identifier)}")
 
         # Register the function parameters as symbols with their type annotations used to determine the type of the
         # symbol. Add the generic type parameters as types. Finally, recursively visit each statement in the function
         # body to build symbols for nested members.
         for param in ast.parameters:
-            s.current_scope.add_symbol(Symbol(convert_identifier_to_string(param.identifier), param.type_annotation, None, mutable=param.is_mutable))
+            s.current_scope.add_symbol(Symbol(convert_identifier_to_string(param.identifier), normalize_type(param.type_annotation), None, mutable=param.is_mutable))
         for generic in ast.generic_parameters:
             s.current_scope.add_type(Symbol(convert_identifier_to_string(generic.identifier), None, None))
         for statement in ast.body.statements:
             SymbolTableBuilder.build_statement_symbols(statement, s)
+        ast.return_type = normalize_type(ast.return_type)
 
         # Exit the function body scope and return to the parent scope.
         s.exit_scope()
+
+        # Add the function prototype to the current scope, and enter a new scope for the function body.
+        ast.identifier.identifier += f"#{','.join([convert_convention_to_string(p.calling_convention) + '|' + convert_type_to_string(p.type_annotation) for p in ast.parameters])}"
+        s.current_scope.add_symbol(Symbol(convert_identifier_to_string(ast.identifier), get_function_type(ast), None))
 
     @staticmethod
     def build_statement_symbols(ast: Ast.StatementAst, s: ScopeHandler) -> None:
@@ -307,7 +337,7 @@ class SymbolTableBuilder:
 
     @staticmethod
     def build_typedef_statement_symbols(ast: Ast.TypedefStatementAst, s: ScopeHandler) -> None:
-        s.current_scope.add_type(Symbol(convert_type_to_string(ast.new_type), ast.old_type, None))
+        s.current_scope.add_type(Symbol(convert_type_to_string(ast.new_type), normalize_type(ast.old_type), None))
 
     @staticmethod
     def build_return_statement_symbols(ast: Ast.ReturnStatementAst, s: ScopeHandler) -> None:
@@ -316,7 +346,7 @@ class SymbolTableBuilder:
     @staticmethod
     def build_let_statement_symbols(ast: Ast.LetStatementAst, s: ScopeHandler) -> None:
         for i, variable in enumerate(ast.variables):
-            s.current_scope.add_symbol(Symbol(convert_identifier_to_string(variable.identifier), ast.type_annotation, ast.value, index=i, mutable=variable.is_mutable))
+            s.current_scope.add_symbol(Symbol(convert_identifier_to_string(variable.identifier), normalize_type(ast.type_annotation), ast.value, index=i, mutable=variable.is_mutable))
             if ast.value: SymbolTableBuilder.build_expression_symbols(ast.value, s)
         if ast.if_null:
             SymbolTableBuilder.build_inner_scope_symbols(ast.if_null, s)
@@ -388,10 +418,13 @@ class SymbolTableBuilder:
 
     @staticmethod
     def build_class_prototype_symbols(ast: Ast.ClassPrototypeAst, s: ScopeHandler) -> None:
+        global CURRENT_MODULE_MEMBER
+        CURRENT_MODULE_MEMBER = Ast.TypeSingleAst([Ast.GenericIdentifierAst(ast.identifier.identifier, [], ast.identifier._tok)], ast.identifier._tok)
+
         s.current_scope.add_type(Symbol(convert_identifier_to_string(ast.identifier), None, None))
         s.enter_scope(f"ClsPrototype__{convert_identifier_to_string(ast.identifier)}")
         for member in ast.body.members:
-            s.current_scope.add_symbol(Symbol(convert_identifier_to_string(member.identifier), member.type_annotation, None, mutable=member.is_mutable))
+            s.current_scope.add_symbol(Symbol(convert_identifier_to_string(member.identifier), normalize_type(member.type_annotation), None, mutable=member.is_mutable))
         s.exit_scope()
 
     @staticmethod
@@ -404,6 +437,9 @@ class SymbolTableBuilder:
 
     @staticmethod
     def build_sup_prototype_symbols(ast: Ast.SupPrototypeNormalAst | Ast.SupPrototypeInheritanceAst, s: ScopeHandler) -> None:
+        global CURRENT_MODULE_MEMBER
+        CURRENT_MODULE_MEMBER = ast.identifier
+
         if isinstance(ast, Ast.SupPrototypeInheritanceAst):
             s.global_scope.get_type(convert_type_to_string(ast.identifier)).bases.append(convert_type_to_string(ast.super_class))
 
@@ -452,7 +488,7 @@ def convert_type_to_string(ast: Ast.TypeAst) -> str:
         s = "("
         for p in ast.types:
             s += convert_type_to_string(p) + ", "
-        return (s[:-1] if len(s) > 1 else s) + ")"
+        return (s[:-2] if len(s) > 2 else s) + ")"
     elif isinstance(ast, str):
         return ast # temp (for type: "TODO") etc
     elif ast is None:
@@ -480,3 +516,26 @@ def convert_convention_to_string(ast: Ast.ParameterPassingConventionReferenceAst
     if not ast: return "one"
     if ast.is_mutable: return "mut"
     return "ref"
+
+def normalize_type(ast: Ast.TypeAst) -> Ast.TypeAst:
+    # For a tuple type, check that each type in the tuple is a valid type, by recursively calling this function.
+    # Return the same ast back out, as the inference of a type node is the same as the type node itself.
+    if isinstance(ast, Ast.TypeTupleAst):
+        for i, type in enumerate(ast.types):
+            ast.types[i] = normalize_type(type)
+        return ast
+
+    # Infer the "Self" keyword to the current class type. This is done by moving up the scopes until the current
+    # scope is the class scope, and then getting the type of the class.
+    if isinstance(ast.parts[0], Ast.SelfTypeAst):
+        enclosing_type = CURRENT_MODULE_MEMBER
+        if not enclosing_type:
+            raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot use 'Self' outside of a class.")
+
+        # Change the "Self" to the actual class name. The "Self" is only able to be the first part of a type, so
+        # only "ast.part[0]" has to be inspected and changed.
+        ast.parts = ast.parts[1:]
+        for p in reversed(enclosing_type.parts):
+            ast.parts.insert(0, p)
+
+    return ast
