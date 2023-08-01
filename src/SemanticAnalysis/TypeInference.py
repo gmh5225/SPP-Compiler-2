@@ -21,7 +21,6 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : mutability checks
 #   - calling mutable functions on immutable references
 # todo : visibility checks
-# todo : builtin decorators
 # todo : memory checks
 #   - enforce the law of exclusivity for member-access-attributes (locals done)
 #   - consuming self (will require function selection)
@@ -31,7 +30,6 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 #       - or just make is so that it is?
 # todo : symbol initialization for tuple types
 # todo : all things lambdas => maybe convert into a function prototype?
-# todo : sup methods can only override methods defined in the base class that are virtual or abstract (overrideable)
 # todo : exhaustion or default for "if comparisons" that are for assignment => add optional param to "check-if"...
 # todo : fold expressions
 # todo : partial functions with underscore placeholder -> make a new type, also memory rules
@@ -43,6 +41,23 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 #   - change "let x = 3" to "let x: Num", "x=3"
 #   - change "x = 3" to x.assign(3)
 #   - so "let x = 3" becomes "let x: Num; x.assign(3)"
+
+
+# todo : if/pattern statements:
+#   - make sure all patterns are valid
+#   - patterns can
+
+# todo : while statement
+#   - infinite loops => where nothing in the condition is changed in the loop
+
+# todo : pure/impure functions
+# todo : tail-call recursion
+
+# todo : where block
+#   - add the inline constraints from the type generics to the where block
+#   - check every type being constrained exists (even as generic params)
+#   - check every type it is being constrained to exists
+
 
 
 BIN_FUNCTION_NAMES = {
