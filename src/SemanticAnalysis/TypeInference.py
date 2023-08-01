@@ -14,7 +14,6 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 
 # todo : a string in a pattern errors?
 # todo : where block (requires generics)
-# todo : value guards
 # todo : optional and variadic parameters
 # todo : check module identifier is correct (matches file name & path/directory)
 # todo : type inference for lambdas
@@ -24,8 +23,8 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : visibility checks
 # todo : memory checks
 #   - enforce the law of exclusivity for member-access-attributes (locals done)
+#       - partial moves
 #   - consuming self (will require function selection)
-#   - partial moves
 #   - fix "self" being &Self but passing to a &mut Self method etc
 #   - convention matching issues => if a variable is a reference, then the "&" isn't required in the function call
 #       - or just make is so that it is?
@@ -37,6 +36,7 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : some errors say "identifier ... not found", should say "attribute ... not found"
 # todo : assignment needs to allow assigning a more derived class onto a base class type
 # todo : all things "yielding"
+# todo : FnRef vs FnMut vs FnOne
 
 # todo : unify behaviour for "let", "=" and func-call()
 #   - change "let x = 3" to "let x: Num", "x=3"
@@ -603,6 +603,13 @@ class TypeInference:
             else:
                 print("???")
 
+        # fn_symbol = s.current_scope.get_symbol(lhs.identifier)
+        # fn_ast = fn_symbol.value
+        # fn_param_types = [p.type_annotation for p in fn_ast.parameters]
+        # for g in fn_ast.generic_parameters:
+        #     if g not in fn_param_types:
+        #         raise SystemExit(ErrFmt.err(ast._tok) + f"Generic parameter '{g}' not cannot be inferred.")
+
         # Get the function type from the symbol table, and return the return type of the function, from the generic type
         # of the function ie FnRef[Output, (Args)]. The return type is the first generic argument.
         lhs_type = TypeInference.infer_type_of_expression(ast.lhs, s, call=True)
@@ -828,7 +835,7 @@ class TypeInference:
             for t in ast.types:
                 TypeInference.infer_type_of_type(t, s)
 
-        elif not s.current_scope.has_type(identifier):
+        elif not s.current_scope.has_type(identifier) and not s.current_scope.has_type(identifier + "?"):
             raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{identifier}' not found.")
 
         # If the type exists, return the type.

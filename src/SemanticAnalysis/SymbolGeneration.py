@@ -155,7 +155,6 @@ class Scope:
                 if len(params_a) != len(params_b): continue
                 for p_a, p_b, c_a, c_b in zip(params_a, params_b, conv_a, conv_b):
                     if c_a == c_b or c_a == "???":
-
                         if p_a == p_b: continue
 
                         # get the base classes of p_a
@@ -365,7 +364,7 @@ class SymbolTableBuilder:
 
         # Add the function prototype to the current scope, and enter a new scope for the function body.
         ast.identifier.identifier += f"#{','.join([convert_convention_to_string(p.calling_convention) + '|' + convert_type_to_string(p.type_annotation) for p in ast.parameters])}"
-        s.current_scope.add_symbol(Symbol(convert_identifier_to_string(ast.identifier), get_function_type(ast), None))
+        s.current_scope.add_symbol(Symbol(convert_identifier_to_string(ast.identifier), get_function_type(ast), ast))
 
     @staticmethod
     def build_statement_symbols(ast: Ast.StatementAst, s: ScopeHandler) -> None:
