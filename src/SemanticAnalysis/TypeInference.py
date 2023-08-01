@@ -44,10 +44,6 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 #   - so "let x = 3" becomes "let x: Num; x.assign(3)"
 
 
-# todo : if/pattern statements:
-#   - make sure comparison function exists
-
-
 # todo : pure/impure functions
 # todo : tail-call recursion
 
@@ -300,11 +296,15 @@ class TypeInference:
         # it's in the global scope, then the order doesn't matter - these are the functions, classes, enums etc.
         if (not s.current_scope.has_symbol(ast.identifier) or not s.current_scope.get_symbol(ast.identifier).defined) and not s.global_scope.has_symbol(ast.identifier):
             identifier = ast.identifier
+
+            # todo : not sure this is picking ip attributes
             candidate_symbols = [sym for sym in s.current_scope.all_symbols() if s.current_scope.get_symbol(sym).defined or s.global_scope.has_symbol(sym)]
             most_likely = (-1.0, "")
 
             # Check each candidate symbol
             for candidate in candidate_symbols:
+                if not call and "#" in candidate:
+                    continue
                 ratio = difflib.SequenceMatcher(None, identifier, candidate).ratio()
 
                 # If a more likely match is found, based on string comparison, then update the most likely match. This
