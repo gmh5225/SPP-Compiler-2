@@ -121,6 +121,11 @@ class TypeInference:
         for parameter in ast.parameters:
             TypeInference.infer_type_of_parameter(parameter, s)
 
+        # Make sure all the type generic parameters are inferrable
+        for type_generic in ast.generic_parameters:
+            if type_generic.identifier.identifier not in [convert_type_to_string(p.type_annotation) for p in ast.parameters]:
+                raise SystemExit(ErrFmt.err(type_generic._tok) + f"Type generic '{type_generic.identifier.identifier}' cannot be inferred.")
+
         # Run a type-infer on the return type so the Self type can be inferred prior to any return statement's type
         # check
         TypeInference.infer_type_of_type(ast.return_type, s)
@@ -605,6 +610,7 @@ class TypeInference:
 
         # fn_symbol = s.current_scope.get_symbol(lhs.identifier)
         # fn_ast = fn_symbol.value
+        # print("F", fn_ast)
         # fn_param_types = [p.type_annotation for p in fn_ast.parameters]
         # for g in fn_ast.generic_parameters:
         #     if g not in fn_param_types:
