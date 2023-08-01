@@ -113,11 +113,14 @@ class Scope:
 
                 if len(params_a) != len(params_b): continue
                 if all([p_a == p_b for p_a, p_b in zip(params_a, params_b)]):
-                    raise SystemExit(ErrFmt.err(symbol.type._tok) + f"Invalid function overload '{function_identifier_strip_signature(name, string_ref=True)}'")
+                    raise SystemExit(ErrFmt.err(symbol.type._tok) + f"Invalid function overload '{function_identifier_strip_signature(name, string_ref=True)}'.")
 
         self.symbols.add(symbol)
 
     def add_type(self, symbol: Symbol):
+        if any([symbol.name == s for s in self.types.symbols.keys()]):
+            raise SystemExit(ErrFmt.err(symbol.type._tok) + f"Type '{symbol.name}' already exists.")
+
         self.types.add(symbol)
 
     def get_symbol(self, name: str) -> Symbol:
@@ -209,6 +212,18 @@ class Scope:
 
     def all_exclusive_symbols(self) -> list[str]:
         return list(self.symbols.symbols.keys())
+
+    def all_types(self) -> list[str]:
+        current = self
+        types = []
+        while current is not None:
+            types += current.types.symbols.keys()
+            current = current.parent
+
+        return types
+
+    def all_exclusive_types(self) -> list[str]:
+        return list(self.types.symbols.keys())
 
     def get_child_scope_for_fn(self, fn_name: str) -> Optional[Scope]:
         for child in self.children:
