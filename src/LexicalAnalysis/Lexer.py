@@ -42,7 +42,7 @@ class Lexer:
                 match token[:2]:
                     # Do the same for the keywords, but also check that the next character isn't a letter, as otherwise
                     # the lexer will think that "mod_id" is "mod" and "id", rather than the "mod_id" identifier.
-                    case "Kw" if self._code[current:upper] == value and not self._code[upper].isalpha():
+                    case "Kw" if self._code[current:upper] == value and not (self._code[upper].isalpha() or self._code[upper] == "_"):
                         output.append(Token(value, TokenType[token]))
                         current += len(value)
                         break
