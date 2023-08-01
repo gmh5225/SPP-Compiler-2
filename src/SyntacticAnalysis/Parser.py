@@ -694,11 +694,10 @@ class Parser:
             p6 = self._parse_token(TokenType.TkArrowReturn).parse_once()
             p7 = self._parse_type_identifier().parse_once()
             p8 = self._parse_where_block().parse_optional()
-            p9 = self._parse_value_guard().parse_optional()
             p10 = self._parse_token(TokenType.TkBraceL).parse_once()
             p11 = self._parse_function_implementation().parse_once()
             p12 = self._parse_token(TokenType.TkBraceR).parse_once()
-            return Ast.FunctionPrototypeAst(p1, p2, p3, p4, p5, p7, p8, p9, p11, c1)
+            return Ast.FunctionPrototypeAst(p1, p2, p3, p4, p5, p7, p8, p11, c1)
         return BoundParser(self, inner)
 
     def _parse_function_implementation(self) -> BoundParser:
