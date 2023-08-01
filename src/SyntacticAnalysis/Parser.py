@@ -604,7 +604,7 @@ class Parser:
     def _parse_sup_method_prototype(self) -> BoundParser:
         def inner():
             p1 = self._parse_function_prototype().parse_once()
-            return Ast.SupMethodPrototypeAst(p1.decorators, p1.is_coro, p1.identifier, p1.generic_parameters, p1.parameters, p1.return_type, p1.where_block, p1.value_guard, p1.body, p1._tok)
+            return Ast.SupMethodPrototypeAst(p1.decorators, p1.is_coro, p1.identifier, p1.generic_parameters, p1.parameters, p1.return_type, p1.where_block, p1.body, p1._tok)
         return BoundParser(self, inner)
 
     # Enums
@@ -931,14 +931,6 @@ class Parser:
         def inner():
             p1 = self._parse_single_type_identifier().parse_once()
             return p1
-        return BoundParser(self, inner)
-
-    def _parse_value_guard(self) -> BoundParser:
-        def inner():
-            c1 = self._current
-            p1 = self._parse_token(TokenType.KwIf).parse_once()
-            p2 = self._parse_non_assignment_expression().parse_once()
-            return Ast.ValueGuardAst(p2, c1)
         return BoundParser(self, inner)
 
     # Decorators
@@ -1560,7 +1552,7 @@ class Parser:
             c1 = self._current
             p1 = self._parse_token(TokenType.TkDoubleAmpersand).parse_once()
             p2 = self._parse_non_assignment_expression().parse_once()
-            return Ast.ValueGuardAst(p2, c1)
+            return p2
         return BoundParser(self, inner)
 
     def _parse_pattern_composite(self) -> BoundParser:

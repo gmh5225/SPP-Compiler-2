@@ -132,7 +132,6 @@ class FunctionPrototypeAst:
     parameters: list[FunctionParameterAst]
     return_type: TypeAst
     where_block: Optional[WhereBlockAst]
-    value_guard: Optional[ValueGuardAst]
     body: FunctionImplementationAst
     _tok: int
 
@@ -205,11 +204,6 @@ class WhereBlockAst:
 class WhereConstraintAst:
     types_to_constrain: list[TypeAst]
     constraints: list[TypeAst]
-    _tok: int
-
-@dataclass
-class ValueGuardAst:
-    value: ExpressionAst
     _tok: int
 
 @dataclass
@@ -324,7 +318,7 @@ class IfStatementAst:
 class PatternStatementAst:
     comparison_op: Optional[TokenAst]
     patterns: list[PatternAst]
-    guard: Optional[ValueGuardAst]
+    guard: Optional[ExpressionAst]
     body: list[StatementAst]
     _tok: int
 
