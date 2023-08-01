@@ -12,6 +12,7 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 
 # todo : document that overloading cannot be done my mutability of parameters
 
+# todo : a string in a pattern errors?
 # todo : where block (requires generics)
 # todo : value guards
 # todo : optional and variadic parameters
@@ -44,11 +45,8 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 
 
 # todo : if/pattern statements:
-#   - make sure all patterns are valid
-#   - patterns can
+#   - make sure comparison function exists
 
-# todo : while statement
-#   - infinite loops => where nothing in the condition is changed in the loop
 
 # todo : pure/impure functions
 # todo : tail-call recursion
@@ -368,7 +366,7 @@ class TypeInference:
         t = CommonTypes.void()
         ts = []
         for branch in ast.branches:
-            t = TypeInference.infer_type_of_if_branch(branch, s)
+            t = TypeInference.infer_type_of_if_branch(ast, branch, s)
             ts.append(t)
         s.prev_scope()
 
@@ -386,8 +384,20 @@ class TypeInference:
         return t
 
     @staticmethod
-    def infer_type_of_if_branch(ast: Ast.PatternStatementAst, s: ScopeHandler) -> Ast.TypeAst:
+    def infer_type_of_if_branch(if_ast: Ast.IfStatementAst, ast: Ast.PatternStatementAst, s: ScopeHandler) -> Ast.TypeAst:
         s.next_scope()
+
+        # If the "if" statement contains the comparison operator, then the branch can't contain the comparison operator.
+        # Check both the "if" condition and the branch condition to ensure they don't both contain the comparison
+        # operator.
+        if if_ast.comparison_op and ast.comparison_op:
+            raise SystemExit(ErrFmt.err(ast._tok) + f"Branch cannot contain a comparison operator.")
+
+        # Check the comparison function exists on the type's being compared.
+        comparison_pattern = if_ast.comparison_op or ast.comparison_op
+        binary_comp = Ast.BinaryExpressionAst(if_ast.condition, comparison_pattern, ast.patterns[0].value, comparison_pattern._tok)
+        TypeInference.infer_type_of_expression(binary_comp, s)
+
         t = CommonTypes.void()
         for statement in ast.body:
             t = TypeInference.infer_type_of_statement(statement, s)
@@ -828,7 +838,6 @@ class TypeInference:
     def infer_type_of_while_statement(ast: Ast.WhileStatementAst, s: ScopeHandler) -> Ast.TypeAst:
         # A "while" statement always returns the Void type, because it doesn't return anything. There are no "break"
         # statements, meaning that the loop will always run until the condition is false.
-
         s.next_scope()
         for statement in ast.body:
             TypeInference.infer_type_of_statement(statement, s)

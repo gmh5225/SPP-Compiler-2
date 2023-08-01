@@ -497,6 +497,11 @@ class SymbolTableBuilder:
         # bind the sup-Scope to the cls-Scope
         cls = ast.identifier
         cls_scope = s.global_scope.get_child_scope_for_cls(cls.parts[0].identifier)
+
+        # If a "sup" block is being used for a "cls" which doesn't exist
+        if not cls_scope:
+            raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Class '{convert_type_to_string(cls)}' does not exist - define it before using a 'sup' block.")
+
         cls_scope.sup_scopes.append(s.current_scope)
 
         s.exit_scope()
