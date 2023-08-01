@@ -12,7 +12,7 @@ CURRENT_MODULE_MEMBER: Optional[Ast.TypeAst] = None
 class Symbol:
     name: str
     type: Optional[Ast.TypeAst]
-    value: Optional[Ast.ExpressionAst]
+    value: Optional[Ast.ExpressionAst | Ast.FunctionPrototypeAst]
 
     # optional metadata
     index: int
@@ -153,8 +153,10 @@ class Scope:
                 params_b = [p.split("|")[1] for p in params_b]
 
                 if len(params_a) != len(params_b): continue
+                generics = [g.identifier.identifier for g in symbol.value.generic_parameters]
                 for p_a, p_b, c_a, c_b in zip(params_a, params_b, conv_a, conv_b):
                     if c_a == c_b or c_a == "???":
+                        if p_b in generics: continue
                         if p_a == p_b: continue
 
                         # get the base classes of p_a
