@@ -650,8 +650,8 @@ class TypeInference:
         # check that the type is a struct type, as all types are structs.
         struct_type = TypeInference.infer_type_of_type(ast.lhs, s)
 
-        # Generics -> substitute the given generic argument in for the generic parameters in teh type symbols table for
-        # the current scope (?)
+        # Generics -> substitute the given generic argument in for the generic parameters in the type symbols table for
+        # the current scope. This will update the generic type parameters to point to the correct type.
         all_generic_types = iter([t for t in s.current_scope.all_types() if s.current_scope.get_type(t).is_generic])
         for generic in ast.lhs.parts[-1].generic_arguments:
             next_type = next(all_generic_types)
@@ -678,19 +678,25 @@ class TypeInference:
 
         # Get a list of all the fields on a struct, so that the "given_fields" can be checked against the
         # "actual_fields" to make sure all fields are given, and that no unknown fields are given.
-        actual_fields = s.global_scope.get_child_scope_for_cls(struct_type.parts[-1].identifier).all_exclusive_symbols()
+        type_definition_scope = s.global_scope.get_child_scope_for_cls(struct_type.parts[-1].identifier)
+        struct_identifier = struct_type.parts[-1].identifier
+        if type_definition_scope is None:
+            actual_type = s.current_scope.get_type(struct_type.parts[-1].identifier).type
+            struct_identifier = convert_type_to_string(actual_type)
+            type_definition_scope = s.global_scope.get_child_scope_for_cls(actual_type.parts[-1].identifier)
+        actual_fields = type_definition_scope.all_exclusive_symbols()
 
         # If the number of given fields is less than the number of actual fields, then not all fields have been given,
         # so display the different in sets of fields.
         if len(given_fields) < len(actual_fields) and not default_obj_given:
-            raise SystemExit(ErrFmt.err(ast._tok) + f"Struct initializer for {struct_type.parts[-1].identifier} is missing fields: {set(actual_fields) - set(given_fields)}.")
+            raise SystemExit(ErrFmt.err(ast._tok) + f"Struct initializer for {struct_identifier} is missing fields: {set(actual_fields) - set(given_fields)}.")
 
         # Now it is guaranteed that the number of given fields is greater than or equal to the number of actual fields,
         # so check that all given fields are actual fields.
         if unknown_fields := set(given_fields) - set(actual_fields):
             unknown_field = unknown_fields.pop()
             unknown_field_ast = ast.op.fields[given_fields.index(unknown_field)]
-            raise SystemExit(ErrFmt.err(unknown_field_ast._tok) + f"Struct initializer for '{struct_type.parts[-1].identifier}' given unknown field: '{unknown_field}'.")
+            raise SystemExit(ErrFmt.err(unknown_field_ast._tok) + f"Struct initializer for '{struct_identifier}' given unknown field: '{unknown_field}'.")
 
         if default_obj_given:
             all_fields_value = ast.op.fields[[isinstance(f.identifier, Ast.TokenAst) and f.identifier.tok.token_type == TokenType.KwElse for f in ast.op.fields].index(True)].value
@@ -698,14 +704,16 @@ class TypeInference:
             if all_fields_value_type != struct_type:
                 error = SemanticError(
                     ErrFmt.err(all_fields_value._tok) +
-                    f"Struct initializer default for {struct_type.parts[-1].identifier} given a value of type {convert_type_to_string(all_fields_value_type)}.")
+                    f"Struct initializer default for {struct_identifier} given a value of type {convert_type_to_string(all_fields_value_type)}.")
                 raise SystemExit(error) from None
 
         for given, actual in zip(sorted(given_fields), sorted(actual_fields)):
             # todo : incorrect type -> should "^" sit under the "=" or the value (value not always given)
             given_value_type = TypeInference.infer_type_of_expression(ast.op.fields[given_fields.index(given)].value or s.current_scope.get_symbol(given).type, s)
-            actual_value_type = s.global_scope.get_child_scope_for_cls(struct_type.parts[-1].identifier).get_symbol(actual).type
-            actual_value_type = s.current_scope.get_type(convert_type_to_string_no_generics(actual_value_type)).type
+            actual_value_type = s.global_scope.get_child_scope_for_cls(struct_identifier).get_symbol(actual).type
+            if not (new_type := convert_type_to_string(actual_value_type)) in s.global_scope.all_types():
+                actual_value_type = s.current_scope.get_type(new_type).type
+
             wrong_type_value = ast.op.fields[given_fields.index(given)].value if ast.op.fields[given_fields.index(given)].value else ast.op.fields[given_fields.index(given)]
             if given_value_type != actual_value_type:
                 raise SystemExit(ErrFmt.err(wrong_type_value._tok) + f"Cannot assign {convert_type_to_string(given_value_type)} to {convert_type_to_string(actual_value_type)}.")
