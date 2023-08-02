@@ -44,6 +44,7 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : assignment needs to allow assigning a more derived class onto a base class type
 # todo : all things "yielding"
 # todo : FnRef vs FnMut vs FnOne
+# todo : for operators, ensure the sup-scope of the correct operator class exists
 
 # todo : unify behaviour for "let", "=" and func-call()
 #   - change "let x = 3" to "let x: Num", "x=3"
@@ -649,6 +650,13 @@ class TypeInference:
         # check that the type is a struct type, as all types are structs.
         struct_type = TypeInference.infer_type_of_type(ast.lhs, s)
 
+        # Generics -> substitute the given generic argument in for the generic parameters in teh type symbols table for
+        # the current scope (?)
+        all_generic_types = iter([t for t in s.current_scope.all_types() if s.current_scope.get_type(t).is_generic])
+        for generic in ast.lhs.parts[-1].generic_arguments:
+            next_type = next(all_generic_types)
+            s.current_scope.get_type(next_type).type = generic.value
+
         # Get the fields that were given to the initializer, and ensure that their values are valid. The value is either
         # the provided value for the field, or the variable with an equivalent identifier to the field.
         given_fields = [f.identifier.identifier for f in ast.op.fields if isinstance(f.identifier, Ast.IdentifierAst)]
@@ -697,6 +705,7 @@ class TypeInference:
             # todo : incorrect type -> should "^" sit under the "=" or the value (value not always given)
             given_value_type = TypeInference.infer_type_of_expression(ast.op.fields[given_fields.index(given)].value or s.current_scope.get_symbol(given).type, s)
             actual_value_type = s.global_scope.get_child_scope_for_cls(struct_type.parts[-1].identifier).get_symbol(actual).type
+            actual_value_type = s.current_scope.get_type(convert_type_to_string_no_generics(actual_value_type)).type
             wrong_type_value = ast.op.fields[given_fields.index(given)].value if ast.op.fields[given_fields.index(given)].value else ast.op.fields[given_fields.index(given)]
             if given_value_type != actual_value_type:
                 raise SystemExit(ErrFmt.err(wrong_type_value._tok) + f"Cannot assign {convert_type_to_string(given_value_type)} to {convert_type_to_string(actual_value_type)}.")
@@ -860,6 +869,17 @@ class TypeInference:
 
         elif not s.current_scope.has_type(identifier):
             raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{identifier}' not found.")
+
+        if s.global_scope.has_type(identifier):
+            symbol = s.global_scope.get_type(identifier)
+            proto = symbol.value
+            if proto.generic_parameters:
+                given_generics = len(ast.parts[-1].generic_arguments)
+                if given_generics < len(proto.generic_parameters):
+                    raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{identifier}' is missing {len(proto.generic_parameters) - given_generics} generic arguments.")
+                elif given_generics > len(proto.generic_parameters):
+                    raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{identifier}' has {given_generics - len(proto.generic_parameters)} too many generic arguments.")
+
 
         # If the type exists, return the type.
         return ast

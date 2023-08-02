@@ -9,6 +9,9 @@ import re
 
 CURRENT_MODULE_MEMBER: Optional[Ast.TypeAst] = None
 
+class SymbolException(Exception):
+    ...
+
 class Symbol:
     name: str
     type: Optional[Ast.TypeAst]
@@ -26,6 +29,9 @@ class Symbol:
     borrowed_mut: bool
     meta: dict[str, Any]
 
+    # generics
+    is_generic: bool
+
     def __init__(self, name: str, type_: Optional[Ast.TypeAst], value: Optional[Ast.ExpressionAst], **kwargs):
         self.name = name
         self.type = type_
@@ -39,6 +45,7 @@ class Symbol:
         self.mutable = kwargs.get("mutable", False)
         self.borrowed_ref = kwargs.get("borrowed_ref", False)
         self.borrowed_mut = kwargs.get("borrowed_mut", False)
+        self.is_generic = kwargs.get("is_generic", False)
         self.meta = {}
 
     def json(self) -> dict[str, any]:
@@ -171,7 +178,7 @@ class Scope:
                 if match: return symbol
 
 
-        raise Exception(f"Symbol '{name}' not found")
+        raise SymbolException(f"Symbol '{name}' not found")
 
     def get_type(self, name: str) -> Symbol:
         current = self
@@ -180,7 +187,7 @@ class Scope:
                 return current.types.get(name)
             current = current.parent
 
-        raise Exception(f"Type '{name}' not found")
+        raise SymbolException(f"Type '{name}' not found")
 
     def has_symbol(self, name: str) -> bool:
         try:
@@ -356,7 +363,7 @@ class SymbolTableBuilder:
                 borrowed_ref=param.calling_convention and not param.calling_convention.is_mutable,
                 borrowed_mut=param.calling_convention and param.calling_convention.is_mutable))
         for generic in ast.generic_parameters:
-            s.current_scope.add_type(Symbol(convert_identifier_to_string(generic.identifier), None, None))
+            s.current_scope.add_type(Symbol(convert_identifier_to_string(generic.identifier), None, None, is_generic=True))
         for statement in ast.body.statements:
             SymbolTableBuilder.build_statement_symbols(statement, s)
         ast.return_type = normalize_type(ast.return_type)
@@ -469,6 +476,8 @@ class SymbolTableBuilder:
 
         s.current_scope.add_type(Symbol(convert_identifier_to_string(ast.identifier), None, ast))
         s.enter_scope(f"ClsPrototype__{convert_identifier_to_string(ast.identifier)}")
+        for generic in ast.generic_parameters:
+            s.current_scope.add_type(Symbol(convert_identifier_to_string(generic.identifier), None, None, is_generic=True))
         for member in ast.body.members:
             s.current_scope.add_symbol(Symbol(convert_identifier_to_string(member.identifier), normalize_type(member.type_annotation), None, mutable=member.is_mutable))
         s.exit_scope()
