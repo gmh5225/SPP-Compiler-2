@@ -1457,7 +1457,7 @@ class Parser:
         def inner():
             c1 = self._current
             p1 = self._parse_type_generic_parameter_identifier().parse_once()
-            p2 = self._parse_type_generic_parameter_inline_constraint().parse_optional()
+            p2 = self._parse_type_generic_parameter_inline_constraint().parse_optional() or []
             return Ast.TypeGenericParameterRequiredAst(p1, p2, c1)
         return BoundParser(self, inner)
 
