@@ -467,7 +467,7 @@ class SymbolTableBuilder:
         global CURRENT_MODULE_MEMBER
         CURRENT_MODULE_MEMBER = Ast.TypeSingleAst([Ast.GenericIdentifierAst(ast.identifier.identifier, [], ast.identifier._tok)], ast.identifier._tok)
 
-        s.current_scope.add_type(Symbol(convert_identifier_to_string(ast.identifier), None, None))
+        s.current_scope.add_type(Symbol(convert_identifier_to_string(ast.identifier), None, ast))
         s.enter_scope(f"ClsPrototype__{convert_identifier_to_string(ast.identifier)}")
         for member in ast.body.members:
             s.current_scope.add_symbol(Symbol(convert_identifier_to_string(member.identifier), normalize_type(member.type_annotation), None, mutable=member.is_mutable))
@@ -517,6 +517,9 @@ def convert_identifier_to_string(ast: Ast.IdentifierAst | Ast.GenericIdentifierA
 
 def convert_multi_identifier_to_string(ast: Ast.ModuleIdentifierAst) -> str:
     return ".".join(map(lambda x: x.identifier, ast.parts))
+
+def convert_type_to_string_no_generics(ast: Ast.TypeAst) -> str:
+    return convert_type_to_string(ast).split("[")[0]
 
 def convert_type_to_string(ast: Ast.TypeAst) -> str:
     if isinstance(ast, Ast.TypeSingleAst):

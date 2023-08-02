@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import itertools
 import re
 from typing import Optional
 import difflib
 
 from src.LexicalAnalysis.Tokens import Token, TokenType
 from src.SyntacticAnalysis import Ast
-from src.SemanticAnalysis.SymbolGeneration import ScopeHandler, convert_type_to_string, convert_multi_identifier_to_string, convert_convention_to_string, function_identifier_strip_signature
+from src.SemanticAnalysis.SymbolGeneration import ScopeHandler, convert_type_to_string,\
+    convert_multi_identifier_to_string, convert_convention_to_string, function_identifier_strip_signature,\
+    convert_type_to_string_no_generics
 from src.SyntacticAnalysis.Parser import ErrFmt
 
 
@@ -18,6 +21,10 @@ from src.SyntacticAnalysis.Parser import ErrFmt
 # todo : check module identifier is correct (matches file name & path/directory)
 # todo : type inference for lambdas
 # todo : all things "type generics"
+#   - function generic inference for parameter types => DONE
+#   - function generic inference from other generics
+#   - check generics defined in upper structures (sup, cls) are available in functions
+#   - sup generics into cls generics?
 # todo : mutability checks
 #   - calling mutable functions on immutable references
 # todo : visibility checks
@@ -122,9 +129,19 @@ class TypeInference:
             TypeInference.infer_type_of_parameter(parameter, s)
 
         # Make sure all the type generic parameters are inferrable
+        # todo : allow inference of generics from other generics
+        gn_parameter_types = [p.type_annotation for p in ast.parameters]
+        gn_generic_constraints = list(itertools.chain(*[c.constraints for c in ast.generic_parameters]))
+        gn_ts = gn_parameter_types + gn_generic_constraints
         for type_generic in ast.generic_parameters:
-            if type_generic.identifier.identifier not in [convert_type_to_string(p.type_annotation) for p in ast.parameters]:
+            match = False
+            for p in gn_ts:
+                if type_generic.identifier.identifier in set(traverse_type(p)):
+                    match = True
+                    break
+            if not match:
                 raise SystemExit(ErrFmt.err(type_generic._tok) + f"Type generic '{type_generic.identifier.identifier}' cannot be inferred.")
+
 
         # Run a type-infer on the return type so the Self type can be inferred prior to any return statement's type
         # check
@@ -836,12 +853,12 @@ class TypeInference:
     def infer_type_of_type(ast: Ast.TypeSingleAst | Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
         # Check if the type exists, by checking the string representation of the type against the types in the current
         # scope (and its parent scopes). If the type doesn't exist, throw an error.
-        identifier = convert_type_to_string(ast)
+        identifier = convert_type_to_string_no_generics(ast)
         if isinstance(ast, Ast.TypeTupleAst):
             for t in ast.types:
                 TypeInference.infer_type_of_type(t, s)
 
-        elif not s.current_scope.has_type(identifier) and not s.current_scope.has_type(identifier + "?"):
+        elif not s.current_scope.has_type(identifier):
             raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{identifier}' not found.")
 
         # If the type exists, return the type.
@@ -930,5 +947,19 @@ class MemoryEnforcer:
             raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot check if {ast} is initialized.")
 
 
-class CompiletimeDecorators:
-    ...
+def traverse_type(ast: Ast.TypeAst | Ast.GenericIdentifierAst):
+    match ast:
+        case Ast.GenericIdentifierAst():
+            yield ast.identifier
+            for t in ast.generic_arguments:
+                yield from traverse_type(t.value)
+        case Ast.TypeSingleAst():
+            yield ast.parts[-1].identifier
+            for t in ast.parts:
+                yield from traverse_type(t)
+        case Ast.TypeTupleAst():
+            for t in ast.types:
+                yield from traverse_type(t)
+        case _:
+            raise SystemExit(ErrFmt.err(ast._tok) + f"Type {type(ast)} not yet supported.")
+
