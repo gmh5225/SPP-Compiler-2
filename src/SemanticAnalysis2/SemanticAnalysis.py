@@ -56,9 +56,8 @@ class SemanticAnalysis:
         generic_constraints = [c for c in generic_constraints if c]
         all_individual_types = chain_generators(*[SemanticAnalysis.traverse_type(t, s) for t in parameter_types + generic_constraints])
         temp = {*all_individual_types}
-        print(ast.generic_parameters, temp)
 
-        if g := any_elem([g.as_type() for g in ast.generic_parameters if g.as_type() not in all_individual_types]):
+        if g := any_elem([g.as_type() for g in ast.generic_parameters if g.identifier.identifier not in temp]):
             raise SystemExit(ErrFmt.err(g._tok) + "Generic parameter type cannot be inferred.")
 
         # Make sure abstract methods have no body
@@ -558,7 +557,7 @@ class SemanticAnalysis:
                     yield from SemanticAnalysis.traverse_type(t, s)
             case Ast.SelfTypeAst():
                 sym = s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol)
-                yield sym.type
+                yield sym.type.parts[-1].identifier
             case _:
                 print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Type {type(ast)} not yet supported for traversal. Report as bug.")
