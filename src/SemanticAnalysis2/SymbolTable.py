@@ -91,7 +91,7 @@ class SymbolTable:
     def add(self, symbol: SymbolTypes.Symbol):
         self.symbols[hash(symbol.name)] = symbol
 
-    def get(self, name: Hashable, expected_sym_type: type, **kwargs) -> SymbolTypes.Symbol | list[SymbolTypes.Symbol]:
+    def get(self, name: Hashable, expected_sym_type: type) -> SymbolTypes.Symbol | list[SymbolTypes.Symbol]:
         symbols = {k: v for k, v in self.symbols.items() if isinstance(v, expected_sym_type)}
 
         match expected_sym_type.__name__:
@@ -127,16 +127,25 @@ class Scope:
     def add_symbol(self, symbol: SymbolTypes.Symbol):
         self.symbol_table.add(symbol)
 
-    def get_symbol(self, name: Hashable, expected_sym_type: type[T], **kwargs) -> T:
-        sym = self.get_symbol_exclusive(name, expected_sym_type, **kwargs)
+    def get_symbol(self, name: Hashable, expected_sym_type: type[T], error=True) -> T:
+        try:
+            sym = self.symbol_table.get(name, expected_sym_type)
+        except:
+            sym = None
         if not sym and self.parent:
-            sym = self.parent.get_symbol(name, expected_sym_type, **kwargs)
+            sym = self.parent.get_symbol(name, expected_sym_type, error=False)
         if not sym:
             raise SystemExit(f"Could not find {expected_sym_type.__name__} '{name}'.")
         return sym
 
-    def get_symbol_exclusive(self, name: Hashable, expected_sym_type: type[T], **kwargs) -> T | list[T]:
-        return self.symbol_table.get(name, expected_sym_type, **kwargs)
+    def get_symbol_exclusive(self, name: Hashable, expected_sym_type: type[T], error=True) -> T | list[T]:
+        try:
+            self.symbol_table.get(name, expected_sym_type)
+        except KeyError as e:
+            if error:
+                raise e
+            else:
+                return None
 
     def has_symbol(self, name: Hashable, expected_sym_type: type) -> bool:
         found = self.has_symbol_exclusive(name, expected_sym_type)

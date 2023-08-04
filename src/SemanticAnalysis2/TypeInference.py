@@ -162,5 +162,6 @@ class TypeInfer:
                 elif ratio == most_likely[0] and abs(len(sym.name.identifier) - len(ast.identifier)) < abs(len(most_likely[1]) - len(ast.identifier)):
                     most_likely = (ratio, sym.name.identifier if isinstance(ast, Ast.IdentifierAst) else sym.name.identifier)
 
-            raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown {what} {ast}. Did you mean {most_likely[1]}?")
+            if most_likely[0] == -1:
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown {what} {ast}. Did you mean {most_likely[1]}?")
         return ast if what == "type" else s.current_scope.get_symbol(ast, SymbolTypes.VariableSymbol).type

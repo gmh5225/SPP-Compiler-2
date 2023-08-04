@@ -53,8 +53,8 @@ class SymbolGeneration:
     def generate_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeHandler):
         ty = Ast.TypeSingleAst([Ast.GenericIdentifierAst(ast.identifier.identifier, [None for _ in range(len(ast.generic_parameters))], ast._tok)], ast._tok)
         s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ty.parts[-1].to_identifier(), ast, []))
-        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast, []))
         s.enter_scope(ast.identifier)
+        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast, []))
         for attr in ast.body.members:
             s.current_scope.add_symbol(SymbolTypes.VariableSymbol(attr.identifier, attr.type_annotation, VariableSymbolMemoryStatus(), False))
         s.exit_scope()
@@ -62,6 +62,7 @@ class SymbolGeneration:
     @staticmethod
     def generate_sup_prototype(ast: Ast.SupPrototypeAst, s: ScopeHandler):
         s.enter_scope(ast.identifier)
+        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast, []))
         for member in ast.body.members: SymbolGeneration.generate_sup_member(member, s)
         cls_scope = s.global_scope.get_symbol(ast.identifier.parts[-1].to_identifier(), SymbolTypes.TypeSymbol).sups.append(s.current_scope)
         s.exit_scope()

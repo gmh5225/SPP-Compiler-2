@@ -52,7 +52,7 @@ class SemanticAnalysis:
         # Analyse the generic type parameters -- they must all be inferrable
         parameter_types = [p.type_annotation for p in ast.parameters]
         generic_constraints = [g.constraints for g in ast.generic_parameters]
-        all_individual_types = chain_generators(*[SemanticAnalysis.traverse_type(t) for t in parameter_types + generic_constraints])
+        all_individual_types = chain_generators(*[SemanticAnalysis.traverse_type(t, s) for t in parameter_types + generic_constraints])
         temp = [*all_individual_types]
 
         if g := any_elem([g.as_type() for g in ast.generic_parameters if g.as_type() not in all_individual_types]):
@@ -540,19 +540,22 @@ class SemanticAnalysis:
         s.prev_scope()
 
     @staticmethod
-    def traverse_type(ast: Ast.TypeAst | Ast.GenericIdentifierAst):
+    def traverse_type(ast: Ast.TypeAst | Ast.GenericIdentifierAst, s: ScopeHandler):
         match ast:
             case Ast.GenericIdentifierAst():
                 yield ast.identifier
                 for t in ast.generic_arguments:
-                    yield from SemanticAnalysis.traverse_type(t.value)
+                    yield from SemanticAnalysis.traverse_type(t.value, s)
             case Ast.TypeSingleAst():
                 yield ast.parts[-1].identifier
                 for t in ast.parts:
-                    yield from SemanticAnalysis.traverse_type(t)
+                    yield from SemanticAnalysis.traverse_type(t, s)
             case Ast.TypeTupleAst():
                 for t in ast.types:
-                    yield from SemanticAnalysis.traverse_type(t)
+                    yield from SemanticAnalysis.traverse_type(t, s)
+            case Ast.SelfTypeAst():
+                sym = s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol)
+                yield sym.type.identifier.identifier
             case _:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Type {type(ast)} not yet supported for traversal. Report as bug.")
 
