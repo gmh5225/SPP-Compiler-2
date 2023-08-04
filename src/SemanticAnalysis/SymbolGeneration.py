@@ -569,7 +569,7 @@ def get_function_type(ast: Ast.FunctionPrototypeAst) -> Ast.TypeAst:
     param_types = Ast.TypeGenericArgumentAst(None, Ast.TypeTupleAst([a.type_annotation for a in ast.parameters], ast.identifier._tok), ast.identifier._tok)
 
     return Ast.TypeSingleAst([
-        Ast.GenericIdentifierAst("std", [], ast.identifier._tok),
+        # Ast.GenericIdentifierAst("std", [], ast.identifier._tok),
         Ast.GenericIdentifierAst("FnRef", [return_type, param_types], ast.identifier._tok)], ast.identifier._tok)
 
 def convert_module_name_to_file_name(ast: Ast.ModuleIdentifierAst | Ast.ImportIdentifierAst) -> str:

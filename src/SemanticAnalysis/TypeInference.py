@@ -7,9 +7,9 @@ import difflib
 
 from src.LexicalAnalysis.Tokens import Token, TokenType
 from src.SyntacticAnalysis import Ast
-from src.SemanticAnalysis.SymbolGeneration import ScopeHandler, convert_type_to_string,\
-    convert_multi_identifier_to_string, convert_convention_to_string, function_identifier_strip_signature,\
-    convert_type_to_string_no_generics
+from src.SemanticAnalysis.SymbolGeneration import ScopeHandler, convert_type_to_string, \
+    convert_multi_identifier_to_string, convert_convention_to_string, function_identifier_strip_signature, \
+    convert_type_to_string_no_generics, Symbol
 from src.SyntacticAnalysis.Parser import ErrFmt
 
 
@@ -135,6 +135,7 @@ class TypeInference:
         gn_generic_constraints = list(itertools.chain(*[c.constraints for c in ast.generic_parameters]))
         gn_ts = gn_parameter_types + gn_generic_constraints
         for type_generic in ast.generic_parameters:
+            # s.current_scope.add_type(Symbol(type_generic.identifier.identifier, type_generic, None))
             match = False
             for p in gn_ts:
                 if type_generic.identifier.identifier in set(traverse_type(p)):
@@ -146,7 +147,7 @@ class TypeInference:
 
         # Run a type-infer on the return type so the Self type can be inferred prior to any return statement's type
         # check
-        TypeInference.infer_type_of_type(ast.return_type, s)
+        TypeInference.infer_type_of_type(ast.return_type, s, delay_generic=True)
 
         # Default the discovered returning type of the function to the Void type. For each statement inferred, get the
         # type of the statement and set the returning type to that type. The final statement's type will be the
@@ -157,9 +158,13 @@ class TypeInference:
 
         # Check that the final statement's inferred type matches the return type of the function. If not, throw an
         # error. If there are no statements in the body, then the token position is just the "{" scope opening token.
-        if discovered_ret_type != ast.return_type:
+        mapped_ret_type = TypeInference.infer_type_of_type(ast.return_type, s)
+        if discovered_ret_type != mapped_ret_type:
             final_statement_ast = ast.body.statements[-1] if ast.body.statements else ast.body
-            raise SystemExit(ErrFmt.err(final_statement_ast._tok) + f"Expected return type {convert_type_to_string(ast.return_type)}, but found {convert_type_to_string(discovered_ret_type or CommonTypes.void())}.")
+
+            # If the return type is a generic type, then allow a mismatch - todo ?
+            if s.current_scope.get_type(convert_type_to_string(mapped_ret_type)).type is not None:
+                raise SystemExit(ErrFmt.err(final_statement_ast._tok) + f"Expected return type {convert_type_to_string(mapped_ret_type)}, but found {convert_type_to_string(discovered_ret_type or CommonTypes.void())}.")
         s.prev_scope()
 
     @staticmethod
@@ -204,13 +209,13 @@ class TypeInference:
         for decorator in ast.decorators:
             TypeInference.infer_type_of_decorator(ast, decorator, s)
 
-        TypeInference.infer_type_of_type(ast.type_annotation, s)
+        TypeInference.infer_type_of_type(ast.type_annotation, s, delay_generic=True)
 
     @staticmethod
     def infer_type_of_parameter(ast: Ast.FunctionParameterAst, s: ScopeHandler) -> None:
         # Check the type of parameter exists, and if the parameter has a default value, check the expression. This
         # expression will actually be evaluated per call at runtime, so only type info is needed here.
-        TypeInference.infer_type_of_type(ast.type_annotation, s)
+        TypeInference.infer_type_of_type(ast.type_annotation, s, delay_generic=True)
         TypeInference.infer_type_of_expression(ast.default_value, s) if ast.default_value else None
         MemoryEnforcer.set_variable_initialized([ast.identifier], s, True)
         s.current_scope.get_symbol(ast.identifier.identifier).defined = True
@@ -378,10 +383,9 @@ class TypeInference:
                 else:
                     raise SystemExit(ErrFmt.err(ast._tok) + f"Function '{bad_function_identifier}' not defined.")
 
-
         # Return the type of the symbol, which is found in the current scope, or a parent scope. This symbol must exist,
         # as prior checks have guaranteed this.
-        return s.current_scope.get_symbol(ast.identifier).type
+        return TypeInference.infer_type_of_type(s.current_scope.get_symbol(ast.identifier).type, s)
 
     @staticmethod
     def infer_type_of_if_statement(ast: Ast.IfStatementAst, s: ScopeHandler) -> Ast.TypeAst:
@@ -463,7 +467,7 @@ class TypeInference:
         # 6. return the type
         idx = ast.op._tok # todo : where to use "idx"
         function_name = Ast.IdentifierAst(BIN_FUNCTION_NAMES[ast.op.tok.token_type], idx)
-        member_access = Ast.PostfixMemberAccessAst(Ast.TokenAst(Token(".", TokenType.TkDot), idx), function_name, idx)
+        member_access = Ast.PostfixMemberAccessAst(function_name, idx)
         member_access = Ast.PostfixExpressionAst(ast.lhs, member_access, idx)
         function_call = Ast.PostfixFunctionCallAst([], [Ast.FunctionArgumentAst(None, ast.rhs, Ast.ParameterPassingConventionReferenceAst(False, idx), False, idx)], idx) # todo : convention
         function_call = Ast.PostfixExpressionAst(member_access, function_call, idx)
@@ -633,6 +637,12 @@ class TypeInference:
         # for g in fn_ast.generic_parameters:
         #     if g not in fn_param_types:
         #         raise SystemExit(ErrFmt.err(ast._tok) + f"Generic parameter '{g}' not cannot be inferred.")
+
+        all_generic_types = iter([t for t in s.current_scope.all_types() if s.current_scope.get_type(t).is_generic])
+        for generic in ast.op.type_arguments:
+            next_type = next(all_generic_types)
+            s.current_scope.get_type(next_type).type = generic.value
+
 
         # Get the function type from the symbol table, and return the return type of the function, from the generic type
         # of the function ie FnRef[Output, (Args)]. The return type is the first generic argument.
@@ -867,13 +877,14 @@ class TypeInference:
         return CommonTypes.void()
 
     @staticmethod
-    def infer_type_of_type(ast: Ast.TypeSingleAst | Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
+    def infer_type_of_type(ast: Ast.TypeSingleAst | Ast.IdentifierAst, s: ScopeHandler, delay_generic: bool = False) -> Ast.TypeAst:
         # Check if the type exists, by checking the string representation of the type against the types in the current
         # scope (and its parent scopes). If the type doesn't exist, throw an error.
         identifier = convert_type_to_string_no_generics(ast)
         if isinstance(ast, Ast.TypeTupleAst):
             for t in ast.types:
-                TypeInference.infer_type_of_type(t, s)
+                ast.types[ast.types.index(t)] = TypeInference.infer_type_of_type(t, s, delay_generic)
+            return ast
 
         elif not s.current_scope.has_type(identifier):
             raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{identifier}' not found.")
@@ -887,7 +898,17 @@ class TypeInference:
                     raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{identifier}' is missing {len(proto.generic_parameters) - given_generics} generic arguments.")
                 elif given_generics > len(proto.generic_parameters):
                     raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{identifier}' has {given_generics - len(proto.generic_parameters)} too many generic arguments.")
+        else:
+            if not convert_type_to_string(ast) in s.current_scope.all_types():
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{identifier}' not found.")
 
+            orig = ast
+            ast = s.current_scope.get_type(identifier).type
+            if ast is None:
+                ast = orig
+
+        for g in ast.parts[-1].generic_arguments:
+            g.value = TypeInference.infer_type_of_type(g.value, s, delay_generic)
 
         # If the type exists, return the type.
         return ast
