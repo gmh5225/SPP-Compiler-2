@@ -516,11 +516,10 @@ class Parser:
         def inner():
             c1 = self._current
             p1 = self._parse_decorators().parse_optional() or []
-            p2 = self._parse_token(TokenType.KwMut).parse_optional()
             p3 = self._parse_class_attribute_identifier().parse_once()
             p4 = self._parse_token(TokenType.TkColon).parse_once()
             p5 = self._parse_type_identifier().parse_once()
-            return Ast.ClassAttributeAst(p1, p2, p3, p5, c1)
+            return Ast.ClassAttributeAst(p1, p3, p5, c1)
         return BoundParser(self, inner)
 
     def _parse_class_attribute_identifier(self) -> BoundParser:
@@ -1768,7 +1767,7 @@ class Parser:
             p2 = self._parse_identifier().delay_parse()
             p3 = self._parse_number().delay_parse()
             p4 = (p2 | p3).parse_once()
-            return Ast.PostfixMemberAccessAst(p1, p4, c1)
+            return Ast.PostfixMemberAccessAst(p4, c1)
         return BoundParser(self, inner)
 
     def _parse_postfix_operator_struct_initializer(self) -> BoundParser:
