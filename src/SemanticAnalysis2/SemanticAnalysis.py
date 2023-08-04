@@ -432,7 +432,7 @@ class SemanticAnalysis:
 
             if given_ty != actual_ty:
                 err_pos = (ast.op.fields[given_fields.index(given)].value or ast.op.fields[given_fields.index(given)].identifier)._tok
-                raise SystemExit(ErrFmt.err(err_pos), f"Field '{given}' given to struct initializer is not of type '{actual_ty}'. It is of type '{given_ty}'.")
+                raise SystemExit(ErrFmt.err(err_pos) + f"Field '{given}' given to struct initializer is not of type '{actual_ty}'. It is of type '{given_ty}'.")
 
     @staticmethod
     def analyse_let_statement(ast: Ast.LetStatementAst, s: ScopeHandler):
@@ -442,14 +442,9 @@ class SemanticAnalysis:
 
         # Check that the type of the variable is not "Void". This is because "Void" values don't exist, and therefore
         # cannot be assigned to a variable.
-        let_statement_type = TypeInfer.infer_type(ast.type_annotation) or TypeInfer.infer_expression(ast.value, s)
+        let_statement_type = TypeInfer.infer_type(ast.type_annotation, s) or TypeInfer.infer_expression(ast.value, s)
         if let_statement_type == CommonTypes.void():
             raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot define a variable with 'Void' type.")
-
-        # Set this variable as initialized. All other memory issues will be handled by the function call analysis of the
-        # "set" function.
-        for variable in ast.variables:
-            s.current_scope.get_symbol(variable, SymbolTypes.VariableSymbol).mem_info.is_initialized = True
 
         # For a single variable, infer its type and set it in the symbol table.
         if len(ast.variables) == 1:
@@ -498,7 +493,8 @@ class SemanticAnalysis:
             # values not types.
             if isinstance(lhs, Ast.IdentifierAst):
                 sym = s.current_scope.get_symbol(lhs, SymbolTypes.VariableSymbol)
-                if not sym.is_mutable: raise SystemExit(ErrFmt.err(lhs._tok) + f"Cannot assign to an immutable variable.")
+                if not sym.is_mutable and sym.mem_info.is_initialized:
+                    raise SystemExit(ErrFmt.err(lhs._tok) + f"Cannot assign to an immutable variable.")
 
         # Create a mock function call for the assignment, and analyse it. Do 1 per variable, so that the function call
         # analysis can handle the multiple function calls for tuples etc.
@@ -533,6 +529,11 @@ class SemanticAnalysis:
                     ], ast.op._tok)
                 fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst("__set__", ast.op._tok), fn_call, ast.op._tok)
                 SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s)
+
+        # Set this variable as initialized. All other memory issues will be handled by the function call analysis of the
+        # "set" function.
+        for variable in ast.lhs:
+            s.current_scope.get_symbol(variable, SymbolTypes.VariableSymbol).mem_info.is_initialized = True
 
     @staticmethod
     def analyse_while_statement(ast: Ast.WhileStatementAst, s: ScopeHandler):

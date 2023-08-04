@@ -29,7 +29,7 @@ class SymbolGeneration:
             case Ast.SupPrototypeNormalAst(): SymbolGeneration.generate_sup_prototype(ast, s)
             case Ast.SupPrototypeInheritanceAst(): SymbolGeneration.generate_sup_prototype(ast, s)
             case _:
-                raise SystemExit(ErrFmt.err(ast._tok), f"Unknown module member {ast} being generated. Report as bug.")
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown module member {ast} being generated. Report as bug.")
 
     @staticmethod
     def generate_import(ast: Ast.ImportStatementAst, s: ScopeHandler):
@@ -37,7 +37,7 @@ class SymbolGeneration:
         try:
             mod_code = open(mod_name, "r").read()
         except FileNotFoundError:
-            raise SystemExit(ErrFmt.err(ast._tok), f"Module {ast.module} not found.")
+            raise SystemExit(ErrFmt.err(ast._tok) + f"Module {ast.module} not found.")
         ts = ErrFmt.TOKENS
         SymbolGeneration.generate_program(Parser(Lexer(mod_code).lex()).parse(), s)
         ErrFmt.TOKENS = ts
@@ -73,7 +73,7 @@ class SymbolGeneration:
             case Ast.SupMethodPrototypeAst(): SymbolGeneration.generate_sup_method_prototype(ast, s)
             case Ast.SupTypedefAst(): SymbolGeneration.generate_sup_typedef(ast, s)
             case _:
-                raise SystemExit(ErrFmt.err(ast._tok), f"Unknown sup member {ast} being generated. Report as bug.")
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown sup member {ast} being generated. Report as bug.")
 
     @staticmethod
     def generate_sup_method_prototype(ast: Ast.SupMethodPrototypeAst, s: ScopeHandler):

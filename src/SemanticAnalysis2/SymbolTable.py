@@ -14,6 +14,11 @@ class VariableSymbolMemoryStatus:
     is_borrowed_mut: bool
     is_initialized: bool
 
+    def __init__(self):
+        self.is_borrowed_ref = False
+        self.is_borrowed_mut = False
+        self.is_initialized = False
+
     def is_borrowed(self):
         return self.is_borrowed_ref or self.is_borrowed_mut
 
@@ -135,7 +140,7 @@ class Scope:
         if not sym and self.parent:
             sym = self.parent.get_symbol(name, expected_sym_type, error=False)
         if not sym:
-            raise SystemExit(f"Could not find {expected_sym_type.__name__} '{name}'.")
+            raise Exception(f"Could not find {expected_sym_type.__name__} '{name}'.")
         return sym
 
     def get_symbol_exclusive(self, name: Hashable, expected_sym_type: type[T], error=True) -> T | list[T]:

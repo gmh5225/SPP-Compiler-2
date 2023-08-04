@@ -33,7 +33,7 @@ class TypeInfer:
             case Ast.NumberLiteralBase10Ast(): return CommonTypes.num()
             case Ast.NumberLiteralBase16Ast(): return CommonTypes.num()
             case _:
-                raise SystemExit(ErrFmt.err(ast._tok), f"Unknown expression {ast} being inferred. Report as bug.")
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown expression {ast} being inferred. Report as bug.")
 
     @staticmethod
     def infer_statement(ast: Ast.StatementAst, s: ScopeHandler) -> Ast.TypeAst:
@@ -62,12 +62,12 @@ class TypeInfer:
 
     @staticmethod
     def infer_postfix_expression(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        match ast:
+        match ast.op:
             case Ast.PostfixMemberAccessAst(): return TypeInfer.infer_postfix_member_access(ast, s)
             case Ast.PostfixFunctionCallAst(): return TypeInfer.infer_postfix_function_call(ast, s)
             case Ast.PostfixStructInitializerAst(): return TypeInfer.infer_postfix_struct_initializer(ast, s)
             case _:
-                raise SystemExit(ErrFmt.err(ast._tok), f"Unknown postfix expression {ast} being inferred. Report as bug.")
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown postfix expression {ast} being inferred. Report as bug.")
 
     @staticmethod
     def infer_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
@@ -112,7 +112,7 @@ class TypeInfer:
             return fn_type.return_type
 
         NL = "\n"
-        raise SystemExit(ErrFmt.err(ast._tok), f"Could not find function {ast.op.identifier} with the given arguments. Available signatures: {NL.join(sigs)}")
+        raise SystemExit(ErrFmt.err(ast._tok) + f"Could not find function {ast.op.identifier} with the given arguments. Available signatures: {NL.join(sigs)}")
 
     @staticmethod
     def infer_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
