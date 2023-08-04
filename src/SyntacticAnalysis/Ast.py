@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Optional
 from dataclasses import dataclass
 
-from src.LexicalAnalysis.Tokens import Token
+from src.LexicalAnalysis.Tokens import Token, TokenType
 
 
 @dataclass
@@ -21,6 +22,9 @@ class ParameterPassingConventionReferenceAst:
     is_mutable: bool
     _tok: int
 
+    def __str__(self):
+        return "&" + ("mut " if self.is_mutable else "")
+
 
 @dataclass
 class IdentifierAst:
@@ -28,10 +32,14 @@ class IdentifierAst:
     _tok: int
 
     def __hash__(self):
-        return hash(self.identifier)
+        h = hashlib.md5(self.identifier.encode()).digest()
+        return int.from_bytes(h, "big")
 
     def __eq__(self, other):
         return isinstance(other, IdentifierAst) and self.identifier == other.identifier
+
+    def __str__(self):
+        return self.identifier
 
 @dataclass
 class ModuleIdentifierAst:
@@ -47,12 +55,32 @@ class GenericIdentifierAst:
     def __eq__(self, other):
         return isinstance(other, GenericIdentifierAst) and self.identifier == other.identifier and self.generic_arguments == other.generic_arguments
 
-@dataclass
+    def __hash__(self):
+        return hash(IdentifierAst(self.identifier, self._tok))
+
+    def __str__(self):
+        return self.identifier + ("[" + ",".join([str(arg) for arg in self.generic_arguments]) + "]" if self.generic_arguments else "")
+
+    def to_identifier(self) -> IdentifierAst:
+        return IdentifierAst(self.identifier, self._tok)
+
+# @dataclass
 class SelfTypeAst:
     _tok: int
+    identifier: str
+
+    def __init__(self, _tok: int):
+        self._tok = _tok
+        self.identifier = "Self"
 
     def __eq__(self, other):
         return isinstance(other, SelfTypeAst)
+
+    def __str__(self):
+        return "Self"
+
+    def __hash__(self):
+        return hash(IdentifierAst("Self", self._tok))
 
 @dataclass
 class ImportTypeAst:
@@ -104,7 +132,6 @@ class ModulePrototypeAst:
 @dataclass
 class ClassAttributeAst:
     decorators: list[DecoratorAst]
-    is_mutable: bool
     identifier: IdentifierAst
     type_annotation: TypeAst
     _tok: int
@@ -123,6 +150,12 @@ class ClassPrototypeAst:
     body: ClassImplementationAst
     _tok: int
 
+    def __hash__(self):
+        return hash(self.identifier)
+
+    def __str__(self):
+        return self.identifier.identifier + ("[" + ",".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "")
+
 @dataclass
 class FunctionPrototypeAst:
     decorators: list[DecoratorAst]
@@ -134,6 +167,9 @@ class FunctionPrototypeAst:
     where_block: Optional[WhereBlockAst]
     body: FunctionImplementationAst
     _tok: int
+
+    def __str__(self):
+        return self.identifier.identifier + ("[" + ",".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "") + "(" + ",".join([str(param) for param in self.parameters]) + ")" + (" -> " + str(self.return_type) if self.return_type else "")
 
 @dataclass
 class FunctionArgumentAst:
@@ -158,6 +194,9 @@ class FunctionParameterAst:
     default_value: Optional[ExpressionAst]
     is_variadic: bool
     _tok: int
+
+    def __str__(self):
+        return "mut" if self.is_mutable else "" + str(self.calling_convention) if self.calling_convention else "" + str(self.identifier) + ": " + str(self.type_annotation)
 
 def FunctionParameterRequiredAst(is_mutable: bool, identifier: IdentifierAst, calling_convention: Optional[TokenAst], type_annotation: TypeAst, _tok: int):
     return FunctionParameterAst(is_mutable, identifier, calling_convention, type_annotation, None, False, _tok)
@@ -265,6 +304,12 @@ class TypeGenericParameterAst:
     is_variadic: bool
     _tok: int
 
+    def as_type(self) -> TypeAst:
+        return TypeSingleAst([GenericIdentifierAst(self.identifier.identifier, [], self.identifier._tok)], self.identifier._tok)
+
+    def __str__(self):
+        return self.identifier.identifier
+
 def TypeGenericParameterRequiredAst(identifier: IdentifierAst, constraints: list[TypeAst], _tok: int):
     return TypeGenericParameterAst(identifier, constraints, None, False, _tok)
 
@@ -285,6 +330,9 @@ class TypeGenericArgumentAst:
     def __eq__(self, other):
         return isinstance(other, TypeGenericArgumentAst) and self.identifier == other.identifier and self.value == other.value
 
+    def __str__(self):
+        return (str(self.identifier) + ": ") if self.identifier else "" + str(self.value)
+
 def TypeGenericArgumentNamedAst(identifier: IdentifierAst, value: TypeAst, _tok: int):
     return TypeGenericArgumentAst(identifier, value, _tok)
 
@@ -299,6 +347,12 @@ class TypeSingleAst:
     def __eq__(self, other):
         return isinstance(other, TypeSingleAst) and self.parts == other.parts
 
+    def __hash__(self):
+        return hash(tuple(self.parts))
+
+    def __str__(self):
+        return ".".join([str(part) for part in self.parts])
+
 @dataclass
 class TypeTupleAst:
     types: list[TypeAst]
@@ -306,6 +360,9 @@ class TypeTupleAst:
 
     def __eq__(self, other):
         return isinstance(other, TypeTupleAst) and self.types == other.types
+
+    def __str__(self):
+        return "(" + ",".join([str(t) for t in self.types]) + ")"
 
 @dataclass
 class IfStatementAst:
@@ -345,6 +402,9 @@ class WithStatementAst:
 class ReturnStatementAst:
     value: list[ExpressionAst]
     _tok: int
+
+    def __str__(self):
+        return "ReturnStatementAst"
 
 @dataclass
 class YieldStatementAst:
@@ -411,7 +471,6 @@ class PostfixFunctionCallAst:
 
 @dataclass
 class PostfixMemberAccessAst:
-    separator: TokenAst
     identifier: IdentifierAst | int
     _tok: int
 
@@ -486,3 +545,29 @@ ExpressionAst = BinaryExpressionAst | PostfixExpressionAst | AssignmentExpressio
 StatementAst = TypedefStatementAst | ReturnStatementAst | LetStatementAst | ExpressionAst | FunctionPrototypeAst
 ModuleMemberAst = EnumPrototypeAst | ClassPrototypeAst | FunctionPrototypeAst | SupPrototypeNormalAst | SupPrototypeInheritanceAst
 SupMemberAst = SupMethodPrototypeAst | SupTypedefAst
+SupPrototypeAst = SupPrototypeNormalAst | SupPrototypeInheritanceAst
+
+
+BIN_FN = {
+    TokenType.TkAdd: "add",
+    TokenType.TkSub: "sub",
+    TokenType.TkMul: "mul",
+    TokenType.TkDiv: "div",
+    TokenType.TkRem: "mod",
+
+    TokenType.TkDoubleAmpersand: "and",
+    TokenType.TkDoublePipe: "or",
+    TokenType.TkAmpersand: "bit_and",
+    TokenType.TkPipe: "bit_or",
+    TokenType.TkCaret: "bit_xor",
+
+    TokenType.TkEq : "eq",
+    TokenType.TkNe: "ne",
+    TokenType.TkLt: "lt",
+    TokenType.TkLe: "le",
+    TokenType.TkGt: "gt",
+    TokenType.TkGe: "ge",
+    TokenType.TkSs : "cmp",
+    TokenType.TkPipeArrowR: "rpip",
+    TokenType.TkPipeArrowL: "lpip",
+}
