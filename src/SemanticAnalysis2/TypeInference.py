@@ -147,8 +147,8 @@ class TypeInfer:
                 if isinstance(ast, Ast.TypeAst):
                     sym: SymbolTypes.TypeSymbol
                     ratio = max([
-                        SequenceMatcher(None, sym.type.identifier.identifier, ast.parts[-1].identifier).ratio(),
-                        SequenceMatcher(None, ast.parts[-1].identifier, sym.type.identifier.identifier).ratio()])
+                        SequenceMatcher(None, sym.name.identifier, ast.parts[-1].identifier).ratio(),
+                        SequenceMatcher(None, ast.parts[-1].identifier, sym.name.identifier).ratio()])
                 else:
                     ratio = max([
                         SequenceMatcher(None, sym.name.identifier, ast.identifier).ratio(),

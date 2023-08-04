@@ -62,7 +62,7 @@ class SymbolGeneration:
     @staticmethod
     def generate_sup_prototype(ast: Ast.SupPrototypeAst, s: ScopeHandler):
         s.enter_scope(ast.identifier)
-        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast, []))
+        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast.identifier, []))
         for member in ast.body.members: SymbolGeneration.generate_sup_member(member, s)
         cls_scope = s.global_scope.get_symbol(ast.identifier.parts[-1].to_identifier(), SymbolTypes.TypeSymbol).sups.append(s.current_scope)
         s.exit_scope()
@@ -82,5 +82,5 @@ class SymbolGeneration:
     @staticmethod
     def generate_sup_typedef(ast: Ast.SupTypedefAst, s: ScopeHandler):
         old_type_sym = s.current_scope.get_symbol(ast.old_type.parts[-1].identifier, SymbolTypes.TypeSymbol)
-        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ast.new_type, old_type_sym.type, old_type_sym.sups))
+        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ast.new_type.parts[-1].to_identifier(), old_type_sym.type, old_type_sym.sups))
 

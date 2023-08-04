@@ -174,7 +174,7 @@ class SemanticAnalysis:
         # Analyse the old type, then add a symbol for the new type that points to the old type.
         ast.old_type = TypeInfer.infer_type(ast.old_type, s)
         old_type_sym = s.current_scope.get_symbol(ast.old_type.parts[-1].identifier, SymbolTypes.TypeSymbol)
-        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ast.new_type.parts[-1], old_type_sym.type, old_type_sym.sup_scopes))
+        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ast.new_type.parts[-1].to_identifier(), old_type_sym.type, old_type_sym.sup_scopes))
 
     @staticmethod
     def analyse_expression(ast: Ast.ExpressionAst, s: ScopeHandler):
@@ -555,7 +555,7 @@ class SemanticAnalysis:
                     yield from SemanticAnalysis.traverse_type(t, s)
             case Ast.SelfTypeAst():
                 sym = s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol)
-                yield sym.type.identifier.identifier
+                yield sym.type
             case _:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Type {type(ast)} not yet supported for traversal. Report as bug.")
 
