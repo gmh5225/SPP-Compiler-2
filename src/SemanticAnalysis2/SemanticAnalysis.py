@@ -1,3 +1,4 @@
+import inspect
 from typing import Iterable, Optional, TypeVar
 
 from src.LexicalAnalysis.Tokens import TokenType, Token
@@ -52,8 +53,10 @@ class SemanticAnalysis:
         # Analyse the generic type parameters -- they must all be inferrable
         parameter_types = [p.type_annotation for p in ast.parameters]
         generic_constraints = [g.constraints for g in ast.generic_parameters]
+        generic_constraints = [c for c in generic_constraints if c]
         all_individual_types = chain_generators(*[SemanticAnalysis.traverse_type(t, s) for t in parameter_types + generic_constraints])
-        temp = [*all_individual_types]
+        temp = {*all_individual_types}
+        print(ast.generic_parameters, temp)
 
         if g := any_elem([g.as_type() for g in ast.generic_parameters if g.as_type() not in all_individual_types]):
             raise SystemExit(ErrFmt.err(g._tok) + "Generic parameter type cannot be inferred.")
@@ -557,6 +560,7 @@ class SemanticAnalysis:
                 sym = s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol)
                 yield sym.type
             case _:
+                print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Type {type(ast)} not yet supported for traversal. Report as bug.")
 
 def chain_generators(*gens):

@@ -140,7 +140,7 @@ class Scope:
 
     def get_symbol_exclusive(self, name: Hashable, expected_sym_type: type[T], error=True) -> T | list[T]:
         try:
-            self.symbol_table.get(name, expected_sym_type)
+            return self.symbol_table.get(name, expected_sym_type)
         except KeyError as e:
             if error:
                 raise e

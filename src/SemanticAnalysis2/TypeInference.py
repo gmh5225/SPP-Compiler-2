@@ -144,23 +144,18 @@ class TypeInfer:
             # Iterate through each symbol, and find the one that is most similar to the identifier.
             for sym in similar_symbols:
                 # Get the ratio of similarity between the identifier and the symbol name.
-                if isinstance(ast, Ast.TypeAst):
-                    sym: SymbolTypes.TypeSymbol
-                    ratio = max([
-                        SequenceMatcher(None, sym.name.identifier, ast.parts[-1].identifier).ratio(),
-                        SequenceMatcher(None, ast.parts[-1].identifier, sym.name.identifier).ratio()])
-                else:
-                    ratio = max([
-                        SequenceMatcher(None, sym.name.identifier, ast.identifier).ratio(),
-                        SequenceMatcher(None, ast.identifier, sym.name.identifier).ratio()])
+                ast_identifier = ast.identifier if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1].identifier
+                ratio = max([
+                    SequenceMatcher(None, sym.name.identifier, ast_identifier).ratio(),
+                    SequenceMatcher(None, ast_identifier, sym.name.identifier).ratio()])
 
                 # If the ratio is higher than the current most likely, then replace the most likely with the new symbol.
                 # If the ratios are the same, do a length comparison, and keep the one closest to the length of the
                 # identifier. Same length identifiers don't matter -- the first one is kept.
                 if ratio > most_likely[0]:
-                    most_likely = (ratio, sym.name.identifier if isinstance(ast, Ast.IdentifierAst) else sym.name.identifier)
-                elif ratio == most_likely[0] and abs(len(sym.name.identifier) - len(ast.identifier)) < abs(len(most_likely[1]) - len(ast.identifier)):
-                    most_likely = (ratio, sym.name.identifier if isinstance(ast, Ast.IdentifierAst) else sym.name.identifier)
+                    most_likely = (ratio, sym.name.identifier)
+                elif ratio == most_likely[0] and abs(len(sym.name.identifier) - len(ast_identifier)) < abs(len(most_likely[1]) - len(ast_identifier)):
+                    most_likely = (ratio, sym.name.identifier)
 
             if most_likely[0] == -1:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown {what} {ast}. Did you mean {most_likely[1]}?")
