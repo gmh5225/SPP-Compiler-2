@@ -76,6 +76,7 @@ class TypeInfer:
             ty = TypeInfer.infer_postfix_member_access(ast.lhs, s) if isinstance(ast.lhs, Ast.PostfixExpressionAst) else TypeInfer.infer_identifier(ast.lhs, s)
         if isinstance(ast, Ast.IdentifierAst):
             ty = TypeInfer.infer_identifier(ast, s)
+        ty = TypeInfer.infer_type(ty, s)
         cls = s.global_scope.get_child_scope(ty)
         sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False)
         if not sym:
@@ -131,6 +132,8 @@ class TypeInfer:
 
     @staticmethod
     def infer_type(ast: Ast.TypeAst, s: ScopeHandler) -> Ast.TypeAst:
+        if isinstance(ast.parts[-1], Ast.SelfTypeAst):
+            return s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol).type
         return ast
 
     @staticmethod
