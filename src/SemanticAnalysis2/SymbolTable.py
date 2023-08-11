@@ -99,10 +99,14 @@ class SymbolTable:
 
         match expected_sym_type.__name__:
             case "VariableSymbol": return symbols[hash(name)]
-            case "FunctionSymbol": return [sym for sym in symbols.values() if sym.name == name]
+            case "FunctionSymbol":
+                funcs = [sym for sym in symbols.values() if sym.name == name]
+                if len(funcs) == 0:
+                    dummy_for_err = symbols[hash(name)]
+                return funcs
             case "TypeSymbol": return symbols[hash(name)]
             case "GenericSymbol": return symbols[hash(name)]
-            case _: raise SystemExit(f"Unknown symbol type {expected_sym_type.__name__}.")
+            case _: raise SystemExit(f"Unknown symbol type '{expected_sym_type.__name__}'.")
 
     def has(self, name: Hashable, expected_sym_type: type) -> bool:
         return hash(name) in self.symbols and isinstance(self.symbols[hash(name)], expected_sym_type)
@@ -135,27 +139,36 @@ class Scope:
 
     def get_symbol(self, name: Hashable, expected_sym_type: type[T], error=True) -> T:
         # combine this, sup-scopes and parents (recursively) into one symbol table
-        # combined_symbol_tables = SymbolTable()
-        # combined_symbol_tables.symbols = {**self.symbol_table.symbols}
-        # for sup_scope in self.sup_scopes:
-        #     combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **sup_scope.symbol_table.symbols}
-        # if self.parent:
-        #     combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **self.parent.symbol_table.symbols}
+        combined_symbol_tables = SymbolTable()
+        combined_symbol_tables.symbols = {**self.symbol_table.symbols}
+        for sup_scope in self.sup_scopes:
+            combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **sup_scope.symbol_table.symbols}
 
+        sym = None
         try:
-            sym = self.symbol_table.get(name, expected_sym_type)
-        except:
-            sym = None
-        if not sym and self.sup_scopes:
-            for sup_scope in self.sup_scopes:
-                sym = sup_scope.get_symbol(name, expected_sym_type, error=False)
-                if sym:
-                    break
-        if not sym and self.parent:
-            sym = self.parent.get_symbol(name, expected_sym_type, error=False)
+            sym = combined_symbol_tables.get(name, expected_sym_type)
+        except KeyError:
+            if self.parent:
+                sym = self.parent.get_symbol(name, expected_sym_type, error=False)
         if not sym:
             raise Exception(f"Could not find {expected_sym_type.__name__} '{name}'.")
         return sym
+
+
+        # try:
+        #     sym = self.symbol_table.get(name, expected_sym_type)
+        # except:
+        #     sym = None
+        # if not sym and self.sup_scopes:
+        #     for sup_scope in self.sup_scopes:
+        #         sym = sup_scope.get_symbol(name, expected_sym_type, error=False)
+        #         if sym:
+        #             break
+        # if not sym and self.parent:
+        #     sym = self.parent.get_symbol(name, expected_sym_type, error=False)
+        # if not sym:
+        #     raise Exception(f"Could not find {expected_sym_type.__name__} '{name}'.")
+        # return sym
 
     def get_symbol_exclusive(self, name: Hashable, expected_sym_type: type[T], error=True) -> T | list[T]:
         combined_symbol_tables = SymbolTable()
