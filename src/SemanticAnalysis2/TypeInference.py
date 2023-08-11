@@ -10,7 +10,7 @@ from src.SemanticAnalysis2.CommonTypes import CommonTypes
 
 class TypeInfer:
     @staticmethod
-    def infer_expression(ast: Ast.ExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+    def infer_expression(ast: Ast.ExpressionAst, s: ScopeHandler, **kwargs) -> Ast.TypeAst:
         match ast:
             case Ast.IdentifierAst(): return TypeInfer.infer_identifier(ast, s)
             case Ast.LambdaAst(): raise NotImplementedError("Lambda expressions are not implemented yet.")
@@ -20,7 +20,7 @@ class TypeInfer:
             case Ast.WithStatementAst(): return TypeInfer.infer_statement(ast.body[-1], s)
             case Ast.InnerScopeAst(): return TypeInfer.infer_statement(ast.body[-1], s)
             case Ast.BinaryExpressionAst(): return TypeInfer.infer_binary_expression(ast, s)
-            case Ast.PostfixExpressionAst(): return TypeInfer.infer_postfix_expression(ast, s)
+            case Ast.PostfixExpressionAst(): return TypeInfer.infer_postfix_expression(ast, s, **kwargs)
             case Ast.AssignmentExpressionAst(): return CommonTypes.void()
             case Ast.PlaceholderAst(): raise NotImplementedError("Placeholder expressions are not implemented yet.")
             case Ast.TypeSingleAst(): return ast
@@ -61,16 +61,16 @@ class TypeInfer:
         return TypeInfer.infer_expression(fn_call, s)
 
     @staticmethod
-    def infer_postfix_expression(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+    def infer_postfix_expression(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs) -> Ast.TypeAst:
         match ast.op:
-            case Ast.PostfixMemberAccessAst(): return TypeInfer.infer_postfix_member_access(ast, s)
+            case Ast.PostfixMemberAccessAst(): return TypeInfer.infer_postfix_member_access(ast, s, **kwargs)
             case Ast.PostfixFunctionCallAst(): return TypeInfer.infer_postfix_function_call(ast, s)
             case Ast.PostfixStructInitializerAst(): return TypeInfer.infer_postfix_struct_initializer(ast, s)
             case _:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown postfix expression {ast} being inferred. Report as bug.")
 
     @staticmethod
-    def infer_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+    def infer_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs) -> Ast.TypeAst:
         ty = None
         if isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.op, Ast.PostfixMemberAccessAst):
             ty = TypeInfer.infer_postfix_member_access(ast.lhs, s) if isinstance(ast.lhs, Ast.PostfixExpressionAst) else TypeInfer.infer_identifier(ast.lhs, s)
@@ -78,45 +78,65 @@ class TypeInfer:
             ty = TypeInfer.infer_identifier(ast, s)
         ty = TypeInfer.infer_type(ty, s)
         cls = s.global_scope.get_child_scope(ty)
-        sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False)
+        sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False) or cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.FunctionSymbol, error=False)
         if not sym:
             raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Unknown member '{ast.op.identifier}' of type '{ty}'.")
-        return sym.type
+        if isinstance(sym, SymbolTypes.VariableSymbol):
+            return sym.type
+        return sym, [s.type for s in sym]
 
     @staticmethod
     def infer_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
         # To infer something like x.y.z(a, b), we need to infer x.y.z, then infer a and b, then infer the function call.
 
-        lhs_type = TypeInfer.infer_expression(ast.lhs, s)
+        syms, lhs_type = TypeInfer.infer_expression(ast.lhs, s, all=True)
         arg_tys = [TypeInfer.infer_expression(arg.value, s) for arg in ast.op.arguments]
         arg_ccs = [arg.calling_convention for arg in ast.op.arguments]
 
-        # Get the function symbol from the scope
-        syms = s.global_scope.get_child_scope(lhs_type).get_symbol_exclusive(ast.op.identifier, SymbolTypes.FunctionSymbol)
+        # The next step is because overloads of functions can return different types ie: 'f(Str) -> Num' and
+        # 'f(Int) -> Str' can be overloads of 'f'. We need to find the function that matches the arguments, and return
+        # the return type of that function.
+
+        # Get the function symbol from the scope.
         sigs = []
-        for sym in syms:
-            fn_type = sym.type
+        errs = []
+        for i, fn_type in enumerate(lhs_type):
+            param_names = [param.identifier.identifier for param in fn_type.parameters]
             param_tys = [param.type_annotation for param in fn_type.parameters]
             param_ccs = [param.calling_convention for param in fn_type.parameters]
-            sigs.append(",".join([f"{param_cc}{param_ty}" for param_cc, param_ty in zip(param_ccs, param_tys)]))
+            sigs.append(fn_type.identifier.identifier + "(" + ",".join([f"{param_name}: {param_cc}{param_ty}" for param_name, param_cc, param_ty in zip(param_names, param_ccs, param_tys)]) + ") -> " + str(fn_type.return_type))
+
+            # Skip first argument type for non-static functions
+            if not syms[i].static:
+                param_tys = param_tys[1:]
+                param_ccs = param_ccs[1:]
 
             # Check if the function is callable with the number of given arguments.
             if len(param_tys) != len(arg_tys):
+                errs.append(f"Expected {len(param_tys)} arguments, but got {len(arg_tys)}.")
                 continue
 
             # Check if the function is callable with the given argument types.
             if any([arg_ty != param_ty for arg_ty, param_ty in zip(arg_tys, param_tys)]):
+                errs.append(f"Expected arguments of types {', '.join([str(ty) for ty in param_tys])}, but got {', '.join([str(ty) for ty in arg_tys])}.")
                 continue
 
             # Check the calling conventions match.
             if any([arg_cc != param_cc for arg_cc, param_cc in zip(arg_ccs, param_ccs)]):
+                errs.append(f"Expected arguments with calling conventions {', '.join([str(cc) for cc in param_ccs])}, but got {', '.join([str(cc) for cc in arg_ccs])}.")
                 continue
 
             # If we get here, we have found the function we are looking for.
             return fn_type.return_type
 
-        NL = "\n"
-        raise SystemExit(ErrFmt.err(ast._tok) + f"Could not find function {ast.op.identifier} with the given arguments. Available signatures: {NL.join(sigs)}")
+        NL = "\n\t- "
+        sigs.insert(0, "")
+        errs.insert(0, "")
+        output = []
+        for i in range(len(sigs)):
+            output.append(f"{sigs[i]}: {errs[i]}")
+
+        raise SystemExit(ErrFmt.err(ast.lhs.op.identifier._tok) + f"Could not find function '{ast.lhs.op.identifier}' with the given arguments.\nAvailable signatures:{NL.join(output)}")
 
     @staticmethod
     def infer_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:

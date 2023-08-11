@@ -44,6 +44,11 @@ class SemanticAnalysis:
         function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.FunctionSymbol)[0]
         s.next_scope()
 
+        # Mark global methods as "static" ie don't have a "self" parameter
+        if s.current_scope == s.global_scope:
+            fun_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.FunctionSymbol)[0]
+            fun_symbol.static = True
+
         # Analyse all the decorators and parameters, and the return type
         [SemanticAnalysis.analyse_decorator(ast, d, s) for d in ast.decorators]
         [SemanticAnalysis.analyse_parameter(p, s) for p in ast.parameters]
@@ -314,7 +319,8 @@ class SemanticAnalysis:
         mut_args = {}
         arg_ts   = []
 
-        # todo : multiple partial moves are not checked at the moment
+        # TODO : multiple partial moves are not checked at the moment
+        # TODO : add "self" into the arguments
 
         for i, arg in enumerate(ast.op.arguments):
             # No calling convention means that a move is taking place.

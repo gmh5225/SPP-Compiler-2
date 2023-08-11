@@ -63,6 +63,10 @@ class SymbolTypes:
                 "type": str(self.type)
             }
 
+        @property
+        def true_type(self) -> Ast.TypeAst:
+            return Ast.TypeSingleAst([Ast.GenericIdentifierAst(self.type.identifier.identifier, [self.type.return_type] + [p.type_annotation for p in self.type.parameters], self.type._tok)], self.type._tok)
+
     @dataclass
     class TypeSymbol(Symbol):
         name: Ast.IdentifierAst

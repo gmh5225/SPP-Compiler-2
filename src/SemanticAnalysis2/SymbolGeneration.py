@@ -73,7 +73,7 @@ class SymbolGeneration:
             case Ast.SupMethodPrototypeAst(): SymbolGeneration.generate_sup_method_prototype(ast, s)
             case Ast.SupTypedefAst(): SymbolGeneration.generate_sup_typedef(ast, s)
             case _:
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown sup member {ast} being generated. Report as bug.")
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown sup member '{ast}' being generated. Report as bug.")
 
     @staticmethod
     def generate_sup_method_prototype(ast: Ast.SupMethodPrototypeAst, s: ScopeHandler):
