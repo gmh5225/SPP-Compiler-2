@@ -43,17 +43,13 @@ class TokenType(Enum):
     TkBraceR = "}"
 
     TkQst = "?"
-
-    TkPipeArrowR = "|>"
-    TkPipeArrowL = "<|"
     TkTripleDot = "..."
     TkColon = ":"
 
     TkDot = "."
     TkComma = ","
     TkAssign = "="
-    TkArrowReturn = "->"
-    TkArrowRFat = "=>"
+    TkArrowR = "->"
     TkAt = "@"
     TkUnderscore = "_"
 

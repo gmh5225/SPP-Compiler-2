@@ -169,7 +169,10 @@ class FunctionPrototypeAst:
     _tok: int
 
     def __str__(self):
-        return self.identifier.identifier + ("[" + ",".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "") + "(" + ",".join([str(param) for param in self.parameters]) + ")" + (" -> " + str(self.return_type) if self.return_type else "")
+        return self.identifier.identifier\
+            + ("[" + ",".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "")\
+            + "(" + ",".join([str(param) for param in self.parameters]) + ")"\
+            + (" -> " + str(self.return_type) if self.return_type else "")
 
 @dataclass
 class FunctionArgumentAst:
@@ -178,6 +181,11 @@ class FunctionArgumentAst:
     calling_convention: Optional[ParameterPassingConventionReferenceAst]
     unpack: bool
     _tok: int
+
+    def __str__(self):
+        s = str(self.calling_convention) if self.calling_convention else ""
+        s += str(self.value)
+        return s
 
 def FunctionArgumentNamedAst(identifier: IdentifierAst, convention: Optional[TokenAst], value: ExpressionAst, _tok: int):
     return FunctionArgumentAst(identifier, value, convention, False, _tok)
@@ -196,7 +204,9 @@ class FunctionParameterAst:
     _tok: int
 
     def __str__(self):
-        return "mut" if self.is_mutable else "" + str(self.calling_convention) if self.calling_convention else "" + str(self.identifier) + ": " + str(self.type_annotation)
+        return ("mut" if self.is_mutable else "")\
+            + (str(self.calling_convention) if self.calling_convention else "")\
+            + str(self.identifier) + ": " + str(self.type_annotation)
 
 def FunctionParameterRequiredAst(is_mutable: bool, identifier: IdentifierAst, calling_convention: Optional[TokenAst], type_annotation: TypeAst, _tok: int):
     return FunctionParameterAst(is_mutable, identifier, calling_convention, type_annotation, None, False, _tok)
@@ -271,6 +281,11 @@ class PostfixExpressionAst:
     lhs: ExpressionAst
     op: PostfixOperationAst
     _tok: int
+
+    def __str__(self):
+        s = str(self.lhs)
+        s += str(self.op)
+        return s
 
 @dataclass
 class PlaceholderAst:
@@ -362,7 +377,7 @@ class TypeTupleAst:
         return isinstance(other, TypeTupleAst) and self.types == other.types
 
     def __str__(self):
-        return "(" + ",".join([str(t) for t in self.types]) + ")"
+        return "(" + ", ".join([str(t) for t in self.types]) + ")"
 
 @dataclass
 class IfStatementAst:
@@ -469,21 +484,38 @@ class PostfixFunctionCallAst:
     arguments: list[FunctionArgumentAst]
     _tok: int
 
+    def __str__(self):
+        s = "[" + ", ".join([str(arg) for arg in self.type_arguments]) + "]" if self.type_arguments else ""
+        s += "(" + ", ".join([str(arg) for arg in self.arguments]) + ")"
+        return s
+
 @dataclass
 class PostfixMemberAccessAst:
     identifier: IdentifierAst | int
     _tok: int
+
+    def __str__(self):
+        return "." + str(self.identifier)
 
 @dataclass
 class PostfixStructInitializerAst:
     fields: list[PostfixStructInitializerFieldAst]
     _tok: int
 
+    def __str__(self):
+        s = "{" + ", ".join([str(field) for field in self.fields]) + "}"
+        return s
+
 @dataclass
 class PostfixStructInitializerFieldAst:
     identifier: IdentifierAst | TokenAst
     value: Optional[ExpressionAst]
     _tok: int
+
+    def __str__(self):
+        s = str(self.identifier)
+        s += ("=" + str(self.value)) if self.value else ""
+        return s
 
 @dataclass
 class NumberLiteralBase10Ast:
@@ -493,6 +525,14 @@ class NumberLiteralBase10Ast:
     exponent: Optional[NumberExponentAst]
     is_imaginary: bool
     _tok: int
+
+    def __str__(self):
+        s = self.sign.tok.token_metadata if self.sign else ""
+        s += self.integer
+        s += "." + self.decimal if self.decimal else ""
+        s += str(self.exponent) if self.exponent else ""
+        s += "i" if self.is_imaginary else ""
+        return s
 
 @dataclass
 class NumberLiteralBase16Ast:
@@ -510,14 +550,18 @@ class NumberExponentAst:
     value: str
     _tok: int
 
+    def __str__(self):
+        s = self.sign.tok.token_metadata + self.value
+        return s
+
 @dataclass
 class StringLiteralAst:
     value: str
     _tok: int
 
 @dataclass
-class CharLiteralAst:
-    value: str
+class ArrayLiteralAst:
+    values: list[ExpressionAst]
     _tok: int
 
 @dataclass
@@ -538,7 +582,7 @@ class TupleLiteralAst:
 
 PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixStructInitializerAst | TokenAst
 NumberLiteralAst = NumberLiteralBase10Ast | NumberLiteralBase16Ast | NumberLiteralBase02Ast
-LiteralAst = NumberLiteralAst | StringLiteralAst | CharLiteralAst | BoolLiteralAst | RegexLiteralAst | TupleLiteralAst
+LiteralAst = NumberLiteralAst | StringLiteralAst | ArrayLiteralAst | BoolLiteralAst | RegexLiteralAst | TupleLiteralAst
 TypeAst = TypeSingleAst | TypeTupleAst
 PrimaryExpressionAst = LiteralAst | IdentifierAst | LambdaAst | PlaceholderAst | TypeSingleAst | IfStatementAst | WhileStatementAst | YieldStatementAst | InnerScopeAst | WithStatementAst | TokenAst
 ExpressionAst = BinaryExpressionAst | PostfixExpressionAst | AssignmentExpressionAst | PrimaryExpressionAst | TokenAst
@@ -568,6 +612,17 @@ BIN_FN = {
     TokenType.TkGt: "gt",
     TokenType.TkGe: "ge",
     TokenType.TkSs : "cmp",
-    TokenType.TkPipeArrowR: "rpip",
-    TokenType.TkPipeArrowL: "lpip",
+
+
+    TokenType.TkAddEq: "add_eq",
+    TokenType.TkSubEq: "sub_eq",
+    TokenType.TkMulEq: "mul_eq",
+    TokenType.TkDivEq: "div_eq",
+    TokenType.TkRemEq: "mod_eq",
+
+    TokenType.TkDoubleAmpersandEquals: "and_eq",
+    TokenType.TkDoublePipeEquals: "or_eq",
+    TokenType.TkAmpersandEquals: "bit_and_eq",
+    TokenType.TkPipeEquals: "bit_or_eq",
+    TokenType.TkCaretEquals: "bit_xor_eq",
 }

@@ -18,9 +18,9 @@ class CommonTypes:
         return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Str", [], -1)], -1)
 
     @staticmethod
-    def char() -> Ast.TypeAst:
+    def array(type: Ast.TypeAst) -> Ast.TypeAst:
         # Character type
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Char", [], -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Arr", [type], -1)], -1)
 
     @staticmethod
     def regex() -> Ast.TypeAst:

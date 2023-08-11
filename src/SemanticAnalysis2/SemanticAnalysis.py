@@ -72,10 +72,15 @@ class SemanticAnalysis:
                 ErrFmt.err([d for d in ast.decorators if d.identifier.parts == ["meta", "abstractmethod"]][0]._tok) + "Method defined as abstract here\n...\n",
                 ErrFmt.err(ast.body.statements[0]._tok) + "Abstract methods cannot have a body.")
 
+        # Analyse each statement
+        if not function_symbol.abstract:
+            for statement in ast.body.statements:
+                SemanticAnalysis.analyse_statement(statement, s)
+
         # Make sure the return type of the last statement matches the return type of the function, unless the method is
         # abstract, in which case it is allowed to not have a return statement
         [SemanticAnalysis.analyse_statement(st, s) for st in ast.body.statements]
-        t = TypeInfer.infer_statement(ast.body.statements[-1], s)
+        t = TypeInfer.infer_statement(ast.body.statements[-1], s) if ast.body.statements else CommonTypes.void()
         if t != ast.return_type and not function_symbol.abstract:
             err_ast = ast.body.statements[-1] if ast.body.statements else ast.body
             raise SystemExit(ErrFmt.err(err_ast._tok) + f"Expected return type of function to be {ast.return_type}, but got {t}.")
@@ -216,6 +221,9 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_identifier(ast: Ast.IdentifierAst, s: ScopeHandler):
+        # Special assignment dummy method to check the statement and avoid code duplication.
+        if ast.identifier == "__set__":
+            return
         if not s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol):
             raise SystemExit(ErrFmt.err(ast._tok) + f"Identifier {ast} not found in scope.")
 
@@ -315,6 +323,9 @@ class SemanticAnalysis:
         
     @staticmethod
     def analyse_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
+        # Verify the LHS is valid
+        SemanticAnalysis.analyse_expression(ast.lhs, s)
+
         ref_args = {}
         mut_args = {}
         arg_ts   = []
@@ -323,6 +334,9 @@ class SemanticAnalysis:
         # TODO : add "self" into the arguments
 
         for i, arg in enumerate(ast.op.arguments):
+            # Check the argument is valid.
+            SemanticAnalysis.analyse_expression(arg.value, s)
+
             # No calling convention means that a move is taking place.
             if not arg.calling_convention:
                 # This can only happen from a non-borrowed context, so check that the argument is an attribute of a borrowed variable.
@@ -389,6 +403,8 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
+        print(f"STRUCT-INIT {ast}")
+
         cls_ty = TypeInfer.check_type(ast.lhs, s)
 
         # Check that each variable being passed into the initializer is valid, ie hasn't been moved already.

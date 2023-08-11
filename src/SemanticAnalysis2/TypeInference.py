@@ -26,7 +26,7 @@ class TypeInfer:
             case Ast.TypeSingleAst(): return ast
             case Ast.BoolLiteralAst(): return CommonTypes.bool()
             case Ast.StringLiteralAst(): return CommonTypes.string()
-            case Ast.CharLiteralAst(): return CommonTypes.char()
+            case Ast.ArrayLiteralAst(): return CommonTypes.array(TypeInfer.infer_expression(ast.elements[0], s))
             case Ast.RegexLiteralAst(): return CommonTypes.regex()
             case Ast.TupleLiteralAst(): return CommonTypes.tuple([TypeInfer.infer_expression(e, s) for e in ast.elements])
             case Ast.NumberLiteralBase02Ast(): return CommonTypes.num()
