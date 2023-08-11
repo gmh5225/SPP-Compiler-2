@@ -318,8 +318,8 @@ class SemanticAnalysis:
                 raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Index {ast.op.identifier.integer} out of range for type '{lhs_type}'.")
 
         # Else, check the attribute exists on the LHS.
-        elif not class_scope.has_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol):
-            raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Attribute {ast.op.identifier} not found in type '{lhs_type}'.")
+        elif not (class_scope.has_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol) or class_scope.has_symbol_exclusive(ast.op.identifier, SymbolTypes.FunctionSymbol)):
+            raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Attribute '{ast.op.identifier}' not found in type '{lhs_type}'.")
         
     @staticmethod
     def analyse_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
@@ -412,9 +412,11 @@ class SemanticAnalysis:
         for given_field in ast.op.fields:
             SemanticAnalysis.analyse_expression(given_field.value or given_field.identifier, s)
 
-            if isinstance(given_field, Ast.IdentifierAst) and not s.current_scope.get_symbol(given_field, SymbolTypes.VariableSymbol).mem_info.is_initialized:
+            if isinstance(given_field.value or given_field.identifier, Ast.IdentifierAst) and not s.current_scope.get_symbol(given_field, SymbolTypes.VariableSymbol).mem_info.is_initialized:
                 raise SystemExit(ErrFmt.err(given_field._tok) + f"Argument {given_field} is not initialized or has been moved.")
-            s.current_scope.get_symbol(given_field.identifier, SymbolTypes.VariableSymbol).mem_info.is_initialized = False
+            print(given_field)
+            if isinstance(given_field.value or given_field.identifier, Ast.IdentifierAst):
+                s.current_scope.get_symbol(given_field.value or given_field.identifier, SymbolTypes.VariableSymbol).mem_info.is_initialized = False
 
         # The "default_obj_given" field is a special field that is used to provide a default value for all fields not
         # given explicitly. If this field is present, then all fields not given explicitly are moved from the default

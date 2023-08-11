@@ -1679,7 +1679,7 @@ class Parser:
             p1 = self._parse_statement_typedef().delay_parse()
             p2 = self._parse_statement_return().delay_parse()
             p3 = self._parse_statement_let().delay_parse()
-            p4 = self._parse_statement_expression().delay_parse()
+            p4 = self._parse_expression().delay_parse()
             p5 = self._parse_function_prototype().delay_parse()
             p6 = (p4 | p1 | p2 | p3 | p5).parse_once()
             return p6

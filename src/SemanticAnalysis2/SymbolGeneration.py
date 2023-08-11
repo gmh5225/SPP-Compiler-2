@@ -24,7 +24,8 @@ class SymbolGeneration:
         match ast:
             case Ast.FunctionPrototypeAst(): SymbolGeneration.generate_function_prototype(ast, s)
             case Ast.ClassPrototypeAst(): SymbolGeneration.generate_class_prototype(ast, s)
-            case Ast.EnumPrototypeAst(): SymbolGeneration.generate_enum_prototype(ast, s)
+            case Ast.EnumPrototypeAst():
+                raise SystemExit(ErrFmt.err(ast._tok) + "Enums are not supported yet.")
             case Ast.SupPrototypeNormalAst(): SymbolGeneration.generate_sup_prototype(ast, s)
             case Ast.SupPrototypeInheritanceAst(): SymbolGeneration.generate_sup_prototype(ast, s)
             case _:
@@ -36,7 +37,7 @@ class SymbolGeneration:
         try:
             mod_code = open(mod_name, "r").read()
         except FileNotFoundError:
-            raise SystemExit(ErrFmt.err(ast._tok) + f"Module {ast.module} not found.")
+            raise SystemExit(ErrFmt.err(ast.module._tok) + f"Module '{ast.module}' not found.")
         ts = ErrFmt.TOKENS
         SymbolGeneration.generate_program(Parser(Lexer(mod_code).lex()).parse(), s)
         ErrFmt.TOKENS = ts
@@ -81,8 +82,13 @@ class SymbolGeneration:
 
     @staticmethod
     def generate_sup_typedef(ast: Ast.SupTypedefAst, s: ScopeHandler):
-        old_type_sym = s.current_scope.get_symbol(ast.old_type.parts[-1].identifier, SymbolTypes.TypeSymbol)
-        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ast.new_type.parts[-1].to_identifier(), old_type_sym.type, old_type_sym.sups))
+        old_type_sym = s.current_scope.get_symbol(ast.old_type.parts[-1], SymbolTypes.TypeSymbol, error=False)
+        if not old_type_sym:
+            raise SystemExit(ErrFmt.err(ast.old_type._tok) + f"Type '{ast.old_type}' not found.")
+
+        old_type_scope = s.global_scope.get_child_scope(ast.old_type)
+        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ast.new_type.parts[-1].to_identifier(), old_type_sym.type))
+        s.current_scope.sup_scopes.extend(old_type_scope.sup_scopes)
 
     @staticmethod
     def dummy_generic_type(ast: Ast.IdentifierAst) -> Ast.TypeAst:

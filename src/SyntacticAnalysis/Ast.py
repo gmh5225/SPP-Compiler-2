@@ -46,6 +46,9 @@ class ModuleIdentifierAst:
     parts: list[IdentifierAst]
     _tok: int
 
+    def __str__(self):
+        return ".".join([str(part) for part in self.parts])
+
 @dataclass
 class GenericIdentifierAst:
     identifier: str
@@ -110,6 +113,9 @@ class ImportStatementAst:
 class ImportIdentifierAst:
     parts: list[IdentifierAst]
     _tok: int
+
+    def __str__(self):
+        return "/".join([str(part) for part in self.parts])
 
 @dataclass
 class ImportBlockAst:

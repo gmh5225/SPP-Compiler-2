@@ -154,7 +154,7 @@ class Scope:
         except KeyError:
             if self.parent:
                 sym = self.parent.get_symbol(name, expected_sym_type, error=False)
-        if not sym:
+        if not sym and error:
             raise Exception(f"Could not find {expected_sym_type.__name__} '{name}'.")
         return sym
 
