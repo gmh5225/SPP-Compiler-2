@@ -73,10 +73,13 @@ class TypeInfer:
     def infer_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
         ty = None
         if isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.op, Ast.PostfixMemberAccessAst):
-            ty = TypeInfer.infer_postfix_member_access(ast.lhs, s)
+            ty = TypeInfer.infer_postfix_member_access(ast.lhs, s) if isinstance(ast.lhs, Ast.PostfixExpressionAst) else TypeInfer.infer_identifier(ast.lhs, s)
         if isinstance(ast, Ast.IdentifierAst):
             ty = TypeInfer.infer_identifier(ast, s)
-        sym = s.global_scope.get_child_scope(ty).get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol)
+        cls = s.global_scope.get_child_scope(ty)
+        sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False)
+        if not sym:
+            raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Unknown member '{ast.op.identifier}' of type '{ty}'.")
         return sym.type
 
     @staticmethod

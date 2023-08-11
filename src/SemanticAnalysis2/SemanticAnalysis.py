@@ -414,7 +414,6 @@ class SemanticAnalysis:
         # an error for the first unknown field.
         difference = set(given_fields) - set(actual_fields)
         if difference and (unknown_field := difference.pop()):
-            print(ast.op.fields)
             raise SystemExit(ErrFmt.err(ast.op.fields[given_fields.index(unknown_field)]._tok) + f"Struct initializer for '{cls_ty}' contains unknown fields: '{unknown_field}'.")
 
         # If there are less given fields than actual fields, then the default object must be given. If it hasn't been
@@ -434,11 +433,11 @@ class SemanticAnalysis:
         # same time, so their order has to be the same.
         for given, actual in zip(sorted(given_fields), sorted(actual_fields)):
             given_ty = TypeInfer.infer_expression(ast.op.fields[given_fields.index(given)].value or ast.op.fields[given_fields.index(given)].identifier, s)
-            actual_ty = cls_definition_scope.get_symbol(actual, SymbolTypes.VariableSymbol).type
+            actual_ty = cls_definition_scope.get_symbol(Ast.IdentifierAst(identifier=actual, _tok=-1), SymbolTypes.VariableSymbol).type
 
             if given_ty != actual_ty:
                 err_pos = (ast.op.fields[given_fields.index(given)].value or ast.op.fields[given_fields.index(given)].identifier)._tok
-                raise SystemExit(ErrFmt.err(err_pos) + f"Field '{given}' given to struct initializer is not of type '{actual_ty}'. It is of type '{given_ty}'.")
+                raise SystemExit(ErrFmt.err(err_pos) + f"Field '{given}' given to struct initializer is type '{given_ty}', but should be '{actual_ty}'.")
 
     @staticmethod
     def analyse_let_statement(ast: Ast.LetStatementAst, s: ScopeHandler):
