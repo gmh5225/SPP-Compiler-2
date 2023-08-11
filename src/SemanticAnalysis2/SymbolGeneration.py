@@ -44,17 +44,16 @@ class SymbolGeneration:
 
     @staticmethod
     def generate_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler):
+        s.current_scope.add_symbol(SymbolTypes.FunctionSymbol(ast.identifier, ast, False, False, False))
         s.enter_scope(ast.identifier)
         s.exit_scope()
-        s.current_scope.add_symbol(SymbolTypes.FunctionSymbol(ast.identifier, ast, False, False, False))
-        a = 1
 
     @staticmethod
     def generate_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeHandler):
         ty = Ast.TypeSingleAst([Ast.GenericIdentifierAst(ast.identifier.identifier, [None for _ in range(len(ast.generic_parameters))], ast._tok)], ast._tok)
-        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ty.parts[-1].to_identifier(), ast, []))
-        s.enter_scope(ast.identifier)
-        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast, []))
+        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ty.parts[-1].to_identifier(), ast))
+        s.enter_scope(ty)
+        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast))
         for attr in ast.body.members:
             s.current_scope.add_symbol(SymbolTypes.VariableSymbol(attr.identifier, attr.type_annotation, VariableSymbolMemoryStatus(), False))
         s.exit_scope()
@@ -62,9 +61,9 @@ class SymbolGeneration:
     @staticmethod
     def generate_sup_prototype(ast: Ast.SupPrototypeAst, s: ScopeHandler):
         s.enter_scope(ast.identifier)
-        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast.identifier, []))
+        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast.identifier))
         for member in ast.body.members: SymbolGeneration.generate_sup_member(member, s)
-        cls_scope = s.global_scope.get_symbol(ast.identifier.parts[-1].to_identifier(), SymbolTypes.TypeSymbol).sups.append(s.current_scope)
+        s.global_scope.get_child_scope(ast.identifier).sup_scopes.append(s.current_scope)
         s.exit_scope()
 
     @staticmethod
@@ -84,3 +83,5 @@ class SymbolGeneration:
         old_type_sym = s.current_scope.get_symbol(ast.old_type.parts[-1].identifier, SymbolTypes.TypeSymbol)
         s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ast.new_type.parts[-1].to_identifier(), old_type_sym.type, old_type_sym.sups))
 
+
+x = False

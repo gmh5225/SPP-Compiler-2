@@ -67,12 +67,10 @@ class SymbolTypes:
     class TypeSymbol(Symbol):
         name: Ast.IdentifierAst
         type: Ast.ClassPrototypeAst
-        sups: list[Scope]
 
         def json(self) -> dict:
             return {
-                "name": str(self.name),
-                "sups": [str(sup.id) for sup in self.sups]
+                "name": str(self.name)
             }
 
     @dataclass
@@ -115,14 +113,17 @@ class Scope:
     parent: Optional[Scope]
     symbol_table: SymbolTable
     children: list[Scope]
+    sup_scopes: list[Scope]
 
     visited: bool
 
     def __init__(self, id: Hashable, parent: Optional[Scope]):
+        self.name = id
         self.id = hash(id)
         self.parent = parent
         self.symbol_table = SymbolTable()
         self.children = []
+        self.sup_scopes = []
 
         self.visited = False
 
@@ -133,10 +134,23 @@ class Scope:
         self.symbol_table.add(symbol)
 
     def get_symbol(self, name: Hashable, expected_sym_type: type[T], error=True) -> T:
+        # combine this, sup-scopes and parents (recursively) into one symbol table
+        # combined_symbol_tables = SymbolTable()
+        # combined_symbol_tables.symbols = {**self.symbol_table.symbols}
+        # for sup_scope in self.sup_scopes:
+        #     combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **sup_scope.symbol_table.symbols}
+        # if self.parent:
+        #     combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **self.parent.symbol_table.symbols}
+
         try:
             sym = self.symbol_table.get(name, expected_sym_type)
         except:
             sym = None
+        if not sym and self.sup_scopes:
+            for sup_scope in self.sup_scopes:
+                sym = sup_scope.get_symbol(name, expected_sym_type, error=False)
+                if sym:
+                    break
         if not sym and self.parent:
             sym = self.parent.get_symbol(name, expected_sym_type, error=False)
         if not sym:
@@ -144,8 +158,13 @@ class Scope:
         return sym
 
     def get_symbol_exclusive(self, name: Hashable, expected_sym_type: type[T], error=True) -> T | list[T]:
+        combined_symbol_tables = SymbolTable()
+        combined_symbol_tables.symbols = {**self.symbol_table.symbols}
+        for sup_scope in self.sup_scopes:
+            combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **sup_scope.symbol_table.symbols}
+
         try:
-            return self.symbol_table.get(name, expected_sym_type)
+            return combined_symbol_tables.get(name, expected_sym_type)
         except KeyError as e:
             if error:
                 raise e
@@ -159,7 +178,12 @@ class Scope:
         return found
 
     def has_symbol_exclusive(self, name: Hashable, expected_sym_type: type) -> bool:
-        return self.symbol_table.has(name, expected_sym_type)
+        combined_symbol_tables = SymbolTable()
+        combined_symbol_tables.symbols = {**self.symbol_table.symbols}
+        for sup_scope in self.sup_scopes:
+            combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **sup_scope.symbol_table.symbols}
+
+        return combined_symbol_tables.has(name, expected_sym_type)
 
     def all_symbols(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
         syms = self.all_symbols_exclusive(expected_sym_type)
@@ -168,7 +192,11 @@ class Scope:
         return syms
 
     def all_symbols_exclusive(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
-        return [s for s in list(self.symbol_table.symbols.values()) if isinstance(s, expected_sym_type)]
+        combined_symbol_tables = SymbolTable()
+        combined_symbol_tables.symbols = {**self.symbol_table.symbols}
+        for sup_scope in self.sup_scopes:
+            combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **sup_scope.symbol_table.symbols}
+        return [sym for sym in combined_symbol_tables.symbols.values() if isinstance(sym, expected_sym_type)]
 
     def get_child_scope(self, id: Hashable) -> Optional[Scope]:
         matches = (c for c in self.children if c.id == hash(id))

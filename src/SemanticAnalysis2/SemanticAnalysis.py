@@ -199,7 +199,7 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_postfix_expression(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
-        match ast:
+        match ast.op:
             case Ast.PostfixMemberAccessAst(): SemanticAnalysis.analyse_postfix_member_access(ast, s)
             case Ast.PostfixFunctionCallAst(): SemanticAnalysis.analyse_postfix_function_call(ast, s)
             case Ast.PostfixStructInitializerAst(): SemanticAnalysis.analyse_postfix_struct_initializer(ast, s)
@@ -397,11 +397,14 @@ class SemanticAnalysis:
             raise SystemExit("Only one default object can be given to a struct initializer." +
                 ErrFmt.err(default_objs_given[0]._tok) + "First default object given here.\n...\n" +
                 ErrFmt.err(default_objs_given[1]._tok) + "Second default object given here.")
-        default_obj_given = default_objs_given[0]
+        default_obj_given = default_objs_given[0] if default_objs_given else None
 
         # Get all the actual fields on a class, so that the given arguments can be checked against them.
         cls_definition_scope = s.global_scope.get_child_scope(cls_ty)
-        actual_fields = cls_definition_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol)
+        if cls_definition_scope is None:
+            raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Cannot find definition for class '{cls_ty}'.")
+
+        actual_fields = [v.name.identifier for v in cls_definition_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol)]
 
         # If a fields has been given twice, then raise an error
         if given_twice := any_elem([f for f in ast.op.fields if given_fields.count(f.identifier.identifier) > 1]):
@@ -409,13 +412,16 @@ class SemanticAnalysis:
 
         # If the given fields contains identifiers not present on the class definition, then these are invalid, so raise
         # an error for the first unknown field.
-        if unknown_field := (set(given_fields) - set(actual_fields)).pop():
+        difference = set(given_fields) - set(actual_fields)
+        if difference and (unknown_field := difference.pop()):
+            print(ast.op.fields)
             raise SystemExit(ErrFmt.err(ast.op.fields[given_fields.index(unknown_field)]._tok) + f"Struct initializer for '{cls_ty}' contains unknown fields: '{unknown_field}'.")
 
         # If there are less given fields than actual fields, then the default object must be given. If it hasn't been
         # given, then an error is raised.
         if len(given_fields) < len(actual_fields) and not default_obj_given:
-            raise SystemExit(ErrFmt.err(ast.op._tok) + f"Struct initializer for '{cls_ty}' is missing fields: '{set(given_fields) - set(actual_fields)}'.")
+            # todo : add the class definition to the error message
+            raise SystemExit(ErrFmt.err(ast.op._tok) + f"Struct initializer for '{cls_ty}' is missing fields: '{','.join(set(actual_fields) - set(given_fields))}'.")
 
         # Handle the default object given (if it is given). Make sure it is the correct type, and not a borrowed object
         # from a parameter.
