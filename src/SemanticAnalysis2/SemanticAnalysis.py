@@ -51,6 +51,7 @@ class SemanticAnalysis:
         ast.return_type = TypeInfer.infer_type(ast.return_type, s)
 
         # Analyse the generic type parameters -- they must all be inferrable
+        # [s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier))) for g in ast.generic_parameters]
         parameter_types = [p.type_annotation for p in ast.parameters]
         generic_constraints = [g.constraints for g in ast.generic_parameters]
         generic_constraints = [c for c in generic_constraints if c]
@@ -80,7 +81,8 @@ class SemanticAnalysis:
     def analyse_parameter(ast: Ast.FunctionParameterAst, s: ScopeHandler):
         # Analyse the parameter type, and Add the parameter to the current scope.
         ast.type_annotation = TypeInfer.infer_type(ast.type_annotation, s)
-        s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.identifier, ast.type_annotation, VariableSymbolMemoryStatus(), ast.is_mutable))
+        ty = ast.type_annotation if not isinstance(ast.type_annotation.parts[0], Ast.SelfTypeAst) else Ast.IdentifierAst("Self", ast.type_annotation._tok)
+        s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.identifier, ty, VariableSymbolMemoryStatus(), ast.is_mutable))
 
         # Analyse the default value
         if ast.default_value:
@@ -89,6 +91,8 @@ class SemanticAnalysis:
     @staticmethod
     def analyse_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeHandler):
         s.next_scope()
+        # for g in ast.generic_parameters:
+        #     s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier)))
         [SemanticAnalysis.analyse_decorator(ast, d, s) for d in ast.decorators]
         [SemanticAnalysis.analyse_class_member(m, s) for m in ast.body.members]
         s.prev_scope()
@@ -224,8 +228,8 @@ class SemanticAnalysis:
                 if (t := TypeInfer.infer_expression(b.body[-1], s)) != ret_type:
                     raise SystemExit(
                         "If an 'if-statement' is being used for assignment, all branches must return the same type" +
-                        ErrFmt.err(ast.branches[0].body[-1]._tok) + f"First branch returns type {ret_type}\n...\n" +
-                        ErrFmt.err(b.body[-1]._tok) + f"Branch {i} returns type {t}.")
+                        ErrFmt.err(ast.branches[0].body[-1]._tok) + f"First branch returns type '{ret_type}'\n...\n" +
+                        ErrFmt.err(b.body[-1]._tok) + f"Branch {i} returns type '{t}'.")
 
         s.prev_scope()
 
@@ -286,6 +290,7 @@ class SemanticAnalysis:
     @staticmethod
     def analyse_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
         lhs_type = TypeInfer.infer_expression(ast.lhs, s)
+        # lhs_type = TypeInfer.infer_type(lhs_type, s)
         lhs_type = isinstance(lhs_type, Ast.TypeTupleAst) and CommonTypes.tuple(lhs_type.types) or lhs_type
         class_scope = s.global_scope.get_child_scope(lhs_type)
 
@@ -294,14 +299,14 @@ class SemanticAnalysis:
         if isinstance(ast.op.identifier, Ast.NumberLiteralBase10Ast):
             # If the member access is a number literal, check the number literal is a valid index for the tuple.
             if not (lhs_type.parts[0].identifier == "std" and lhs_type.parts[1].identifier == "Tup" and len(lhs_type.parts) == 2):
-                raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Cannot index into non-tuple type {lhs_type}.")
+                raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Cannot index into non-tuple type '{lhs_type}'.")
 
             if int(ast.op.identifier.integer) >= len(lhs_type.parts[1].generic_arguments):
-                raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Index {ast.op.identifier.integer} out of range for type {lhs_type}.")
+                raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Index {ast.op.identifier.integer} out of range for type '{lhs_type}'.")
 
         # Else, check the attribute exists on the LHS.
         elif not class_scope.has_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol):
-            raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Attribute {ast.op.identifier} not found in type {lhs_type}.")
+            raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Attribute {ast.op.identifier} not found in type '{lhs_type}'.")
         
     @staticmethod
     def analyse_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
@@ -447,7 +452,7 @@ class SemanticAnalysis:
 
         # Check that the type of the variable is not "Void". This is because "Void" values don't exist, and therefore
         # cannot be assigned to a variable.
-        let_statement_type = TypeInfer.infer_type(ast.type_annotation, s) or TypeInfer.infer_expression(ast.value, s)
+        let_statement_type = TypeInfer.infer_type(ast.type_annotation, s) if ast.type_annotation else TypeInfer.infer_expression(ast.value, s)
         if let_statement_type == CommonTypes.void():
             raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot define a variable with 'Void' type.")
 
@@ -475,7 +480,7 @@ class SemanticAnalysis:
 
         # Handle the "else" clause for the let statement. Check that the type returned from the "else" block is valid.
         if ast.if_null and (else_ty := TypeInfer.infer_expression(ast.if_null, s)) != let_statement_type:
-            raise SystemExit(ErrFmt.err(ast.if_null._tok) + f"Type of else clause for let statement is not of type {let_statement_type}. Found {else_ty}")
+            raise SystemExit(ErrFmt.err(ast.if_null._tok) + f"Type of else clause for let statement is not of type '{let_statement_type}'. Found '{else_ty}'")
 
         # Because the assignment can handle multiple ie "x, y = (1, 2), all the variables will be passed to the
         # assignment in one go, and the assignment will handle the multiple function calls for tuples etc.
@@ -566,7 +571,7 @@ class SemanticAnalysis:
                 yield sym.type.parts[-1].identifier
             case _:
                 print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Type {type(ast)} not yet supported for traversal. Report as bug.")
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{type(ast)}' not yet supported for traversal. Report as bug.")
 
 def chain_generators(*gens):
     for gen in gens:
