@@ -66,7 +66,11 @@ class SymbolGeneration:
         s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast.identifier))
         for g in ast.generic_parameters: s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier)))
         for member in ast.body.members: SymbolGeneration.generate_sup_member(member, s)
-        s.global_scope.get_child_scope(ast.identifier).sup_scopes.append(s.current_scope)
+
+        cls_scope = s.global_scope.get_child_scope(ast.identifier)
+        if not cls_scope:
+            raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Class '{ast.identifier}' not found.")
+        cls_scope.sup_scopes.append(s.current_scope)
         s.exit_scope()
 
     @staticmethod

@@ -296,6 +296,9 @@ class PostfixExpressionAst:
         s += str(self.op)
         return s
 
+    def __hash__(self):
+        return hash(self.lhs) + hash(self.op)
+
 @dataclass
 class PlaceholderAst:
     _tok: int
@@ -501,6 +504,9 @@ class PostfixFunctionCallAst:
         s += "(" + ", ".join([str(arg) for arg in self.arguments]) + ")"
         return s
 
+    def __hash__(self):
+        return hash(tuple(self.type_arguments)) + hash(tuple(self.arguments))
+
 @dataclass
 class PostfixMemberAccessAst:
     identifier: IdentifierAst | int
@@ -508,6 +514,9 @@ class PostfixMemberAccessAst:
 
     def __str__(self):
         return "." + str(self.identifier)
+
+    def __hash__(self):
+        return hash(self.identifier)
 
 @dataclass
 class PostfixStructInitializerAst:
@@ -517,6 +526,9 @@ class PostfixStructInitializerAst:
     def __str__(self):
         s = "{" + ", ".join([str(field) for field in self.fields]) + "}"
         return s
+
+    def __hash__(self):
+        return hash(tuple(self.fields))
 
 @dataclass
 class PostfixStructInitializerFieldAst:

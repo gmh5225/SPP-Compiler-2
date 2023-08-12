@@ -14,7 +14,7 @@ class TypeInfer:
         match ast:
             case Ast.IdentifierAst(): return TypeInfer.infer_identifier(ast, s)
             case Ast.LambdaAst(): raise NotImplementedError("Lambda expressions are not implemented yet.")
-            case Ast.IfStatementAst(): return TypeInfer.infer_statement(ast.body[-1], s)
+            case Ast.IfStatementAst(): return TypeInfer.infer_if_statement(ast, s)
             case Ast.WhileStatementAst(): return CommonTypes.void()
             case Ast.YieldStatementAst(): raise NotImplementedError("Yield expressions are not implemented yet.")
             case Ast.WithStatementAst(): return TypeInfer.infer_statement(ast.body[-1], s)
@@ -28,12 +28,18 @@ class TypeInfer:
             case Ast.StringLiteralAst(): return CommonTypes.string()
             case Ast.ArrayLiteralAst(): return CommonTypes.array(TypeInfer.infer_expression(ast.elements[0], s))
             case Ast.RegexLiteralAst(): return CommonTypes.regex()
-            case Ast.TupleLiteralAst(): return CommonTypes.tuple([TypeInfer.infer_expression(e, s) for e in ast.elements])
+            case Ast.TupleLiteralAst(): return CommonTypes.tuple([TypeInfer.infer_expression(e, s) for e in ast.values])
             case Ast.NumberLiteralBase02Ast(): return CommonTypes.num()
             case Ast.NumberLiteralBase10Ast(): return CommonTypes.num()
             case Ast.NumberLiteralBase16Ast(): return CommonTypes.num()
             case _:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown expression {ast} being inferred. Report as bug.")
+
+    @staticmethod
+    def infer_if_statement(ast: Ast.StatementAst, s: ScopeHandler) -> Ast.TypeAst:
+        if ast.branches and ast.branches[0].body:
+            return TypeInfer.infer_statement(ast.branches[0].body[-1], s)
+        return CommonTypes.void()
 
     @staticmethod
     def infer_statement(ast: Ast.StatementAst, s: ScopeHandler) -> Ast.TypeAst:

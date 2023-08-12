@@ -57,14 +57,15 @@ class SemanticAnalysis:
 
         # Analyse the generic type parameters -- they must all be inferrable
         # [s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier))) for g in ast.generic_parameters]
-        parameter_types = [p.type_annotation for p in ast.parameters]
-        generic_constraints = [g.constraints for g in ast.generic_parameters]
-        generic_constraints = [c for c in generic_constraints if c]
-        all_individual_types = chain_generators(*[SemanticAnalysis.traverse_type(t, s) for t in parameter_types + generic_constraints])
-        temp = {*all_individual_types}
-
-        if g := any_elem([g.as_type() for g in ast.generic_parameters if g.identifier.identifier not in temp]):
-            raise SystemExit(ErrFmt.err(g._tok) + "Generic parameter type cannot be inferred.")
+        # todo : in wrong place
+        # parameter_types = [p.type_annotation for p in ast.parameters]
+        # generic_constraints = [g.constraints for g in ast.generic_parameters]
+        # generic_constraints = [c for c in generic_constraints if c]
+        # all_individual_types = chain_generators(*[SemanticAnalysis.traverse_type(t, s) for t in parameter_types + generic_constraints])
+        # temp = {*all_individual_types}
+        #
+        # if g := any_elem([g.as_type() for g in ast.generic_parameters if g.identifier.identifier not in temp]):
+        #     raise SystemExit(ErrFmt.err(g._tok) + "Generic parameter type cannot be inferred.")
 
         # Make sure abstract methods have no body
         if function_symbol.abstract and ast.body.statements:
@@ -236,8 +237,14 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_if_statement(ast: Ast.IfStatementAst, s: ScopeHandler, **kwargs):
-        s.next_scope()
+        s.enter_scope("if")
+
+        # Analyse the condition and make sure its Boolean
         SemanticAnalysis.analyse_expression(ast.condition, s)
+        if (cond_expr_ty := TypeInfer.infer_expression(ast.condition, s)) != CommonTypes.bool():
+            raise SystemExit(ErrFmt.err(ast.condition._tok) + f"Condition must be a 'Bool' type, not '{cond_expr_ty}'.")
+
+        # Analyse each pattern
         [SemanticAnalysis.analyse_pattern_statement(ast, b, s) for b in ast.branches]
 
         # If the 'if-statement' is being used for assignment, make sure the final statements in each branch have a
@@ -251,22 +258,23 @@ class SemanticAnalysis:
                         ErrFmt.err(ast.branches[0].body[-1]._tok) + f"First branch returns type '{ret_type}'\n...\n" +
                         ErrFmt.err(b.body[-1]._tok) + f"Branch {i} returns type '{t}'.")
 
-        s.prev_scope()
+        s.exit_scope()
 
     @staticmethod
     def analyse_pattern_statement(owner: Ast.IfStatementAst, ast: Ast.PatternStatementAst, s: ScopeHandler):
-        s.next_scope()
+        s.enter_scope("pattern")
+
         # Check there isn't a comparison operator in the if-statement and the pattern statement.
         if owner.comparison_op and ast.comparison_op:
             raise SystemExit(
-                "Cannot have a comparison operator in both the if-statement and the pattern statement." +
-                ErrFmt.err(owner._tok) + "Comparison operator in if-statement.\n...\n" +
+                "Cannot have a comparison operator in both the if-statement and the pattern-statement." +
+                ErrFmt.err(owner.comparison_op._tok) + "Comparison operator in if-statement.\n..." +
                 ErrFmt.err(ast._tok) + "Comparison operator in pattern statement.")
 
         # Check the comparison function exists for each pattern in the pattern statement.
         pat_comp = ast.comparison_op or owner.comparison_op
         for pat in ast.patterns:
-            bin_comp = Ast.BinaryExpressionAst(owner.condition, pat_comp, pat, pat_comp._tok)
+            bin_comp = Ast.BinaryExpressionAst(owner.condition, pat_comp, pat.value, pat_comp._tok)
             SemanticAnalysis.analyse_expression(bin_comp, s)
 
         # Check the pattern guard
@@ -275,7 +283,7 @@ class SemanticAnalysis:
 
         # Check each statement in the pattern statement.
         [SemanticAnalysis.analyse_statement(st, s) for st in ast.body]
-        s.prev_scope()
+        s.exit_scope()
 
     @staticmethod
     def analyse_inner_scope(ast: Ast.InnerScopeAst, s: ScopeHandler):
@@ -336,8 +344,8 @@ class SemanticAnalysis:
         # Verify the LHS is valid.
         SemanticAnalysis.analyse_expression(ast.lhs, s)
 
-        ref_args = {}
-        mut_args = {}
+        ref_args = set()
+        mut_args = set()
         arg_ts   = []
 
         # TODO : multiple partial moves are not checked at the moment
@@ -497,11 +505,11 @@ class SemanticAnalysis:
             ty = TypeInfer.infer_expression(ast.value, s)
 
             # Ensure that the RHS is a tuple type.
-            if not isinstance(ty, Ast.TypeTupleAst):
+            if not ty.parts[-1].identifier == "Tup":
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot assign non-tuple type to a tuple. Found {ty}")
 
             # Ensure that the tuple contains the correct number of elements.
-            if len(ty.types) != len(ast.variables):
+            if len(ty.parts[-1].generic_arguments) != len(ast.variables):
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot assign tuple of length {len(ty.types)} to a tuple of length {len(ast.variables)}.")
 
             # Infer the type of each variable, and set it in the symbol table.
@@ -554,11 +562,11 @@ class SemanticAnalysis:
         # types of the symbols in the table prior to assignment.
         else:
             # Ensure that the RHS is a tuple type.
-            if not isinstance(ty, Ast.TypeTupleAst):
+            if not ty.parts[-1].identifier == "Tup":
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot assign non-tuple type to a tuple. Found {ty}")
 
             # Ensure that the tuple contains the correct number of elements.
-            if len(ty.types) != len(ast.lhs):
+            if len(ty.parts[-1].generic_arguments) != len(ast.lhs):
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot assign tuple of length {len(ty.types)} to a tuple of length {len(ast.lhs)}.")
 
             # Create a function prototype for each variable in the tuple.
@@ -578,10 +586,10 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_while_statement(ast: Ast.WhileStatementAst, s: ScopeHandler):
-        s.next_scope()
+        s.enter_scope("while")
         SemanticAnalysis.analyse_expression(ast.condition, s)
         [SemanticAnalysis.analyse_statement(st, s) for st in ast.body]
-        s.prev_scope()
+        s.exit_scope()
 
     @staticmethod
     def traverse_type(ast: Ast.TypeAst | Ast.GenericIdentifierAst, s: ScopeHandler):
