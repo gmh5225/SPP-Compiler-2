@@ -354,6 +354,9 @@ class TypeGenericArgumentAst:
     def __str__(self):
         return (str(self.identifier) + ": ") if self.identifier else "" + str(self.value)
 
+    def __hash__(self):
+        return hash(self.value)
+
 def TypeGenericArgumentNamedAst(identifier: IdentifierAst, value: TypeAst, _tok: int):
     return TypeGenericArgumentAst(identifier, value, _tok)
 

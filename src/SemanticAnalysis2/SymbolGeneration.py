@@ -64,6 +64,7 @@ class SymbolGeneration:
     def generate_sup_prototype(ast: Ast.SupPrototypeAst, s: ScopeHandler):
         s.enter_scope(Ast.IdentifierAst(ast.identifier.parts[-1].identifier + "#SUP", ast.identifier._tok))
         s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast.identifier))
+        for g in ast.generic_parameters: s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier)))
         for member in ast.body.members: SymbolGeneration.generate_sup_member(member, s)
         s.global_scope.get_child_scope(ast.identifier).sup_scopes.append(s.current_scope)
         s.exit_scope()

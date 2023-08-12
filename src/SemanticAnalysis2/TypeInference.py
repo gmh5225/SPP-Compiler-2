@@ -148,6 +148,7 @@ class TypeInfer:
 
     @staticmethod
     def check_type(ast: Ast.TypeAst, s: ScopeHandler) -> Ast.TypeAst:
+        if isinstance(ast, Ast.TypeGenericArgumentAst): ast = ast.value
         return TypeInfer.likely_symbols(ast, SymbolTypes.TypeSymbol, "type", s)
 
     @staticmethod
@@ -160,17 +161,17 @@ class TypeInfer:
     def likely_symbols(ast: Ast.IdentifierAst | Ast.TypeAst, sym_ty: type, what: str, s: ScopeHandler) -> Ast.TypeAst:
         # If the symbol isn't in the current of any parent scope, then it doesn't exist, so throw an error, and give any
         # possible matches.
-        if not s.current_scope.has_symbol(ast, sym_ty):
-
+        if not s.current_scope.has_symbol(ast if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1], sym_ty):
             # Get all the variable symbols that are in the scope. Define the most likely to be "-1" so that any symbol
             # will be more likely than it.
+
             similar_symbols = s.current_scope.all_symbols(sym_ty)
             most_likely = (-1.0, "")
 
             # Iterate through each symbol, and find the one that is most similar to the identifier.
             for sym in similar_symbols:
                 # Get the ratio of similarity between the identifier and the symbol name.
-                ast_identifier = ast.identifier if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1].identifier
+                ast_identifier = ast.identifier if isinstance(ast, Ast.IdentifierAst) else str(ast)
                 ratio = max([
                     SequenceMatcher(None, sym.name.identifier, ast_identifier).ratio(),
                     SequenceMatcher(None, ast_identifier, sym.name.identifier).ratio()])
@@ -183,6 +184,12 @@ class TypeInfer:
                 elif ratio == most_likely[0] and abs(len(sym.name.identifier) - len(ast_identifier)) < abs(len(most_likely[1]) - len(ast_identifier)):
                     most_likely = (ratio, sym.name.identifier)
 
-            if most_likely[0] == -1:
+            if most_likely[0] != -1:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown {what} {ast}. Did you mean {most_likely[1]}?")
-        return ast if what == "type" else s.current_scope.get_symbol(ast, SymbolTypes.VariableSymbol).type
+            else:
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown {what} {ast}.")
+
+        if what == "type":
+            print(ast, type(ast))
+            return s.current_scope.get_symbol(ast.parts[-1], SymbolTypes.TypeSymbol).type
+        return s.current_scope.get_symbol(ast, SymbolTypes.VariableSymbol).type

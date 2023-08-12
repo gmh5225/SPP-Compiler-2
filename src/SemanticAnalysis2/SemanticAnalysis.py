@@ -117,6 +117,10 @@ class SemanticAnalysis:
         s.next_scope()
         if type(ast) == Ast.SupPrototypeInheritanceAst:
             TypeInfer.check_type(ast.super_class, s)
+            for type_part in ast.super_class.parts if ast.super_class else []:
+                [TypeInfer.check_type(g, s) for g in type_part.generic_arguments]
+        for type_part in ast.identifier.parts:
+            [TypeInfer.check_type(g, s) for g in type_part.generic_arguments]
         [SemanticAnalysis.analyse_sup_member(ast, m, s) for m in ast.body.members]
         s.prev_scope()
 
@@ -131,13 +135,16 @@ class SemanticAnalysis:
         if isinstance(owner, Ast.SupPrototypeInheritanceAst):
             super_class_scope = s.global_scope.get_child_scope(owner.super_class)
 
+            if not super_class_scope:
+                raise SystemExit(ErrFmt.err(owner.super_class._tok) + f"Super class '{owner.super_class}' not found.")
+
             # Make sure the method exists in the super class.
             if not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.FunctionSymbol):
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Method '{ast.identifier}' not found in super class '{owner.super_class}'.")
+                raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' not found in super class '{owner.super_class}'.")
 
             # Make sure the method in the super-class is overridable -- virtual or abstract.
             if not super_class_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.FunctionSymbol)[0].overridable():
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Method '{ast.identifier}' in super class '{owner.super_class}' is not virtual or abstract.")
+                raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' in super class '{owner.super_class}' is not virtual or abstract.")
 
         SemanticAnalysis.analyse_function_prototype(ast, s)
 
@@ -305,7 +312,10 @@ class SemanticAnalysis:
         lhs_type = TypeInfer.infer_expression(ast.lhs, s)
         # lhs_type = TypeInfer.infer_type(lhs_type, s)
         lhs_type = isinstance(lhs_type, Ast.TypeTupleAst) and CommonTypes.tuple(lhs_type.types) or lhs_type
+
         class_scope = s.global_scope.get_child_scope(lhs_type)
+        if not class_scope:
+            raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Type '{lhs_type}' not found.")
 
         # For numeric member access, ie "x.0", check the LHS is a tuple type, and that the number is a valid index for
         # the tuple.
@@ -403,8 +413,6 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
-        print(f"STRUCT-INIT {ast}")
-
         cls_ty = TypeInfer.check_type(ast.lhs, s)
 
         # Check that each variable being passed into the initializer is valid, ie hasn't been moved already.
@@ -414,7 +422,6 @@ class SemanticAnalysis:
 
             if isinstance(given_field.value or given_field.identifier, Ast.IdentifierAst) and not s.current_scope.get_symbol(given_field, SymbolTypes.VariableSymbol).mem_info.is_initialized:
                 raise SystemExit(ErrFmt.err(given_field._tok) + f"Argument {given_field} is not initialized or has been moved.")
-            print(given_field)
             if isinstance(given_field.value or given_field.identifier, Ast.IdentifierAst):
                 s.current_scope.get_symbol(given_field.value or given_field.identifier, SymbolTypes.VariableSymbol).mem_info.is_initialized = False
 
