@@ -329,10 +329,10 @@ class SemanticAnalysis:
         # the tuple.
         if isinstance(ast.op.identifier, Ast.NumberLiteralBase10Ast):
             # If the member access is a number literal, check the number literal is a valid index for the tuple.
-            if not (lhs_type.parts[0].identifier == "std" and lhs_type.parts[1].identifier == "Tup" and len(lhs_type.parts) == 2):
+            if not lhs_type.parts[-1].identifier == "Tup":
                 raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Cannot index into non-tuple type '{lhs_type}'.")
 
-            if int(ast.op.identifier.integer) >= len(lhs_type.parts[1].generic_arguments):
+            if int(ast.op.identifier.integer) >= len(lhs_type.parts[-1].generic_arguments):
                 raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Index {ast.op.identifier.integer} out of range for type '{lhs_type}'.")
 
         # Else, check the attribute exists on the LHS.
@@ -451,7 +451,7 @@ class SemanticAnalysis:
         actual_fields = [v.name.identifier for v in cls_definition_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol)]
 
         # If a fields has been given twice, then raise an error
-        if given_twice := any_elem([f for f in ast.op.fields if given_fields.count(f.identifier.identifier) > 1]):
+        if given_twice := any_elem([f for f in ast.op.fields if isinstance(f.identifier, Ast.IdentifierAst) and given_fields.count(f.identifier.identifier) > 1]):
             raise SystemExit(ErrFmt.err(given_twice._tok) + f"Field {given_twice} given twice in struct initializer.")
 
         # If the given fields contains identifiers not present on the class definition, then these are invalid, so raise
@@ -518,13 +518,19 @@ class SemanticAnalysis:
                 s.current_scope.add_symbol(SymbolTypes.VariableSymbol(variable.identifier, t, VariableSymbolMemoryStatus(), variable.is_mutable))
 
         # Handle the "else" clause for the let statement. Check that the type returned from the "else" block is valid.
-        if ast.if_null and (else_ty := TypeInfer.infer_expression(ast.if_null, s)) != let_statement_type:
-            raise SystemExit(ErrFmt.err(ast.if_null._tok) + f"Type of else clause for let statement is not of type '{let_statement_type}'. Found '{else_ty}'")
+        if ast.if_null:
+            for statement in ast.if_null.body:
+                SemanticAnalysis.analyse_statement(statement, s)
+
+            else_ty = TypeInfer.infer_expression(ast.if_null.body[-1], s) if ast.if_null.body else CommonTypes.void()
+            if else_ty != let_statement_type:
+                raise SystemExit(ErrFmt.err(ast.if_null._tok) + f"Type of else clause for let statement is not of type '{let_statement_type}'. Found '{else_ty}'")
 
         # Because the assignment can handle multiple ie "x, y = (1, 2), all the variables will be passed to the
         # assignment in one go, and the assignment will handle the multiple function calls for tuples etc.
-        mock_assignment = Ast.AssignmentExpressionAst([x.identifier for x in ast.variables], Ast.TokenAst(Token("=", TokenType.TkAssign), ast._tok), ast.value, ast._tok)
-        SemanticAnalysis.analyse_assignment_expression(mock_assignment, s)
+        if ast.value:
+            mock_assignment = Ast.AssignmentExpressionAst([x.identifier for x in ast.variables], Ast.TokenAst(Token("=", TokenType.TkAssign), ast._tok), ast.value, ast._tok)
+            SemanticAnalysis.analyse_assignment_expression(mock_assignment, s)
 
     @staticmethod
     def analyse_assignment_expression(ast: Ast.AssignmentExpressionAst, s: ScopeHandler):

@@ -285,6 +285,9 @@ class AssignmentExpressionAst:
     rhs: ExpressionAst
     _tok: int
 
+    def __str__(self):
+        return ", ".join([str(lhs) for lhs in self.lhs]) + " = " + str(self.rhs)
+
 @dataclass
 class PostfixExpressionAst:
     lhs: ExpressionAst
@@ -557,6 +560,9 @@ class NumberLiteralBase10Ast:
         s += str(self.exponent) if self.exponent else ""
         s += "i" if self.is_imaginary else ""
         return s
+
+    def __hash__(self):
+        return hash(IdentifierAst((self.integer or "") + (self.decimal or ""), self._tok))
 
 @dataclass
 class NumberLiteralBase16Ast:

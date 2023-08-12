@@ -84,12 +84,17 @@ class TypeInfer:
             ty = TypeInfer.infer_identifier(ast, s)
         ty = TypeInfer.infer_type(ty, s)
         cls = s.global_scope.get_child_scope(ty)
-        sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False) or cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.FunctionSymbol, error=False)
-        if not sym:
-            raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Unknown member '{ast.op.identifier}' of type '{ty}'.")
-        if isinstance(sym, SymbolTypes.VariableSymbol):
-            return sym.type
-        return sym#, [s.type for s in sym]
+
+        if isinstance(ast.op.identifier, Ast.IdentifierAst):
+            sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False) or cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.FunctionSymbol, error=False)
+            if not sym:
+                raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Unknown member '{ast.op.identifier}' of type '{ty}'.")
+            if isinstance(sym, SymbolTypes.VariableSymbol):
+                return sym.type
+            return sym#, [s.type for s in sym]
+        else:
+            ty = TypeInfer.infer_expression(ast.lhs, s)
+            return ty.parts[-1].generic_arguments[int(ast.op.identifier.integer)]
 
     @staticmethod
     def infer_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
