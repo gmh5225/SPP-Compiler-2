@@ -73,7 +73,7 @@ class TypeInfer:
     def infer_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs) -> Ast.TypeAst:
         ty = None
         if isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.op, Ast.PostfixMemberAccessAst):
-            ty = TypeInfer.infer_postfix_member_access(ast.lhs, s) if isinstance(ast.lhs, Ast.PostfixExpressionAst) else TypeInfer.infer_identifier(ast.lhs, s)
+            ty = TypeInfer.infer_postfix_member_access(ast.lhs, s) if isinstance(ast.lhs, Ast.PostfixExpressionAst) else TypeInfer.infer_identifier(ast.lhs, s) if isinstance(ast.lhs, Ast.IdentifierAst) else TypeInfer.infer_type(ast.lhs, s)
         if isinstance(ast, Ast.IdentifierAst):
             ty = TypeInfer.infer_identifier(ast, s)
         ty = TypeInfer.infer_type(ty, s)
@@ -147,8 +147,13 @@ class TypeInfer:
         return TypeInfer.likely_symbols(ast, SymbolTypes.VariableSymbol, "identifier", s)
 
     @staticmethod
+    def infer_identifier_for_call(ast: Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
+        return TypeInfer.likely_symbols(ast, SymbolTypes.FunctionSymbol, "function", s)
+
+    @staticmethod
     def check_type(ast: Ast.TypeAst, s: ScopeHandler) -> Ast.TypeAst:
-        if isinstance(ast, Ast.TypeGenericArgumentAst): ast = ast.value
+        if isinstance(ast, Ast.TypeGenericArgumentAst):
+            ast = ast.value
         return TypeInfer.likely_symbols(ast, SymbolTypes.TypeSymbol, "type", s)
 
     @staticmethod
@@ -165,13 +170,13 @@ class TypeInfer:
             # Get all the variable symbols that are in the scope. Define the most likely to be "-1" so that any symbol
             # will be more likely than it.
 
-            similar_symbols = s.current_scope.all_symbols(sym_ty)
+            similar_symbols = [sym for sym in s.current_scope.all_symbols(sym_ty) if type(sym) == sym_ty]
             most_likely = (-1.0, "")
+            ast_identifier = ast.identifier if isinstance(ast, Ast.IdentifierAst) else str(ast)
 
             # Iterate through each symbol, and find the one that is most similar to the identifier.
             for sym in similar_symbols:
                 # Get the ratio of similarity between the identifier and the symbol name.
-                ast_identifier = ast.identifier if isinstance(ast, Ast.IdentifierAst) else str(ast)
                 ratio = max([
                     SequenceMatcher(None, sym.name.identifier, ast_identifier).ratio(),
                     SequenceMatcher(None, ast_identifier, sym.name.identifier).ratio()])
@@ -185,11 +190,10 @@ class TypeInfer:
                     most_likely = (ratio, sym.name.identifier)
 
             if most_likely[0] != -1:
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown {what} {ast}. Did you mean {most_likely[1]}?")
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown {what} '{ast}'. Did you mean '{most_likely[1]}'?")
             else:
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown {what} {ast}.")
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown {what} '{ast}'.")
 
         if what == "type":
-            print(ast, type(ast))
             return s.current_scope.get_symbol(ast.parts[-1], SymbolTypes.TypeSymbol).type
         return s.current_scope.get_symbol(ast, SymbolTypes.VariableSymbol).type

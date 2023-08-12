@@ -162,6 +162,9 @@ class ClassPrototypeAst:
     def __str__(self):
         return self.identifier.identifier + ("[" + ",".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "")
 
+    def to_type(self) -> TypeAst:
+        return TypeSingleAst([GenericIdentifierAst(self.identifier.identifier, [], self.identifier._tok)], self._tok)
+
 @dataclass
 class FunctionPrototypeAst:
     decorators: list[DecoratorAst]

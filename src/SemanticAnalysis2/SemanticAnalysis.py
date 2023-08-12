@@ -333,7 +333,7 @@ class SemanticAnalysis:
         
     @staticmethod
     def analyse_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
-        # Verify the LHS is valid
+        # Verify the LHS is valid.
         SemanticAnalysis.analyse_expression(ast.lhs, s)
 
         ref_args = {}
@@ -413,7 +413,7 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
-        cls_ty = TypeInfer.check_type(ast.lhs, s)
+        cls_ty = TypeInfer.check_type(ast.lhs, s).to_type()
 
         # Check that each variable being passed into the initializer is valid, ie hasn't been moved already.
         given_fields = [f.identifier.identifier for f in ast.op.fields if isinstance(f.identifier, Ast.IdentifierAst)]
