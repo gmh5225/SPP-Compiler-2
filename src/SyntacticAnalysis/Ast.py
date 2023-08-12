@@ -62,7 +62,7 @@ class GenericIdentifierAst:
         return hash(IdentifierAst(self.identifier, self._tok))
 
     def __str__(self):
-        return self.identifier + ("[" + ",".join([str(arg) for arg in self.generic_arguments]) + "]" if self.generic_arguments else "")
+        return self.identifier + ("[" + ", ".join([str(arg) for arg in self.generic_arguments]) + "]" if self.generic_arguments else "")
 
     def to_identifier(self) -> IdentifierAst:
         return IdentifierAst(self.identifier, self._tok)
@@ -160,7 +160,7 @@ class ClassPrototypeAst:
         return hash(self.identifier)
 
     def __str__(self):
-        return self.identifier.identifier + ("[" + ",".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "")
+        return self.identifier.identifier + ("[" + ", ".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "")
 
     def to_type(self) -> TypeAst:
         return TypeSingleAst([GenericIdentifierAst(self.identifier.identifier, [], self.identifier._tok)], self._tok)
@@ -179,8 +179,8 @@ class FunctionPrototypeAst:
 
     def __str__(self):
         return self.identifier.identifier\
-            + ("[" + ",".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "")\
-            + "(" + ",".join([str(param) for param in self.parameters]) + ")"\
+            + ("[" + ", ".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "")\
+            + "(" + ", ".join([str(param) for param in self.parameters]) + ")"\
             + (" -> " + str(self.return_type) if self.return_type else "")
 
 @dataclass

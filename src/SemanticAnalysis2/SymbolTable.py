@@ -96,7 +96,10 @@ class SymbolTable:
         self.symbols = {}
 
     def add(self, symbol: SymbolTypes.Symbol):
-        self.symbols[hash(symbol.name)] = symbol
+        if isinstance(symbol, SymbolTypes.FunctionSymbol):
+            self.symbols[hash(Ast.IdentifierAst(symbol.name.identifier + "#" + str(symbol.type), symbol.name._tok))] = symbol
+        else:
+            self.symbols[hash(symbol.name)] = symbol
 
     def get(self, name: Hashable, expected_sym_type: type) -> SymbolTypes.Symbol | list[SymbolTypes.Symbol]:
         symbols = {k: v for k, v in self.symbols.items() if isinstance(v, expected_sym_type)}
@@ -113,7 +116,10 @@ class SymbolTable:
             case _: raise SystemExit(f"Unknown symbol type '{expected_sym_type.__name__}'.")
 
     def has(self, name: Hashable, expected_sym_type: type) -> bool:
-        return hash(name) in self.symbols and isinstance(self.symbols[hash(name)], expected_sym_type)
+        if expected_sym_type == SymbolTypes.FunctionSymbol:
+            return any([sym.name.identifier.startswith(name.identifier) for sym in self.symbols.values() if isinstance(sym, expected_sym_type)])
+        else:
+            return hash(name) in self.symbols and isinstance(self.symbols[hash(name)], expected_sym_type)
 
 
 class Scope:

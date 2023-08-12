@@ -83,13 +83,13 @@ class TypeInfer:
             raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Unknown member '{ast.op.identifier}' of type '{ty}'.")
         if isinstance(sym, SymbolTypes.VariableSymbol):
             return sym.type
-        return sym, [s.type for s in sym]
+        return sym#, [s.type for s in sym]
 
     @staticmethod
     def infer_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
         # To infer something like x.y.z(a, b), we need to infer x.y.z, then infer a and b, then infer the function call.
 
-        syms, lhs_type = TypeInfer.infer_expression(ast.lhs, s, all=True)
+        syms = TypeInfer.infer_expression(ast.lhs, s, all=True)
         arg_tys = [TypeInfer.infer_expression(arg.value, s) for arg in ast.op.arguments]
         arg_ccs = [arg.calling_convention for arg in ast.op.arguments]
 
@@ -100,11 +100,11 @@ class TypeInfer:
         # Get the function symbol from the scope.
         sigs = []
         errs = []
-        for i, fn_type in enumerate(lhs_type):
+        for i, fn_type in enumerate(sym.type for sym in syms):
             param_names = [param.identifier.identifier for param in fn_type.parameters]
             param_tys = [param.type_annotation for param in fn_type.parameters]
             param_ccs = [param.calling_convention for param in fn_type.parameters]
-            sigs.append(fn_type.identifier.identifier + "(" + ",".join([f"{param_name}: {param_cc}{param_ty}" for param_name, param_cc, param_ty in zip(param_names, param_ccs, param_tys)]) + ") -> " + str(fn_type.return_type))
+            sigs.append(fn_type.identifier.identifier + "(" + ", ".join([f"{param_name}: {param_cc}{param_ty}" for param_name, param_cc, param_ty in zip(param_names, param_ccs, param_tys)]) + ") -> " + str(fn_type.return_type))
 
             # Skip first argument type for non-static functions
             if not syms[i].static:
@@ -136,7 +136,7 @@ class TypeInfer:
         for i in range(len(sigs)):
             output.append(f"{sigs[i]}: {errs[i]}")
 
-        raise SystemExit(ErrFmt.err(ast.lhs.op.identifier._tok) + f"Could not find function '{ast.lhs.op.identifier}' with the given arguments.\nAvailable signatures:{NL.join(output)}")
+        raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Could not find function '{ast.lhs}' with the given arguments.\nAvailable signatures:{NL.join(output)}")
 
     @staticmethod
     def infer_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
@@ -166,11 +166,18 @@ class TypeInfer:
     def likely_symbols(ast: Ast.IdentifierAst | Ast.TypeAst, sym_ty: type, what: str, s: ScopeHandler) -> Ast.TypeAst:
         # If the symbol isn't in the current of any parent scope, then it doesn't exist, so throw an error, and give any
         # possible matches.
-        if not s.current_scope.has_symbol(ast if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1], sym_ty):
+        check = s.current_scope.has_symbol(ast if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1] if isinstance(ast, Ast.TypeSingleAst) else ast.identifier, sym_ty)
+        if not check and sym_ty == SymbolTypes.VariableSymbol:
+            check |= s.current_scope.has_symbol(ast if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1] if isinstance(ast, Ast.TypeSingleAst) else ast.identifier, SymbolTypes.FunctionSymbol)
+
+        if not check:
             # Get all the variable symbols that are in the scope. Define the most likely to be "-1" so that any symbol
             # will be more likely than it.
 
             similar_symbols = [sym for sym in s.current_scope.all_symbols(sym_ty) if type(sym) == sym_ty]
+            if sym_ty == SymbolTypes.VariableSymbol:
+                similar_symbols += [sym for sym in s.current_scope.all_symbols(SymbolTypes.FunctionSymbol) if type(sym) == SymbolTypes.FunctionSymbol]
+
             most_likely = (-1.0, "")
             ast_identifier = ast.identifier if isinstance(ast, Ast.IdentifierAst) else str(ast)
 
@@ -196,4 +203,7 @@ class TypeInfer:
 
         if what == "type":
             return s.current_scope.get_symbol(ast.parts[-1], SymbolTypes.TypeSymbol).type
-        return s.current_scope.get_symbol(ast, SymbolTypes.VariableSymbol).type
+        try:
+            return s.current_scope.get_symbol(ast, SymbolTypes.VariableSymbol).type
+        except:
+            return s.current_scope.get_symbol(ast, SymbolTypes.FunctionSymbol)
