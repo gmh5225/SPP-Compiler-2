@@ -231,8 +231,8 @@ class SemanticAnalysis:
         # Special assignment dummy method to check the statement and avoid code duplication.
         if ast.identifier == "__set__":
             return
-        if not s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol):
-            raise SystemExit(ErrFmt.err(ast._tok) + f"Identifier {ast} not found in scope.")
+        if not (s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol) or s.current_scope.has_symbol(ast, SymbolTypes.FunctionSymbol)):
+            raise SystemExit(ErrFmt.err(ast._tok) + f"Identifier '{ast}' not found in scope.")
 
     @staticmethod
     def analyse_if_statement(ast: Ast.IfStatementAst, s: ScopeHandler, **kwargs):

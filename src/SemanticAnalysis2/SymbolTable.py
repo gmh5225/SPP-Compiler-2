@@ -53,6 +53,7 @@ class SymbolTypes:
         virtual: bool
         abstract: bool
         static: bool
+        is_method: bool
 
         def overridable(self) -> bool:
             return self.virtual or self.abstract

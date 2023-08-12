@@ -104,10 +104,10 @@ class TypeInfer:
             param_names = [param.identifier.identifier for param in fn_type.parameters]
             param_tys = [param.type_annotation for param in fn_type.parameters]
             param_ccs = [param.calling_convention for param in fn_type.parameters]
-            sigs.append(fn_type.identifier.identifier + "(" + ", ".join([f"{param_name}: {param_cc}{param_ty}" for param_name, param_cc, param_ty in zip(param_names, param_ccs, param_tys)]) + ") -> " + str(fn_type.return_type))
+            sigs.append(str(fn_type))
 
             # Skip first argument type for non-static functions
-            if not syms[i].static:
+            if syms[i].is_method and not syms[i].static:
                 param_tys = param_tys[1:]
                 param_ccs = param_ccs[1:]
 

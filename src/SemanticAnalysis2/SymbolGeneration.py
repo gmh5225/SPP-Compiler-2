@@ -22,7 +22,7 @@ class SymbolGeneration:
     @staticmethod
     def generate_module_member(ast: Ast.ModuleMemberAst, s: ScopeHandler):
         match ast:
-            case Ast.FunctionPrototypeAst(): SymbolGeneration.generate_function_prototype(ast, s)
+            case Ast.FunctionPrototypeAst(): SymbolGeneration.generate_function_prototype(ast, False, s)
             case Ast.ClassPrototypeAst(): SymbolGeneration.generate_class_prototype(ast, s)
             case Ast.EnumPrototypeAst():
                 raise SystemExit(ErrFmt.err(ast._tok) + "Enums are not supported yet.")
@@ -43,8 +43,8 @@ class SymbolGeneration:
         ErrFmt.TOKENS = ts
 
     @staticmethod
-    def generate_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler):
-        s.current_scope.add_symbol(SymbolTypes.FunctionSymbol(ast.identifier, ast, False, False, False))
+    def generate_function_prototype(ast: Ast.FunctionPrototypeAst, is_method: bool, s: ScopeHandler):
+        s.current_scope.add_symbol(SymbolTypes.FunctionSymbol(ast.identifier, ast, False, False, False, is_method))
         s.enter_scope(ast.identifier)
         [s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier))) for g in ast.generic_parameters]
         s.exit_scope()
@@ -79,7 +79,7 @@ class SymbolGeneration:
 
     @staticmethod
     def generate_sup_method_prototype(ast: Ast.SupMethodPrototypeAst, s: ScopeHandler):
-        SymbolGeneration.generate_function_prototype(ast, s)
+        SymbolGeneration.generate_function_prototype(ast, True, s)
 
     @staticmethod
     def generate_sup_typedef(ast: Ast.SupTypedefAst, s: ScopeHandler):
