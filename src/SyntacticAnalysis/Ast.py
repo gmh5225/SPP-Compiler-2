@@ -25,6 +25,9 @@ class ParameterPassingConventionReferenceAst:
     is_mutable: bool
     _tok: int
 
+    def __eq__(self, other):
+        return isinstance(other, ParameterPassingConventionReferenceAst) and self.is_mutable == other.is_mutable
+
     def __str__(self):
         return "&" + ("mut " if self.is_mutable else "")
 
@@ -217,8 +220,7 @@ class FunctionParameterAst:
 
     def __str__(self):
         return ("mut" if self.is_mutable else "")\
-            + (str(self.calling_convention) if self.calling_convention else "")\
-            + str(self.identifier) + ": " + str(self.type_annotation)
+            + str(self.identifier) + ": " + (str(self.calling_convention) if self.calling_convention else "") + str(self.type_annotation)
 
 def FunctionParameterRequiredAst(is_mutable: bool, identifier: IdentifierAst, calling_convention: Optional[TokenAst], type_annotation: TypeAst, _tok: int):
     return FunctionParameterAst(is_mutable, identifier, calling_convention, type_annotation, None, False, _tok)

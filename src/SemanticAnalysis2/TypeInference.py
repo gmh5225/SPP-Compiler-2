@@ -135,7 +135,7 @@ class TypeInfer:
 
             # Check the calling conventions match.
             if any([arg_cc != param_cc for arg_cc, param_cc in zip(arg_ccs, param_ccs)]):
-                errs.append(f"Expected arguments with calling conventions {', '.join([str(cc) for cc in param_ccs])}, but got {', '.join([str(cc) for cc in arg_ccs])}.")
+                errs.append(f"Expected arguments with calling conventions [{', '.join([str(cc) for cc in param_ccs])}], but got [{', '.join([str(cc) for cc in arg_ccs])}].")
                 continue
 
             # If we get here, we have found the function we are looking for.

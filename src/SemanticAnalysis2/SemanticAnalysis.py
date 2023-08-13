@@ -348,8 +348,7 @@ class SemanticAnalysis:
         mut_args = set()
         arg_ts   = []
 
-        # TODO : multiple partial moves are not checked at the moment
-        # TODO : add "self" into the arguments
+        # TODO : partial moves not working at the moment
 
         for i, arg in enumerate(ast.op.arguments):
             # Check the argument is valid.
@@ -358,21 +357,21 @@ class SemanticAnalysis:
             # No calling convention means that a move is taking place.
             if not arg.calling_convention:
                 # This can only happen from a non-borrowed context, so check that the argument is an attribute of a borrowed variable.
-                if isinstance(arg.value, Ast.PostfixExpressionAst) and isinstance(arg.value.op, Ast.PostfixMemberAccessAst) and (value := arg.value):
+                value = arg.value
+                if isinstance(arg.value, Ast.PostfixExpressionAst) and isinstance(arg.value.op, Ast.PostfixMemberAccessAst):
 
                     # For a move to be valid, no part of the attribute chain can be borrowed.
                     while isinstance(value, Ast.PostfixExpressionAst) and isinstance(value.op, Ast.PostfixMemberAccessAst):
-                        if value in ref_args: raise SystemExit(ErrFmt.err(value._tok) + f"Cannot move a value that is already borrowed.")
-                        if value in mut_args: raise SystemExit(ErrFmt.err(value._tok) + f"Cannot move a value that is already mutably borrowed.")
+                        if value in ref_args: raise SystemExit(ErrFmt.err(value._tok) + f"Cannot move value '{value}' that is already borrowed.")
+                        if value in mut_args: raise SystemExit(ErrFmt.err(value._tok) + f"Cannot move value '{value}' that is already mutably borrowed.")
                         value = value.lhs
 
-                elif isinstance(arg.value, Ast.IdentifierAst) and (value := arg.value):
-                    if value in ref_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move a value that is already borrowed.")
-                    if value in mut_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move a value that is already mutably borrowed.")
+                if isinstance(value, Ast.IdentifierAst):
+                    if value in ref_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move value '{value}' that is already borrowed.")
+                    if value in mut_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move value '{value}' that is already mutably borrowed.")
 
                     sym = s.current_scope.get_symbol(value, SymbolTypes.VariableSymbol)
-                    print(sym.name, sym.mem_info.is_initialized)
-                    if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move a value that is not initialized.")
+                    if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move value '{value}' that is not initialized.")
                     sym.mem_info.is_initialized = False
 
             # Handle mutable borrows
