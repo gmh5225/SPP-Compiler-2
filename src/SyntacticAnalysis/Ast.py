@@ -17,6 +17,9 @@ class TokenAst:
     tok: Token
     _tok: int
 
+    def __str__(self):
+        return self.tok.token_metadata
+
 @dataclass
 class ParameterPassingConventionReferenceAst:
     is_mutable: bool
@@ -589,25 +592,40 @@ class StringLiteralAst:
     value: str
     _tok: int
 
+    def __str__(self):
+        return self.value
+
 @dataclass
 class ArrayLiteralAst:
     values: list[ExpressionAst]
     _tok: int
+
+    def __str__(self):
+        return "[" + ", ".join([str(value) for value in self.values]) + "]"
 
 @dataclass
 class BoolLiteralAst:
     value: bool
     _tok: int
 
+    def __str__(self):
+        return "true" if self.value else "false"
+
 @dataclass
 class RegexLiteralAst:
     value: str
     _tok: int
 
+    def __str__(self):
+        return self.value
+
 @dataclass
 class TupleLiteralAst:
     values: list[ExpressionAst]
     _tok: int
+
+    def __str__(self):
+        return "(" + ", ".join([str(value) for value in self.values]) + ")"
 
 
 PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixStructInitializerAst | TokenAst
