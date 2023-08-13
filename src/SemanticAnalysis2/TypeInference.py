@@ -133,7 +133,8 @@ class TypeInfer:
                 errs.append(f"Expected arguments of types {', '.join([str(ty) for ty in param_tys])}, but got {', '.join([str(ty) for ty in arg_tys])}.")
                 continue
 
-            # Check the calling conventions match.
+            # Check the calling conventions match. A &mut argument cal collapse into an & parameter, but the __eq__
+            # implementation handles this.
             if any([arg_cc != param_cc for arg_cc, param_cc in zip(arg_ccs, param_ccs)]):
                 errs.append(f"Expected arguments with calling conventions [{', '.join([str(cc) for cc in param_ccs])}], but got [{', '.join([str(cc) for cc in arg_ccs])}].")
                 continue
@@ -148,7 +149,7 @@ class TypeInfer:
         for i in range(len(sigs)):
             output.append(f"{sigs[i]}: {errs[i]}")
 
-        raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Could not find function '{ast.lhs}' with the given arguments.\nAvailable signatures:{NL.join(output)}")
+        raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Could not find function '{ast.lhs}' with the given arguments.\nAvailable signatures{NL.join(output)}")
 
     @staticmethod
     def infer_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
