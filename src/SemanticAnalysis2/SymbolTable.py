@@ -32,12 +32,19 @@ class SymbolTypes:
         def json(self) -> dict:
             ...
 
-    @dataclass
     class VariableSymbol(Symbol):
         name: Ast.IdentifierAst
         type: Ast.TypeAst
         mem_info: VariableSymbolMemoryStatus
         is_mutable: bool
+        meta_data: dict[str, Any]
+
+        def __init__(self, name: Ast.IdentifierAst, type: Ast.TypeAst, is_mutable: bool = False):
+            self.name = name
+            self.type = type
+            self.mem_info = VariableSymbolMemoryStatus()
+            self.is_mutable = is_mutable
+            self.meta_data = {}
 
         def json(self) -> dict:
             return {
@@ -45,28 +52,6 @@ class SymbolTypes:
                 "type": str(self.type),
                 "is_mutable": self.is_mutable
             }
-
-    @dataclass
-    class FunctionSymbol(Symbol):
-        name: Ast.IdentifierAst
-        type: Ast.FunctionPrototypeAst
-        virtual: bool
-        abstract: bool
-        static: bool
-        is_method: bool
-
-        def overridable(self) -> bool:
-            return self.virtual or self.abstract
-
-        def json(self) -> dict:
-            return {
-                "name": str(self.name),
-                "type": str(self.type)
-            }
-
-        @property
-        def true_type(self) -> Ast.TypeAst:
-            return Ast.TypeSingleAst([Ast.GenericIdentifierAst(self.type.identifier.identifier, [self.type.return_type] + [p.type_annotation for p in self.type.parameters], self.type._tok)], self.type._tok)
 
     @dataclass
     class TypeSymbol(Symbol):
@@ -97,30 +82,19 @@ class SymbolTable:
         self.symbols = {}
 
     def add(self, symbol: SymbolTypes.Symbol):
-        if isinstance(symbol, SymbolTypes.FunctionSymbol):
-            self.symbols[hash(Ast.IdentifierAst(symbol.name.identifier + "#" + str(symbol.type), symbol.name._tok))] = symbol
-        else:
-            self.symbols[hash(symbol.name)] = symbol
+        self.symbols[hash(symbol.name)] = symbol
 
     def get(self, name: Hashable, expected_sym_type: type) -> SymbolTypes.Symbol | list[SymbolTypes.Symbol]:
         symbols = {k: v for k, v in self.symbols.items() if isinstance(v, expected_sym_type)}
 
         match expected_sym_type.__name__:
             case "VariableSymbol": return symbols[hash(name)]
-            case "FunctionSymbol":
-                funcs = [sym for sym in symbols.values() if sym.name == name]
-                if len(funcs) == 0:
-                    dummy_for_err = symbols[hash(name)]
-                return funcs
             case "TypeSymbol": return symbols[hash(name)]
             case "GenericSymbol": return symbols[hash(name)]
             case _: raise SystemExit(f"Unknown symbol type '{expected_sym_type.__name__}'.")
 
     def has(self, name: Hashable, expected_sym_type: type) -> bool:
-        if expected_sym_type == SymbolTypes.FunctionSymbol:
-            return any([sym.name.identifier.startswith(name.identifier) for sym in self.symbols.values() if isinstance(sym, expected_sym_type)])
-        else:
-            return hash(name) in self.symbols and isinstance(self.symbols[hash(name)], expected_sym_type)
+        return hash(name) in self.symbols and isinstance(self.symbols[hash(name)], expected_sym_type)
 
 
 class Scope:
@@ -221,6 +195,11 @@ class Scope:
         for sup_scope in self.sup_scopes:
             combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **sup_scope.symbol_table.symbols}
         return [sym for sym in combined_symbol_tables.symbols.values() if isinstance(sym, expected_sym_type)]
+
+    def all_symbols_exclusive_no_fn(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
+        syms = self.all_symbols_exclusive(expected_sym_type)
+        syms = [s for s in syms if s.type.parts[-1].identifier != "FnRef"]
+        return syms
 
     def get_child_scope(self, id: Hashable) -> Optional[Scope]:
         matches = (c for c in self.children if c.id == hash(id))

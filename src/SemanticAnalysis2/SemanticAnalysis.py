@@ -41,13 +41,12 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler):
-        function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.FunctionSymbol)[0]
+        function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.VariableSymbol)
         s.next_scope()
 
         # Mark global methods as "static" ie don't have a "self" parameter
         if s.current_scope == s.global_scope:
-            fun_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.FunctionSymbol)[0]
-            fun_symbol.static = True
+            function_symbol.static = True
 
         # Analyse all the decorators and parameters, and the return type
         [SemanticAnalysis.analyse_decorator(ast, d, s) for d in ast.decorators]
@@ -68,13 +67,13 @@ class SemanticAnalysis:
         #     raise SystemExit(ErrFmt.err(g._tok) + "Generic parameter type cannot be inferred.")
 
         # Make sure abstract methods have no body
-        if function_symbol.abstract and ast.body.statements:
+        if function_symbol.meta_data.get("abstract", False) and ast.body.statements:
             raise SystemExit(
                 ErrFmt.err([d for d in ast.decorators if d.identifier.parts == ["meta", "abstractmethod"]][0]._tok) + "Method defined as abstract here\n...\n",
                 ErrFmt.err(ast.body.statements[0]._tok) + "Abstract methods cannot have a body.")
 
         # Analyse each statement
-        if not function_symbol.abstract:
+        if not function_symbol.meta_data.get("abstract", False):
             for statement in ast.body.statements:
                 SemanticAnalysis.analyse_statement(statement, s)
 
@@ -82,9 +81,9 @@ class SemanticAnalysis:
         # abstract, in which case it is allowed to not have a return statement
         [SemanticAnalysis.analyse_statement(st, s) for st in ast.body.statements]
         t = TypeInfer.infer_statement(ast.body.statements[-1], s) if ast.body.statements else CommonTypes.void()
-        if t != ast.return_type and not function_symbol.abstract:
+        if t != ast.return_type and not function_symbol.meta_data.get("abstract", False):
             err_ast = ast.body.statements[-1] if ast.body.statements else ast.body
-            raise SystemExit(ErrFmt.err(err_ast._tok) + f"Expected return type of function to be {ast.return_type}, but got {t}.")
+            raise SystemExit(ErrFmt.err(err_ast._tok) + f"Expected return type of function to be '{ast.return_type}', but got '{t}'.")
 
         s.prev_scope()
 
@@ -93,7 +92,7 @@ class SemanticAnalysis:
         # Analyse the parameter type, and Add the parameter to the current scope.
         ast.type_annotation = TypeInfer.infer_type(ast.type_annotation, s)
         ty = ast.type_annotation if not isinstance(ast.type_annotation.parts[0], Ast.SelfTypeAst) else Ast.IdentifierAst("Self", ast.type_annotation._tok)
-        s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.identifier, ty, VariableSymbolMemoryStatus(), ast.is_mutable))
+        s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.identifier, ty, is_mutable=ast.is_mutable))
 
         # Analyse the default value
         if ast.default_value:
@@ -140,11 +139,11 @@ class SemanticAnalysis:
                 raise SystemExit(ErrFmt.err(owner.super_class._tok) + f"Super class '{owner.super_class}' not found.")
 
             # Make sure the method exists in the super class.
-            if not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.FunctionSymbol):
+            if not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
                 raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' not found in super class '{owner.super_class}'.")
 
             # Make sure the method in the super-class is overridable -- virtual or abstract.
-            if not super_class_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.FunctionSymbol)[0].overridable():
+            if not any([k in super_class_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol).meta_data.keys() for k in ["virtual", "abstract"]]):
                 raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' in super class '{owner.super_class}' is not virtual or abstract.")
 
         SemanticAnalysis.analyse_function_prototype(ast, s)
@@ -177,16 +176,16 @@ class SemanticAnalysis:
             case ["meta", "protected"]: ...
             case ["meta", "virtualmethod"]:
                 if not isinstance(apply_to, Ast.FunctionPrototypeAst): raise SystemExit(ErrFmt.err(ast._tok) + "virtualmethod decorator can only be applied to functions.")
-                fun_symbol = s.current_scope.get_symbol(apply_to.identifier, SymbolTypes.FunctionSymbol)[0]
-                fun_symbol.virtual = True
+                fun_symbol = s.current_scope.get_symbol(apply_to.identifier, SymbolTypes.VariableSymbol)
+                fun_symbol.meta_data["virtual"] = True
             case ["meta", "abstractmethod"]:
                 if not isinstance(apply_to, Ast.FunctionPrototypeAst): raise SystemExit(ErrFmt.err(ast._tok) + "abstractmethod decorator can only be applied to functions.")
-                fun_symbol = s.current_scope.get_symbol(apply_to.identifier, SymbolTypes.FunctionSymbol)[0]
-                fun_symbol.abstract = True
+                fun_symbol = s.current_scope.get_symbol(apply_to.identifier, SymbolTypes.VariableSymbol)
+                fun_symbol.meta_data["abstract"] = True
             case ["meta", "staticmethod"]:
                 if not isinstance(apply_to, Ast.FunctionPrototypeAst): raise SystemExit(ErrFmt.err(ast._tok) + "staticmethod decorator can only be applied to functions.")
-                fun_symbol = s.current_scope.get_symbol(apply_to.identifier, SymbolTypes.FunctionSymbol)[0]
-                fun_symbol.static = True
+                fun_symbol = s.current_scope.get_symbol(apply_to.identifier, SymbolTypes.VariableSymbol)
+                fun_symbol.meta_data["static"] = True
             case ["meta", _]:
                 raise SystemExit(ErrFmt.err(ast._tok) + "Unknown meta decorator.")
             case _:
@@ -455,7 +454,7 @@ class SemanticAnalysis:
         if cls_definition_scope is None:
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Cannot find definition for class '{cls_ty}'.")
 
-        actual_fields = [v.name.identifier for v in cls_definition_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol)]
+        actual_fields = [v.name.identifier for v in cls_definition_scope.all_symbols_exclusive_no_fn(SymbolTypes.VariableSymbol)]
 
         # If a fields has been given twice, then raise an error
         if given_twice := any_elem([f for f in ast.op.fields if isinstance(f.identifier, Ast.IdentifierAst) and given_fields.count(f.identifier.identifier) > 1]):
@@ -504,7 +503,7 @@ class SemanticAnalysis:
 
         # For a single variable, infer its type and set it in the symbol table.
         if len(ast.variables) == 1:
-            s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.variables[0].identifier, let_statement_type, VariableSymbolMemoryStatus(), ast.variables[0].is_mutable))
+            s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.variables[0].identifier, let_statement_type, ast.variables[0].is_mutable))
 
         # Handle the tuple assignment case. There are a few special checks that need to take place, mostly concerning
         # destructuring.
@@ -522,7 +521,7 @@ class SemanticAnalysis:
             # Infer the type of each variable, and set it in the symbol table.
             for variable in ast.variables:
                 t = TypeInfer.infer_expression(ty.parts[-1].generic_arguments[ast.variables.index(variable)], s)
-                s.current_scope.add_symbol(SymbolTypes.VariableSymbol(variable.identifier, t, VariableSymbolMemoryStatus(), variable.is_mutable))
+                s.current_scope.add_symbol(SymbolTypes.VariableSymbol(variable.identifier, t, variable.is_mutable))
 
         # Handle the "else" clause for the let statement. Check that the type returned from the "else" block is valid.
         if ast.if_null:

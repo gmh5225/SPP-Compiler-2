@@ -112,6 +112,8 @@ class TypeInfer:
         sigs = []
         errs = []
 
+        sym
+
         for i, fn_type in enumerate(sym.type for sym in syms):
             param_names = [param.identifier.identifier for param in fn_type.parameters]
             param_tys = [param.type_annotation for param in fn_type.parameters]

@@ -47,6 +47,9 @@ class IdentifierAst:
     def __str__(self):
         return self.identifier
 
+    def to_generic_identifier(self) -> GenericIdentifierAst:
+        return GenericIdentifierAst(self.identifier, [], self._tok)
+
 @dataclass
 class ModuleIdentifierAst:
     parts: list[IdentifierAst]

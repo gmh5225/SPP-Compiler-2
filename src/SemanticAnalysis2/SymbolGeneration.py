@@ -1,7 +1,10 @@
+import dataclasses
+
 from src.LexicalAnalysis.Lexer import Lexer
 
 from src.SyntacticAnalysis import Ast
 from src.SyntacticAnalysis.Parser import ErrFmt, Parser
+from src.SemanticAnalysis2.AstReduction import AstReduction
 from src.SemanticAnalysis2.SymbolTable import ScopeHandler, SymbolTypes, VariableSymbolMemoryStatus
 
 
@@ -9,6 +12,10 @@ class SymbolGeneration:
     @staticmethod
     def generate(ast: Ast.ProgramAst) -> ScopeHandler:
         s = ScopeHandler()
+        AstReduction.reduce(ast)
+        from src.Compiler.Printer import save_json
+        save_json(dataclasses.asdict(ast), "_out/reduced-ast.json")
+
         SymbolGeneration.generate_program(ast, s)
         s.switch_to_global_scope()
         return s
@@ -44,7 +51,12 @@ class SymbolGeneration:
 
     @staticmethod
     def generate_function_prototype(ast: Ast.FunctionPrototypeAst, is_method: bool, s: ScopeHandler):
-        s.current_scope.add_symbol(SymbolTypes.FunctionSymbol(ast.identifier, ast, False, False, False, is_method))
+        if s.current_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
+            sym = s.current_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol)
+        else:
+            sym = SymbolTypes.VariableSymbol(ast.identifier, Ast.TypeSingleAst([Ast.GenericIdentifierAst("FnRef", [ast.return_type] + [p.type_annotation for p in ast.parameters], ast.identifier._tok)], ast._tok))
+            s.current_scope.add_symbol(sym)
+
         s.enter_scope(ast.identifier)
         [s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier))) for g in ast.generic_parameters]
         s.exit_scope()
@@ -57,7 +69,7 @@ class SymbolGeneration:
         [s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier))) for g in ast.generic_parameters]
         s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast))
         for attr in ast.body.members:
-            s.current_scope.add_symbol(SymbolTypes.VariableSymbol(attr.identifier, attr.type_annotation, VariableSymbolMemoryStatus(), False))
+            s.current_scope.add_symbol(SymbolTypes.VariableSymbol(attr.identifier, attr.type_annotation))
         s.exit_scope()
 
     @staticmethod
@@ -78,6 +90,8 @@ class SymbolGeneration:
         match ast:
             case Ast.SupMethodPrototypeAst(): SymbolGeneration.generate_sup_method_prototype(ast, s)
             case Ast.SupTypedefAst(): SymbolGeneration.generate_sup_typedef(ast, s)
+            case Ast.SupPrototypeNormalAst(): SymbolGeneration.generate_sup_prototype(ast, s) # fn building
+            case Ast.SupPrototypeInheritanceAst(): SymbolGeneration.generate_sup_prototype(ast, s) # fn building
             case _:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown sup member '{ast}' being generated. Report as bug.")
 
