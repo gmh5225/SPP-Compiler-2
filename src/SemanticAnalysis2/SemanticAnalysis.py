@@ -36,6 +36,7 @@ class SemanticAnalysis:
             case Ast.EnumPrototypeAst(): s.skip_scope()
             case Ast.SupPrototypeNormalAst(): SemanticAnalysis.analyse_sup_prototype(ast, s)
             case Ast.SupPrototypeInheritanceAst(): SemanticAnalysis.analyse_sup_prototype(ast, s)
+            case Ast.LetStatementAst(): SemanticAnalysis.analyse_let_statement(ast, s)
             case _:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown module member {ast} being analysed. Report as bug.")
 
@@ -235,10 +236,10 @@ class SemanticAnalysis:
         if ast.identifier == "__set__":
             return
         if not s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol):
-            if not s.current_scope.has_symbol("__MOCK_" + ast, SymbolTypes.TypeSymbol):
+            # if not s.current_scope.has_symbol("__MOCK_" + ast, SymbolTypes.TypeSymbol):
                 if not kwargs.get("no_throw", False):
                     raise SystemExit(ErrFmt.err(ast._tok) + f"Identifier '{ast}' not found in scope.")
-            return False
+                return False
         return True
 
     @staticmethod
@@ -343,10 +344,7 @@ class SemanticAnalysis:
 
         # Else, check the attribute exists on the LHS.
 
-        elif not (s.current_scope.has_symbol(ast.op.identifier, SymbolTypes.VariableSymbol) or s.current_scope.has_symbol("__MOCK_" + ast.op.identifier, SymbolTypes.TypeSymbol)):
-            print("-" * 50)
-            print(ast)
-            print([str(x.name) for x in s.current_scope.all_symbols(SymbolTypes.TypeSymbol)])
+        elif not s.current_scope.has_symbol(ast.op.identifier, SymbolTypes.VariableSymbol): #or s.current_scope.has_symbol("__MOCK_" + ast.op.identifier, SymbolTypes.TypeSymbol)):
             what = "Attribute" if not kwargs.get("call", False) else "Method"
             raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"{what} '{ast.op.identifier}' not found on type '{lhs_type}'.")
         
@@ -515,7 +513,7 @@ class SemanticAnalysis:
 
         # For a single variable, infer its type and set it in the symbol table.
         if len(ast.variables) == 1:
-            s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.variables[0].identifier, let_statement_type, ast.variables[0].is_mutable))
+            s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.variables[0].identifier, let_statement_type, is_mutable=ast.variables[0].is_mutable))
 
         # Handle the tuple assignment case. There are a few special checks that need to take place, mostly concerning
         # destructuring.
@@ -533,7 +531,7 @@ class SemanticAnalysis:
             # Infer the type of each variable, and set it in the symbol table.
             for variable in ast.variables:
                 t = TypeInfer.infer_expression(ty.parts[-1].generic_arguments[ast.variables.index(variable)], s)
-                s.current_scope.add_symbol(SymbolTypes.VariableSymbol(variable.identifier, t, variable.is_mutable))
+                s.current_scope.add_symbol(SymbolTypes.VariableSymbol(variable.identifier, t, is_mutable=variable.is_mutable))
 
         # Handle the "else" clause for the let statement. Check that the type returned from the "else" block is valid.
         if ast.if_null:

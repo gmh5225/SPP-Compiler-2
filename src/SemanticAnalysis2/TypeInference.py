@@ -100,7 +100,7 @@ class TypeInfer:
     def infer_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
         # To infer something like x.y.z(a, b), we need to infer x.y.z, then infer a and b, then infer the function call.
 
-        cls_type_of_fn = TypeInfer.infer_expression(ast.lhs, s, all=True)
+        ty = TypeInfer.infer_expression(ast.lhs, s, all=True)
         arg_tys = [TypeInfer.infer_expression(arg.value, s) for arg in ast.op.arguments]
         arg_ccs = [arg.calling_convention for arg in ast.op.arguments]
 
@@ -112,7 +112,6 @@ class TypeInfer:
         sigs = []
         errs = []
 
-        ty = Ast.TypeSingleAst([cls_type_of_fn.identifier.to_generic_identifier()], ast.lhs._tok)
         s = s.global_scope.get_child_scope(ty)
         functions = [x for x in s.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
 
@@ -190,7 +189,7 @@ class TypeInfer:
 
         check = False
         if sym_ty == SymbolTypes.VariableSymbol:
-            check = not s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol) and not s.current_scope.has_symbol("__MOCK_" + ast, SymbolTypes.TypeSymbol)
+            check = not s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol)# and not s.current_scope.has_symbol("__MOCK_" + ast, SymbolTypes.TypeSymbol)
         elif sym_ty == SymbolTypes.TypeSymbol:
             check = not s.current_scope.has_symbol(ast, SymbolTypes.TypeSymbol)
 
@@ -227,5 +226,5 @@ class TypeInfer:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown {what} '{ast}'.")
 
         if sym_ty == SymbolTypes.VariableSymbol:
-            return (s.current_scope.get_symbol(ast, SymbolTypes.VariableSymbol, error=False) or s.current_scope.get_symbol("__MOCK_" + ast, SymbolTypes.TypeSymbol)).type
+            return s.current_scope.get_symbol(ast, SymbolTypes.VariableSymbol, error=False).type
         return s.current_scope.get_symbol(ast, SymbolTypes.TypeSymbol).type

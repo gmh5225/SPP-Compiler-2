@@ -182,8 +182,8 @@ class Scope:
         found = self.has_symbol_exclusive(name, expected_sym_type)
         if not found and self.parent:
             found = self.parent.has_symbol(name, expected_sym_type)
-        if not found and expected_sym_type == SymbolTypes.TypeSymbol and not name.identifier.startswith("__MOCK_"):
-            found = self.has_symbol("__MOCK_" + name, expected_sym_type)
+        # if not found and expected_sym_type == SymbolTypes.TypeSymbol and not name.identifier.startswith("__MOCK_"):
+        #     found = self.has_symbol("__MOCK_" + name, expected_sym_type)
         return found
 
     def has_symbol_exclusive(self, name: Hashable, expected_sym_type: type) -> bool:
