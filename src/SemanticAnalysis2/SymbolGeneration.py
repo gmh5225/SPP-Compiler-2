@@ -56,6 +56,8 @@ class SymbolGeneration:
             sym = s.current_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol)
         else:
             sym = SymbolTypes.VariableSymbol(ast.identifier, Ast.TypeSingleAst([Ast.GenericIdentifierAst("FnRef", [ast.return_type] + [p.type_annotation for p in ast.parameters], ast.identifier._tok)], ast._tok))
+            sym.meta_data["fn_proto"] = ast
+            sym.meta_data["is_method"] = is_method
             s.current_scope.add_symbol(sym)
 
         s.enter_scope(ast.identifier)
@@ -85,7 +87,7 @@ class SymbolGeneration:
 
         c = copy.deepcopy(ast)
         c.identifier.parts[-1] = ("__MOCK_" + c.identifier.parts[-1].to_identifier()).to_generic_identifier()
-        cls_scope = s.global_scope.get_child_scope(ast.identifier) or s.global_scope.get_child_scope(c.identifier)
+        cls_scope = s.global_scope.get_child_scope(ast.identifier) or s.global_scope.get_child_scope(c.identifier) or s.current_scope.parent.get_child_scope(c.identifier)
         if not cls_scope:
             raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Class '{ast.identifier}' not found.")
         cls_scope.sup_scopes.append(s.current_scope)

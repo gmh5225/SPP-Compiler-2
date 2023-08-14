@@ -112,16 +112,18 @@ class TypeInfer:
         sigs = []
         errs = []
 
-        sym
+        ty = Ast.TypeSingleAst([Ast.GenericIdentifierAst(syms.identifier.identifier, [None for _ in range(len(syms.generic_parameters))], ast._tok)], ast._tok)
+        s = s.global_scope.get_child_scope(ty)
+        functions = [x for x in s.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
 
-        for i, fn_type in enumerate(sym.type for sym in syms):
+        for i, fn_type in enumerate([f.meta_data["fn_proto"] for f in functions]):
             param_names = [param.identifier.identifier for param in fn_type.parameters]
             param_tys = [param.type_annotation for param in fn_type.parameters]
             param_ccs = [param.calling_convention for param in fn_type.parameters]
             sigs.append(str(fn_type))
 
             # Skip first argument type for non-static functions
-            if syms[i].is_method and not syms[i].static:
+            if functions[i].meta_data.get("method", False) and not syms[i].meta_data.get("is_static", False):
                 param_tys = param_tys[1:]
                 param_ccs = param_ccs[1:]
 
@@ -181,23 +183,31 @@ class TypeInfer:
     def likely_symbols(ast: Ast.IdentifierAst | Ast.TypeAst, sym_ty: type, what: str, s: ScopeHandler) -> Ast.TypeAst:
         # If the symbol isn't in the current of any parent scope, then it doesn't exist, so throw an error, and give any
         # possible matches.
-        check = s.current_scope.has_symbol(ast if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1] if isinstance(ast, Ast.TypeSingleAst) else ast.identifier, sym_ty)
-        if not check and sym_ty == SymbolTypes.VariableSymbol:
-            check |= s.current_scope.has_symbol(ast if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1] if isinstance(ast, Ast.TypeSingleAst) else ast.identifier, SymbolTypes.FunctionSymbol)
+        # check = s.current_scope.has_symbol(ast if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1] if isinstance(ast, Ast.TypeSingleAst) else ast.identifier, sym_ty)
+        # check = SemanticAnalysis.analyse_identifier(ast if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1] if isinstance(ast, Ast.TypeSingleAst) else ast.identifier, s, no_throw=True)
+        if isinstance(ast, Ast.TypeSingleAst):
+            ast = ast.parts[-1].to_identifier()
 
-        if not check:
+        check = False
+        if sym_ty == SymbolTypes.VariableSymbol:
+            check = not s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol) and not s.current_scope.has_symbol("__MOCK_" + ast, SymbolTypes.TypeSymbol)
+        elif sym_ty == SymbolTypes.TypeSymbol:
+            check = not s.current_scope.has_symbol(ast, SymbolTypes.TypeSymbol)
+
+        if check:
             # Get all the variable symbols that are in the scope. Define the most likely to be "-1" so that any symbol
             # will be more likely than it.
 
             similar_symbols = [sym for sym in s.current_scope.all_symbols(sym_ty) if type(sym) == sym_ty]
-            if sym_ty == SymbolTypes.VariableSymbol:
-                similar_symbols += [sym for sym in s.current_scope.all_symbols(SymbolTypes.FunctionSymbol) if type(sym) == SymbolTypes.FunctionSymbol]
 
             most_likely = (-1.0, "")
             ast_identifier = ast.identifier if isinstance(ast, Ast.IdentifierAst) else str(ast)
 
             # Iterate through each symbol, and find the one that is most similar to the identifier.
             for sym in similar_symbols:
+                if sym.name.identifier.startswith("__") or sym.name.identifier in ["call_ref", "call_mut", "call_one"]:
+                    continue
+
                 # Get the ratio of similarity between the identifier and the symbol name.
                 ratio = max([
                     SequenceMatcher(None, sym.name.identifier, ast_identifier).ratio(),
@@ -216,9 +226,6 @@ class TypeInfer:
             else:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown {what} '{ast}'.")
 
-        if what == "type":
-            return s.current_scope.get_symbol(ast.parts[-1], SymbolTypes.TypeSymbol).type
-        try:
-            return s.current_scope.get_symbol(ast, SymbolTypes.VariableSymbol).type
-        except:
-            return s.current_scope.get_symbol(ast, SymbolTypes.FunctionSymbol)
+        if sym_ty == SymbolTypes.VariableSymbol:
+            return (s.current_scope.get_symbol(ast, SymbolTypes.VariableSymbol, error=False) or s.current_scope.get_symbol("__MOCK_" + ast, SymbolTypes.TypeSymbol)).type
+        return s.current_scope.get_symbol(ast, SymbolTypes.TypeSymbol).type

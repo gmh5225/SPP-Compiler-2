@@ -27,6 +27,7 @@ class SymbolTypes:
     @dataclass
     class Symbol(ABC):
         name: Any
+        meta_data: dict[str, Any]
 
         @abstractmethod
         def json(self) -> dict:
@@ -37,14 +38,15 @@ class SymbolTypes:
         type: Ast.TypeAst
         mem_info: VariableSymbolMemoryStatus
         is_mutable: bool
-        meta_data: dict[str, Any]
 
-        def __init__(self, name: Ast.IdentifierAst, type: Ast.TypeAst, is_mutable: bool = False):
+        def __init__(self, name: Ast.IdentifierAst, type: Ast.TypeAst, **kwargs):
             self.name = name
             self.type = type
             self.mem_info = VariableSymbolMemoryStatus()
-            self.is_mutable = is_mutable
+            self.is_mutable = kwargs.get("is_mutable", False)
             self.meta_data = {}
+
+            self.mem_info.is_initialized = kwargs.get("is_initialized", False)
 
         def json(self) -> dict:
             return {
@@ -57,6 +59,11 @@ class SymbolTypes:
     class TypeSymbol(Symbol):
         name: Ast.IdentifierAst
         type: Ast.ClassPrototypeAst
+
+        def __init__(self, name: Ast.IdentifierAst, type: Ast.ClassPrototypeAst, **kwargs):
+            self.name = name
+            self.type = type
+            self.meta_data = {}
 
         def json(self) -> dict:
             return {
@@ -175,6 +182,8 @@ class Scope:
         found = self.has_symbol_exclusive(name, expected_sym_type)
         if not found and self.parent:
             found = self.parent.has_symbol(name, expected_sym_type)
+        if not found and expected_sym_type == SymbolTypes.TypeSymbol and not name.identifier.startswith("__MOCK_"):
+            found = self.has_symbol("__MOCK_" + name, expected_sym_type)
         return found
 
     def has_symbol_exclusive(self, name: Hashable, expected_sym_type: type) -> bool:
@@ -183,7 +192,8 @@ class Scope:
         for sup_scope in self.sup_scopes:
             combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **sup_scope.symbol_table.symbols}
 
-        return combined_symbol_tables.has(name, expected_sym_type)
+        t = combined_symbol_tables.has(name, expected_sym_type)
+        return t
 
     def all_symbols(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
         syms = self.all_symbols_exclusive(expected_sym_type)
@@ -204,6 +214,11 @@ class Scope:
         return syms
 
     def get_child_scope(self, id: Hashable) -> Optional[Scope]:
+        # sup_children = []
+        # for sup_scope in self.sup_scopes:
+        #     sup_children.extend(sup_scope.children)
+        # children = self.children + sup_children
+        # matches = (c for c in children if c.id == hash(id))
         matches = (c for c in self.children if c.id == hash(id))
         return next(matches, None)
 
@@ -257,6 +272,7 @@ class ScopeHandler:
         def scope_to_json(scope: Scope) -> dict:
             return {
                 "id": scope.id,
+                "name": str(scope.name),
                 "parent": scope.parent.id if scope.parent is not None else None,
                 "symbol_table": {
                     "symbols": {str(v.name): v.json() for k, v in scope.symbol_table.symbols.items()}

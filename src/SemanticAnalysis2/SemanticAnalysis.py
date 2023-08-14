@@ -79,7 +79,6 @@ class SemanticAnalysis:
 
         # Make sure the return type of the last statement matches the return type of the function, unless the method is
         # abstract, in which case it is allowed to not have a return statement
-        [SemanticAnalysis.analyse_statement(st, s) for st in ast.body.statements]
         t = TypeInfer.infer_statement(ast.body.statements[-1], s) if ast.body.statements else CommonTypes.void()
         if t != ast.return_type and not function_symbol.meta_data.get("abstract", False):
             err_ast = ast.body.statements[-1] if ast.body.statements else ast.body
@@ -92,7 +91,7 @@ class SemanticAnalysis:
         # Analyse the parameter type, and Add the parameter to the current scope.
         ast.type_annotation = TypeInfer.infer_type(ast.type_annotation, s)
         ty = ast.type_annotation if not isinstance(ast.type_annotation.parts[0], Ast.SelfTypeAst) else Ast.IdentifierAst("Self", ast.type_annotation._tok)
-        s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.identifier, ty, is_mutable=ast.is_mutable))
+        s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.identifier, ty, is_mutable=ast.is_mutable, is_initialized=True))
 
         # Analyse the default value
         if ast.default_value:
@@ -227,12 +226,16 @@ class SemanticAnalysis:
             case _: raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown postfix expression {ast} being analysed. Report as bug.")
 
     @staticmethod
-    def analyse_identifier(ast: Ast.IdentifierAst, s: ScopeHandler):
+    def analyse_identifier(ast: Ast.IdentifierAst, s: ScopeHandler, **kwargs):
         # Special assignment dummy method to check the statement and avoid code duplication.
         if ast.identifier == "__set__":
             return
-        if not (s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol)):
-            raise SystemExit(ErrFmt.err(ast._tok) + f"Identifier '{ast}' not found in scope.")
+        if not s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol):
+            if not s.current_scope.has_symbol("__MOCK_" + ast, SymbolTypes.TypeSymbol):
+                if not kwargs.get("no_throw", False):
+                    raise SystemExit(ErrFmt.err(ast._tok) + f"Identifier '{ast}' not found in scope.")
+            return False
+        return True
 
     @staticmethod
     def analyse_if_statement(ast: Ast.IfStatementAst, s: ScopeHandler, **kwargs):
@@ -302,7 +305,7 @@ class SemanticAnalysis:
     def analyse_binary_expression(ast: Ast.BinaryExpressionAst, s: ScopeHandler):
         # Remodel the binary expression into a function call, then analyse the function call. Start with constructing a
         # postfix call to the correct method name. For example, for "x + y", begin with constructing "x.add".
-        pos = ast._tok
+        pos = ast.op._tok
         fn = Ast.IdentifierAst(Ast.BIN_FN[ast.op.tok.token_type], pos)
         fn = Ast.PostfixMemberAccessAst(fn, pos)
         fn = Ast.PostfixExpressionAst(ast.lhs, fn, pos)
@@ -323,6 +326,7 @@ class SemanticAnalysis:
         if not class_scope:
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Type '{lhs_type}' not found.")
 
+
         # For numeric member access, ie "x.0", check the LHS is a tuple type, and that the number is a valid index for
         # the tuple.
         if isinstance(ast.op.identifier, Ast.NumberLiteralBase10Ast):
@@ -336,7 +340,7 @@ class SemanticAnalysis:
         # Else, check the attribute exists on the LHS.
         elif not (class_scope.has_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol)):
             what = "Attribute" if not kwargs.get("call", False) else "Method"
-            raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"{what} '{ast.op.identifier}' not found in type '{lhs_type}'.")
+            raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"{what} '{ast.op.identifier}' not found on type '{lhs_type}'.")
         
     @staticmethod
     def analyse_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):
