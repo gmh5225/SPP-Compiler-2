@@ -219,8 +219,18 @@ class Scope:
         #     sup_children.extend(sup_scope.children)
         # children = self.children + sup_children
         # matches = (c for c in children if c.id == hash(id))
-        matches = (c for c in self.children if c.id == hash(id))
-        return next(matches, None)
+
+        # matches = (c for c in self.children if c.id == hash(id))
+        # return next(matches, None)
+
+        matches = [c for c in self.children if c.id == hash(id)]
+        if not any(matches):
+            for c in self.children:
+                match = c.get_child_scope(id)
+                if match:
+                    return match
+        else:
+            return matches[0]
 
 
 class ScopeHandler:

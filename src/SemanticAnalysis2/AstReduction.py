@@ -3,7 +3,7 @@ from functools import cmp_to_key
 
 
 class AstReduction:
-    REDUCED_FUNCTIONS = []
+    REDUCED_FUNCTIONS = {}
 
     @staticmethod
     def sort_members(lhs, rhs):
@@ -14,6 +14,7 @@ class AstReduction:
             Ast.ClassPrototypeAst: 0,
             Ast.SupPrototypeNormalAst: 1,
             Ast.SupPrototypeInheritanceAst: 2,
+            Ast.LetStatementAst: 3,
         }
         return cmp(cmp_dict[type(lhs)], cmp_dict[type(rhs)])
 
@@ -47,13 +48,14 @@ class AstReduction:
           fn call_ref(...xs: Ts) { ... }
         }
 
-        cls A {}
-        sup FnRef[Num, Num] for A {
+        cls __MOCK_a {}
+        sup FnRef[Num, Num] for __MOCK_a {
           fn call_ref(x: Num) -> Num { ... }
         }
-        sup FnRef[Str, Str] for A {
+        sup FnRef[Str, Str] for __MOCK_a {
           fn call_ref(x: Str) -> Str { ... }
         }
+        let a = __MOCK_a {}
         """
 
         i = owner.body.members.index(ast)
@@ -66,17 +68,24 @@ class AstReduction:
         # a function named "f", the class "__MOCK_f" will be created. For every function definition for "f" found,
         # including this first one, the "FnRef" class will be super-imposed on it, with "call_ref" having the parameter
         # and generic types from the original "f" definition.
-        if ast.identifier.identifier not in AstReduction.REDUCED_FUNCTIONS:
-            AstReduction.REDUCED_FUNCTIONS.append(ast.identifier.identifier)
+        if AstReduction.merge_names(owner.identifier, ast.identifier.identifier) not in AstReduction.REDUCED_FUNCTIONS.keys():
             cls_ast = Ast.ClassPrototypeAst([], "__MOCK_" + ast.identifier, [], None, Ast.ClassImplementationAst([], -1), -1)
+            AstReduction.REDUCED_FUNCTIONS[AstReduction.merge_names(owner.identifier, ast.identifier.identifier)] = cls_ast
             owner.body.members.insert(0, cls_ast)
 
+        ty = AstReduction.REDUCED_FUNCTIONS[AstReduction.merge_names(owner.identifier, ast.identifier.identifier)]
         new_fun = Ast.SupMethodPrototypeAst(ast.decorators, ast.is_coro, Ast.IdentifierAst("call_ref", -1), ast.generic_parameters, ast.parameters, ast.return_type, None, ast.body, ast._tok)
-        owner.body.members.insert(i, Ast.SupPrototypeInheritanceAst(ast.generic_parameters, Ast.TypeSingleAst([ast.identifier.to_generic_identifier()], ast.identifier._tok), None, Ast.SupImplementationAst([new_fun], -1), -1, Ast.TypeSingleAst([Ast.GenericIdentifierAst("FnRef", [ast.return_type] + [p.type_annotation for p in ast.parameters], ast.identifier._tok)], ast._tok)))
+        owner.body.members.insert(i + 0, Ast.SupPrototypeInheritanceAst(ast.generic_parameters, Ast.TypeSingleAst([ast.identifier.to_generic_identifier()], ast.identifier._tok), None, Ast.SupImplementationAst([new_fun], -1), -1, Ast.TypeSingleAst([Ast.GenericIdentifierAst("FnRef", [ast.return_type] + [p.type_annotation for p in ast.parameters], ast.identifier._tok)], ast._tok)))
+        owner.body.members.insert(i + 1, Ast.LetStatementAst([Ast.LocalVariableAst(False, ast.identifier, -1)], Ast.PostfixExpressionAst(ast.identifier, Ast.PostfixStructInitializerAst([], -1), -1), ty, None, -1))
         owner.body.members.remove(ast)
 
     @staticmethod
-    def reduce_sup_prototype(mod: Ast.ModulePrototypeAst, ast: Ast.SupPrototypeAst):
+    def merge_names(*args) -> str:
+        return ".".join([str(a) for a in args])
+
+    @staticmethod
+    def reduce_sup_prototype(owner: Ast.ModulePrototypeAst, ast: Ast.SupPrototypeAst):
         for member in [m for m in ast.body.members if isinstance(m, Ast.FunctionPrototypeAst)]:
+            # print(f"reducing sup-method {ast.identifier}::{member.identifier}")
             AstReduction.reduce_function_prototype(ast, member)
         ast.body.members.sort(key=cmp_to_key(AstReduction.sort_members))

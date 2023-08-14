@@ -36,6 +36,7 @@ class SymbolGeneration:
                 raise SystemExit(ErrFmt.err(ast._tok) + "Enums are not supported yet.")
             case Ast.SupPrototypeNormalAst(): SymbolGeneration.generate_sup_prototype(ast, s)
             case Ast.SupPrototypeInheritanceAst(): SymbolGeneration.generate_sup_prototype(ast, s)
+            case Ast.LetStatementAst(): SymbolGeneration.generate_sup_fn_let_statement(ast, s) # fn building
             case _:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown module member {ast} being generated. Report as bug.")
 
@@ -52,13 +53,18 @@ class SymbolGeneration:
 
     @staticmethod
     def generate_function_prototype(ast: Ast.FunctionPrototypeAst, is_method: bool, s: ScopeHandler):
-        if s.current_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
-            sym = s.current_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol)
-        else:
-            sym = SymbolTypes.VariableSymbol(ast.identifier, Ast.TypeSingleAst([Ast.GenericIdentifierAst("FnRef", [ast.return_type] + [p.type_annotation for p in ast.parameters], ast.identifier._tok)], ast._tok))
-            sym.meta_data["fn_proto"] = ast
-            sym.meta_data["is_method"] = is_method
-            s.current_scope.add_symbol(sym)
+        # if s.current_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
+        #     sym = s.current_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol)
+        # else:
+        #     sym = SymbolTypes.VariableSymbol(ast.identifier, Ast.TypeSingleAst([Ast.GenericIdentifierAst("FnRef", [ast.return_type] + [p.type_annotation for p in ast.parameters], ast.identifier._tok)], ast._tok))
+        #     sym.meta_data["fn_proto"] = ast
+        #     sym.meta_data["is_method"] = is_method
+        #     s.current_scope.add_symbol(sym)
+
+        sym = SymbolTypes.VariableSymbol(ast.identifier, Ast.TypeSingleAst([Ast.GenericIdentifierAst("FnRef", [ast.return_type] + [p.type_annotation for p in ast.parameters], ast.identifier._tok)], ast._tok))
+        sym.meta_data["fn_proto"] = ast
+        sym.meta_data["is_method"] = is_method
+        s.current_scope.add_symbol(sym)
 
         s.enter_scope(ast.identifier)
         [s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier))) for g in ast.generic_parameters]
@@ -101,8 +107,13 @@ class SymbolGeneration:
             case Ast.SupPrototypeNormalAst(): SymbolGeneration.generate_sup_prototype(ast, s, hidden=True) # fn building
             case Ast.SupPrototypeInheritanceAst(): SymbolGeneration.generate_sup_prototype(ast, s, hidden=True) # fn building
             case Ast.ClassPrototypeAst(): SymbolGeneration.generate_class_prototype(ast, s, hidden=True) # fn building
+            case Ast.LetStatementAst(): SymbolGeneration.generate_sup_fn_let_statement(ast, s) # fn building
             case _:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown sup member '{ast}' being generated. Report as bug.")
+
+    @staticmethod
+    def generate_sup_fn_let_statement(ast: Ast.LetStatementAst, s: ScopeHandler):
+        s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.variables[0].identifier, ast.type_annotation, is_mutable=False))
 
     @staticmethod
     def generate_sup_method_prototype(ast: Ast.SupMethodPrototypeAst, s: ScopeHandler):

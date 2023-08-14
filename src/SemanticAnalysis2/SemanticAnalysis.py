@@ -41,15 +41,18 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler):
-        function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.VariableSymbol)
+        special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
+        function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.VariableSymbol) if not special else None
+
         s.next_scope()
 
         # Mark global methods as "static" ie don't have a "self" parameter
-        if s.current_scope == s.global_scope:
+        if not special and s.current_scope == s.global_scope:
             function_symbol.static = True
 
         # Analyse all the decorators and parameters, and the return type
-        [SemanticAnalysis.analyse_decorator(ast, d, s) for d in ast.decorators]
+        if not special:
+            [SemanticAnalysis.analyse_decorator(ast, d, s) for d in ast.decorators]
         [SemanticAnalysis.analyse_parameter(p, s) for p in ast.parameters]
         TypeInfer.check_type(ast.return_type, s)
         ast.return_type = TypeInfer.infer_type(ast.return_type, s)
@@ -67,20 +70,20 @@ class SemanticAnalysis:
         #     raise SystemExit(ErrFmt.err(g._tok) + "Generic parameter type cannot be inferred.")
 
         # Make sure abstract methods have no body
-        if function_symbol.meta_data.get("abstract", False) and ast.body.statements:
+        if not special and function_symbol.meta_data.get("abstract", False) and ast.body.statements:
             raise SystemExit(
                 ErrFmt.err([d for d in ast.decorators if d.identifier.parts == ["meta", "abstractmethod"]][0]._tok) + "Method defined as abstract here\n...\n",
                 ErrFmt.err(ast.body.statements[0]._tok) + "Abstract methods cannot have a body.")
 
         # Analyse each statement
-        if not function_symbol.meta_data.get("abstract", False):
+        if not special and not function_symbol.meta_data.get("abstract", False):
             for statement in ast.body.statements:
                 SemanticAnalysis.analyse_statement(statement, s)
 
         # Make sure the return type of the last statement matches the return type of the function, unless the method is
-        # abstract, in which case it is allowed to not have a return statement
+        # abstract, in which case it is allowed to not have a return statement.
         t = TypeInfer.infer_statement(ast.body.statements[-1], s) if ast.body.statements else CommonTypes.void()
-        if t != ast.return_type and not function_symbol.meta_data.get("abstract", False):
+        if not special and t != ast.return_type and not function_symbol.meta_data.get("abstract", False):
             err_ast = ast.body.statements[-1] if ast.body.statements else ast.body
             raise SystemExit(ErrFmt.err(err_ast._tok) + f"Expected return type of function to be '{ast.return_type}', but got '{t}'.")
 
@@ -133,16 +136,17 @@ class SemanticAnalysis:
     def analyse_sup_method_prototype(owner: Ast.SupPrototypeAst, ast: Ast.SupMethodPrototypeAst, s: ScopeHandler):
         if isinstance(owner, Ast.SupPrototypeInheritanceAst):
             super_class_scope = s.global_scope.get_child_scope(owner.super_class)
+            special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
 
             if not super_class_scope:
                 raise SystemExit(ErrFmt.err(owner.super_class._tok) + f"Super class '{owner.super_class}' not found.")
 
             # Make sure the method exists in the super class.
-            if not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
+            if not special and not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
                 raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' not found in super class '{owner.super_class}'.")
 
             # Make sure the method in the super-class is overridable -- virtual or abstract.
-            if not any([k in super_class_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol).meta_data.keys() for k in ["virtual", "abstract"]]):
+            if not special and not any([k in super_class_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol).meta_data.keys() for k in ["virtual", "abstract"]]):
                 raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' in super class '{owner.super_class}' is not virtual or abstract.")
 
         SemanticAnalysis.analyse_function_prototype(ast, s)
@@ -338,7 +342,11 @@ class SemanticAnalysis:
                 raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Index {ast.op.identifier.integer} out of range for type '{lhs_type}'.")
 
         # Else, check the attribute exists on the LHS.
-        elif not (class_scope.has_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol)):
+
+        elif not (s.current_scope.has_symbol(ast.op.identifier, SymbolTypes.VariableSymbol) or s.current_scope.has_symbol("__MOCK_" + ast.op.identifier, SymbolTypes.TypeSymbol)):
+            print("-" * 50)
+            print(ast)
+            print([str(x.name) for x in s.current_scope.all_symbols(SymbolTypes.TypeSymbol)])
             what = "Attribute" if not kwargs.get("call", False) else "Method"
             raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"{what} '{ast.op.identifier}' not found on type '{lhs_type}'.")
         

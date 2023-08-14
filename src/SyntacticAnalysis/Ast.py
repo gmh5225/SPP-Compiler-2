@@ -497,6 +497,9 @@ class SupPrototypeNormalAst:
     body: SupImplementationAst
     _tok: int
 
+    def __str__(self):
+        return str(self.identifier)
+
 @dataclass
 class SupPrototypeInheritanceAst(SupPrototypeNormalAst):
     super_class: TypeAst
