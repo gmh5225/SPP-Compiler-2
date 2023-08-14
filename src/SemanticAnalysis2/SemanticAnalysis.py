@@ -42,8 +42,6 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler):
-        print(f"Analyse function prototype {ast.identifier}")
-
         special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
         function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.VariableSymbol) if not special else None
 
@@ -472,7 +470,8 @@ class SemanticAnalysis:
         if cls_definition_scope is None:
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Cannot find definition for class '{cls_ty}'.")
 
-        actual_fields = [v.name.identifier for v in cls_definition_scope.all_symbols_exclusive_no_fn(SymbolTypes.VariableSymbol)]
+        actual_fields = [v.name.identifier for v in cls_definition_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol)]
+        actual_fields = [a for a in actual_fields if str(a) not in ["call_ref", "call_mut", "call_one"]]
 
         # If a fields has been given twice, then raise an error
         if given_twice := any_elem([f for f in ast.op.fields if isinstance(f.identifier, Ast.IdentifierAst) and given_fields.count(f.identifier.identifier) > 1]):

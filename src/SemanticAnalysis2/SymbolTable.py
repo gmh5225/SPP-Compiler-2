@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Hashable, Optional, TypeVar, Callable
+
 from src.SyntacticAnalysis import Ast
 
 
@@ -202,15 +203,16 @@ class Scope:
         return syms
 
     def all_symbols_exclusive(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
-        combined_symbol_tables = SymbolTable()
-        combined_symbol_tables.symbols = {**self.symbol_table.symbols}
+        combined_symbol_tables = [a for a in self.symbol_table.symbols.values() if isinstance(a, expected_sym_type)]
         for sup_scope in self.sup_scopes:
-            combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **sup_scope.symbol_table.symbols}
-        return [sym for sym in combined_symbol_tables.symbols.values() if isinstance(sym, expected_sym_type)]
+            combined_symbol_tables += [a for a in sup_scope.symbol_table.symbols.values() if isinstance(a, expected_sym_type)]
+        return combined_symbol_tables
 
     def all_symbols_exclusive_no_fn(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
         syms = self.all_symbols_exclusive(expected_sym_type)
-        syms = [s for s in syms if s.type.parts[-1].identifier != "FnRef"]
+        for s in syms:
+            print(s.type, type(s.type))
+        syms = [s for s in syms if s.type.identifier.identifier != "FnRef"]
         return syms
 
     def get_child_scope(self, id: Hashable) -> Optional[Scope]:

@@ -98,7 +98,6 @@ class TypeInfer:
 
     @staticmethod
     def infer_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        print("HELLO")
         # To infer something like x.y.z(a, b), we need to infer x.y.z, then infer a and b, then infer the function call.
 
         ty = TypeInfer.infer_expression(ast.lhs, s, all=True)
