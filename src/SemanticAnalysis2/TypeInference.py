@@ -86,7 +86,7 @@ class TypeInfer:
         cls = s.global_scope.get_child_scope(ty)
 
         if isinstance(ast.op.identifier, Ast.IdentifierAst):
-            sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False) or cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.FunctionSymbol, error=False)
+            sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False)
             if not sym:
                 raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Unknown member '{ast.op.identifier}' of type '{ty}'.")
             if isinstance(sym, SymbolTypes.VariableSymbol):
@@ -98,6 +98,7 @@ class TypeInfer:
 
     @staticmethod
     def infer_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+        print("HELLO")
         # To infer something like x.y.z(a, b), we need to infer x.y.z, then infer a and b, then infer the function call.
 
         ty = TypeInfer.infer_expression(ast.lhs, s, all=True)
@@ -114,6 +115,9 @@ class TypeInfer:
 
         s = s.global_scope.get_child_scope(ty)
         functions = [x for x in s.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
+
+        for f in functions:
+            print(f)
 
         for i, fn_type in enumerate([f.meta_data["fn_proto"] for f in functions]):
             param_names = [param.identifier.identifier for param in fn_type.parameters]
@@ -161,10 +165,6 @@ class TypeInfer:
     @staticmethod
     def infer_identifier(ast: Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
         return TypeInfer.likely_symbols(ast, SymbolTypes.VariableSymbol, "identifier", s)
-
-    @staticmethod
-    def infer_identifier_for_call(ast: Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
-        return TypeInfer.likely_symbols(ast, SymbolTypes.FunctionSymbol, "function", s)
 
     @staticmethod
     def check_type(ast: Ast.TypeAst, s: ScopeHandler) -> Ast.TypeAst:

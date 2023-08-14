@@ -42,6 +42,8 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler):
+        print(f"Analyse function prototype {ast.identifier}")
+
         special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
         function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.VariableSymbol) if not special else None
 
@@ -77,7 +79,7 @@ class SemanticAnalysis:
                 ErrFmt.err(ast.body.statements[0]._tok) + "Abstract methods cannot have a body.")
 
         # Analyse each statement
-        if not special and not function_symbol.meta_data.get("abstract", False):
+        if not special and not function_symbol.meta_data.get("abstract", False) or special:
             for statement in ast.body.statements:
                 SemanticAnalysis.analyse_statement(statement, s)
 
@@ -132,6 +134,12 @@ class SemanticAnalysis:
         match ast:
             case Ast.SupTypedefAst(): SemanticAnalysis.analyse_sup_typedef(ast, s)
             case Ast.SupMethodPrototypeAst(): SemanticAnalysis.analyse_sup_method_prototype(owner, ast, s)
+            case Ast.ClassPrototypeAst(): SemanticAnalysis.analyse_class_prototype(ast, s)
+            case Ast.LetStatementAst(): SemanticAnalysis.analyse_let_statement(ast, s)
+            case Ast.SupPrototypeNormalAst(): SemanticAnalysis.analyse_sup_prototype(ast, s)
+            case Ast.SupPrototypeInheritanceAst(): SemanticAnalysis.analyse_sup_prototype(ast, s)
+            case _:
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown sup member '{type(ast).__name__}' being analysed. Report as bug.")
 
     @staticmethod
     def analyse_sup_method_prototype(owner: Ast.SupPrototypeAst, ast: Ast.SupMethodPrototypeAst, s: ScopeHandler):
@@ -562,10 +570,10 @@ class SemanticAnalysis:
             # the outermost identifier in a postfix member access operation. If the outermost of a member access is a
             # function call ie "a.b.c().d.e" will be "c()", then the mutability is irrelevant, as mutability is tied to
             # values not types.
-            if isinstance(lhs, Ast.IdentifierAst):
-                sym = s.current_scope.get_symbol(lhs, SymbolTypes.VariableSymbol)
-                if not sym.is_mutable and sym.mem_info.is_initialized:
-                    raise SystemExit(ErrFmt.err(lhs._tok) + f"Cannot assign to an immutable variable.")
+            # if isinstance(lhs, Ast.IdentifierAst):
+            #     sym = s.current_scope.get_symbol(lhs, SymbolTypes.VariableSymbol)
+            #     if not sym.is_mutable and sym.mem_info.is_initialized:
+            #         raise SystemExit(ErrFmt.err(lhs._tok) + f"Cannot assign to an immutable variable.")
 
         # Create a mock function call for the assignment, and analyse it. Do 1 per variable, so that the function call
         # analysis can handle the multiple function calls for tuples etc.
@@ -573,7 +581,7 @@ class SemanticAnalysis:
         if len(ast.lhs) == 1:
             fn_call = Ast.PostfixFunctionCallAst(
                 [], [
-                    Ast.FunctionArgumentAst(None, ast.lhs[0], None, False, ast.lhs[0]._tok),
+                    Ast.FunctionArgumentAst(None, ast.lhs[0], Ast.ParameterPassingConventionReferenceAst(False, -1), False, ast.lhs[0]._tok),
                     Ast.FunctionArgumentAst(None, ast.rhs, None, False, ast.rhs._tok)
                 ], ast.op._tok)
             fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst("__set__", ast.op._tok), fn_call, ast.op._tok)
@@ -632,7 +640,7 @@ class SemanticAnalysis:
                 yield sym.type.parts[-1].identifier
             case _:
                 print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{type(ast)}' not yet supported for traversal. Report as bug.")
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{type(ast).__name__}' not yet supported for traversal. Report as bug.")
 
 def chain_generators(*gens):
     for gen in gens:
