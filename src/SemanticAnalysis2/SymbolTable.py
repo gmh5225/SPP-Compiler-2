@@ -105,8 +105,9 @@ class Scope:
     sup_scopes: list[Scope]
 
     visited: bool
+    hidden: bool
 
-    def __init__(self, id: Hashable, parent: Optional[Scope]):
+    def __init__(self, id: Hashable, parent: Optional[Scope], hidden: bool = False):
         self.name = id
         self.id = hash(id)
         self.parent = parent
@@ -115,6 +116,7 @@ class Scope:
         self.sup_scopes = []
 
         self.visited = False
+        self.hidden = hidden
 
         if parent is not None:
             parent.children.append(self)
@@ -214,8 +216,8 @@ class ScopeHandler:
         self.global_scope  = Scope(Ast.IdentifierAst("Global", -1), None)
         self.current_scope = self.global_scope
 
-    def enter_scope(self, name: Hashable) -> None:
-        self.current_scope = Scope(name, self.current_scope)
+    def enter_scope(self, name: Hashable, hidden: bool = False) -> None:
+        self.current_scope = Scope(name, self.current_scope, hidden=hidden)
 
     def exit_scope(self) -> None:
         self.current_scope = self.current_scope.parent

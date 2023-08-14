@@ -58,9 +58,17 @@ class AstReduction:
 
         i = owner.body.members.index(ast)
 
+        # Recursion break case
+        if ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]:
+            return
+
+        # If no overload of a function has been seen before, then create the class for it. So for the first instance of
+        # a function named "f", the class "__MOCK_f" will be created. For every function definition for "f" found,
+        # including this first one, the "FnRef" class will be super-imposed on it, with "call_ref" having the parameter
+        # and generic types from the original "f" definition.
         if ast.identifier.identifier not in AstReduction.REDUCED_FUNCTIONS:
             AstReduction.REDUCED_FUNCTIONS.append(ast.identifier.identifier)
-            cls_ast = Ast.ClassPrototypeAst([], ast.identifier, [], None, Ast.ClassImplementationAst([], -1), -1)
+            cls_ast = Ast.ClassPrototypeAst([], "__MOCK_" + ast.identifier, [], None, Ast.ClassImplementationAst([], -1), -1)
             owner.body.members.insert(0, cls_ast)
 
         new_fun = Ast.SupMethodPrototypeAst(ast.decorators, ast.is_coro, Ast.IdentifierAst("call_ref", -1), ast.generic_parameters, ast.parameters, ast.return_type, None, ast.body, ast._tok)
@@ -71,3 +79,4 @@ class AstReduction:
     def reduce_sup_prototype(mod: Ast.ModulePrototypeAst, ast: Ast.SupPrototypeAst):
         for member in [m for m in ast.body.members if isinstance(m, Ast.FunctionPrototypeAst)]:
             AstReduction.reduce_function_prototype(ast, member)
+        ast.body.members.sort(key=cmp_to_key(AstReduction.sort_members))

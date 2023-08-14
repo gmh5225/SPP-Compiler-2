@@ -47,6 +47,12 @@ class IdentifierAst:
     def __str__(self):
         return self.identifier
 
+    def __add__(self, other: str) -> IdentifierAst:
+        return IdentifierAst(self.identifier + other, self._tok)
+
+    def __radd__(self, other: str) -> IdentifierAst:
+        return IdentifierAst(other + self.identifier, self._tok)
+
     def to_generic_identifier(self) -> GenericIdentifierAst:
         return GenericIdentifierAst(self.identifier, [], self._tok)
 

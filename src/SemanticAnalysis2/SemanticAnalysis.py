@@ -5,7 +5,7 @@ from src.LexicalAnalysis.Tokens import TokenType, Token
 from src.SyntacticAnalysis import Ast
 from src.SyntacticAnalysis.Parser import ErrFmt
 
-from src.SemanticAnalysis2.SymbolTable import ScopeHandler, SymbolTypes, VariableSymbolMemoryStatus
+from src.SemanticAnalysis2.SymbolTable import ScopeHandler, SymbolTypes
 from src.SemanticAnalysis2.CommonTypes import CommonTypes
 from src.SemanticAnalysis2.TypeInference import TypeInfer
 
@@ -200,7 +200,7 @@ class SemanticAnalysis:
         s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ast.new_type.parts[-1].to_identifier(), old_type_sym.type, old_type_sym.sup_scopes))
 
     @staticmethod
-    def analyse_expression(ast: Ast.ExpressionAst, s: ScopeHandler):
+    def analyse_expression(ast: Ast.ExpressionAst, s: ScopeHandler, **kwargs):
         match ast:
             case Ast.IdentifierAst(): SemanticAnalysis.analyse_identifier(ast, s)
             case Ast.LambdaAst(): raise NotImplementedError("Lambda expressions are not implemented yet.")
@@ -210,7 +210,7 @@ class SemanticAnalysis:
             case Ast.WithStatementAst(): SemanticAnalysis.analyse_with_statement(ast, s)
             case Ast.InnerScopeAst(): SemanticAnalysis.analyse_inner_scope(ast, s)
             case Ast.BinaryExpressionAst(): SemanticAnalysis.analyse_binary_expression(ast, s)
-            case Ast.PostfixExpressionAst(): SemanticAnalysis.analyse_postfix_expression(ast, s)
+            case Ast.PostfixExpressionAst(): SemanticAnalysis.analyse_postfix_expression(ast, s, **kwargs)
             case Ast.AssignmentExpressionAst(): SemanticAnalysis.analyse_assignment_expression(ast, s)
             case Ast.PlaceholderAst(): raise NotImplementedError("Placeholder expressions are not implemented yet.")
             case Ast.TypeSingleAst(): TypeInfer.check_type(ast, s)
@@ -219,9 +219,9 @@ class SemanticAnalysis:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown expression {ast} being analysed. Report as bug.")
 
     @staticmethod
-    def analyse_postfix_expression(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
+    def analyse_postfix_expression(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):
         match ast.op:
-            case Ast.PostfixMemberAccessAst(): SemanticAnalysis.analyse_postfix_member_access(ast, s)
+            case Ast.PostfixMemberAccessAst(): SemanticAnalysis.analyse_postfix_member_access(ast, s, **kwargs)
             case Ast.PostfixFunctionCallAst(): SemanticAnalysis.analyse_postfix_function_call(ast, s)
             case Ast.PostfixStructInitializerAst(): SemanticAnalysis.analyse_postfix_struct_initializer(ast, s)
             case _: raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown postfix expression {ast} being analysed. Report as bug.")
@@ -231,7 +231,7 @@ class SemanticAnalysis:
         # Special assignment dummy method to check the statement and avoid code duplication.
         if ast.identifier == "__set__":
             return
-        if not (s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol) or s.current_scope.has_symbol(ast, SymbolTypes.FunctionSymbol)):
+        if not (s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol)):
             raise SystemExit(ErrFmt.err(ast._tok) + f"Identifier '{ast}' not found in scope.")
 
     @staticmethod
@@ -315,9 +315,8 @@ class SemanticAnalysis:
         SemanticAnalysis.analyse_expression(fn_call, s)
 
     @staticmethod
-    def analyse_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
+    def analyse_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):
         lhs_type = TypeInfer.infer_expression(ast.lhs, s)
-        # lhs_type = TypeInfer.infer_type(lhs_type, s)
         lhs_type = isinstance(lhs_type, Ast.TypeTupleAst) and CommonTypes.tuple(lhs_type.types) or lhs_type
 
         class_scope = s.global_scope.get_child_scope(lhs_type)
@@ -335,13 +334,14 @@ class SemanticAnalysis:
                 raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Index {ast.op.identifier.integer} out of range for type '{lhs_type}'.")
 
         # Else, check the attribute exists on the LHS.
-        elif not (class_scope.has_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol) or class_scope.has_symbol_exclusive(ast.op.identifier, SymbolTypes.FunctionSymbol)):
-            raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Attribute '{ast.op.identifier}' not found in type '{lhs_type}'.")
+        elif not (class_scope.has_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol)):
+            what = "Attribute" if not kwargs.get("call", False) else "Method"
+            raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"{what} '{ast.op.identifier}' not found in type '{lhs_type}'.")
         
     @staticmethod
     def analyse_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):
         # Verify the LHS is valid.
-        SemanticAnalysis.analyse_expression(ast.lhs, s)
+        SemanticAnalysis.analyse_expression(ast.lhs, s, call=True)
 
         ref_args = set()
         mut_args = set()

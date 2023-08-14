@@ -1,11 +1,12 @@
 import dataclasses
+import copy
 
 from src.LexicalAnalysis.Lexer import Lexer
 
 from src.SyntacticAnalysis import Ast
 from src.SyntacticAnalysis.Parser import ErrFmt, Parser
 from src.SemanticAnalysis2.AstReduction import AstReduction
-from src.SemanticAnalysis2.SymbolTable import ScopeHandler, SymbolTypes, VariableSymbolMemoryStatus
+from src.SemanticAnalysis2.SymbolTable import ScopeHandler, SymbolTypes
 
 
 class SymbolGeneration:
@@ -62,10 +63,10 @@ class SymbolGeneration:
         s.exit_scope()
 
     @staticmethod
-    def generate_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeHandler):
+    def generate_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeHandler, hidden: bool = False):
         ty = Ast.TypeSingleAst([Ast.GenericIdentifierAst(ast.identifier.identifier, [None for _ in range(len(ast.generic_parameters))], ast._tok)], ast._tok)
         s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ty.parts[-1].to_identifier(), ast))
-        s.enter_scope(ty)
+        s.enter_scope(ty, hidden=hidden)
         [s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier))) for g in ast.generic_parameters]
         s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast))
         for attr in ast.body.members:
@@ -73,13 +74,18 @@ class SymbolGeneration:
         s.exit_scope()
 
     @staticmethod
-    def generate_sup_prototype(ast: Ast.SupPrototypeAst, s: ScopeHandler):
-        s.enter_scope(Ast.IdentifierAst(ast.identifier.parts[-1].identifier + "#SUP", ast.identifier._tok))
+    def generate_sup_prototype(ast: Ast.SupPrototypeAst, s: ScopeHandler, hidden: bool = False):
+        s.enter_scope(Ast.IdentifierAst(ast.identifier.parts[-1].identifier + "#SUP", ast.identifier._tok), hidden=hidden)
         s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast.identifier))
         for g in ast.generic_parameters: s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier)))
         for member in ast.body.members: SymbolGeneration.generate_sup_member(member, s)
 
-        cls_scope = s.global_scope.get_child_scope(ast.identifier)
+        if ast.identifier.parts[-1].identifier in ["call_ref", "call_mut", "call_one"]:
+            return
+
+        c = copy.deepcopy(ast)
+        c.identifier.parts[-1] = ("__MOCK_" + c.identifier.parts[-1].to_identifier()).to_generic_identifier()
+        cls_scope = s.global_scope.get_child_scope(ast.identifier) or s.global_scope.get_child_scope(c.identifier)
         if not cls_scope:
             raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Class '{ast.identifier}' not found.")
         cls_scope.sup_scopes.append(s.current_scope)
@@ -90,8 +96,9 @@ class SymbolGeneration:
         match ast:
             case Ast.SupMethodPrototypeAst(): SymbolGeneration.generate_sup_method_prototype(ast, s)
             case Ast.SupTypedefAst(): SymbolGeneration.generate_sup_typedef(ast, s)
-            case Ast.SupPrototypeNormalAst(): SymbolGeneration.generate_sup_prototype(ast, s) # fn building
-            case Ast.SupPrototypeInheritanceAst(): SymbolGeneration.generate_sup_prototype(ast, s) # fn building
+            case Ast.SupPrototypeNormalAst(): SymbolGeneration.generate_sup_prototype(ast, s, hidden=True) # fn building
+            case Ast.SupPrototypeInheritanceAst(): SymbolGeneration.generate_sup_prototype(ast, s, hidden=True) # fn building
+            case Ast.ClassPrototypeAst(): SymbolGeneration.generate_class_prototype(ast, s, hidden=True) # fn building
             case _:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown sup member '{ast}' being generated. Report as bug.")
 
