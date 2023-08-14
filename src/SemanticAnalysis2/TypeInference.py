@@ -113,19 +113,15 @@ class TypeInfer:
         errs = []
 
         s = s.global_scope.get_child_scope(ty)
-        functions = [x for x in s.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
-
-        for f in functions:
-            print(f)
-
-        for i, fn_type in enumerate([f.meta_data["fn_proto"] for f in functions]):
+        overloads = [x for x in s.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
+        for i, fn_type in enumerate([f.meta_data["fn_proto"] for f in overloads]):
             param_names = [param.identifier.identifier for param in fn_type.parameters]
             param_tys = [param.type_annotation for param in fn_type.parameters]
             param_ccs = [param.calling_convention for param in fn_type.parameters]
             sigs.append(str(fn_type))
 
             # Skip first argument type for non-static functions
-            if functions[i].meta_data.get("is_method", False) and not functions[i].meta_data.get("is_static", False):
+            if overloads[i].meta_data.get("is_method", False) and not overloads[i].meta_data.get("is_static", False):
                 param_tys = param_tys[1:]
                 param_ccs = param_ccs[1:]
 

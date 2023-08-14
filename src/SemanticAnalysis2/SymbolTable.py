@@ -210,8 +210,6 @@ class Scope:
 
     def all_symbols_exclusive_no_fn(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
         syms = self.all_symbols_exclusive(expected_sym_type)
-        for s in syms:
-            print(s.type, type(s.type))
         syms = [s for s in syms if s.type.identifier.identifier != "FnRef"]
         return syms
 
