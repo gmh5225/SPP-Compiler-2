@@ -482,13 +482,13 @@ class SemanticAnalysis:
         # an error for the first unknown field.
         difference = set(given_fields) - set(actual_fields)
         if difference and (unknown_field := difference.pop()):
-            raise SystemExit(ErrFmt.err(ast.op.fields[given_fields.index(unknown_field)]._tok) + f"Struct initializer for '{cls_ty}' contains unknown fields: '{unknown_field}'.")
+            raise SystemExit(ErrFmt.err(ast.op.fields[given_fields.index(unknown_field)]._tok) + f"Struct initializer for '{cls_ty}' contains unknown field: '{unknown_field}'.")
 
         # If there are less given fields than actual fields, then the default object must be given. If it hasn't been
         # given, then an error is raised.
         if len(given_fields) < len(actual_fields) and not default_obj_given:
             # todo : add the class definition to the error message
-            raise SystemExit(ErrFmt.err(ast.op._tok) + f"Struct initializer for '{cls_ty}' is missing fields: '{','.join(set(actual_fields) - set(given_fields))}'.")
+            raise SystemExit(ErrFmt.err(ast._tok) + f"Struct initializer for '{cls_ty}' is missing fields: '{', '.join(set(actual_fields) - set(given_fields))}'.")
 
         # Handle the default object given (if it is given). Make sure it is the correct type, and not a borrowed object
         # from a parameter.
