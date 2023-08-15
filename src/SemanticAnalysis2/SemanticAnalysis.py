@@ -407,7 +407,7 @@ class SemanticAnalysis:
                     # its fields, so only the outermost value needs to be checked.
                     if isinstance(value, Ast.IdentifierAst):
                         sym = s.current_scope.get_symbol(value, SymbolTypes.VariableSymbol)
-                        if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move a value that is not initialized.")
+                        if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"[0] Cannot move a value that is not initialized.")
                         if not sym.is_mutable: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow from an immutable value.")
 
                     # If the outermost value is the result of a function call, then the value being returned cannot have
@@ -420,7 +420,7 @@ class SemanticAnalysis:
                     if value in mut_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow a value that is already mutably borrowed.")
                     if value in ref_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow a value that is already immutably borrowed.")
                     if not sym.is_mutable: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow from an immutable value.")
-                    if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move a value that is not initialized.")
+                    if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"[1] Cannot move a value that is not initialized.")
                     mut_args |= {value}
 
             # Handle immutable borrows -- they are slightly more relaxed than mutable borrows, as they can overlap, and
@@ -439,7 +439,7 @@ class SemanticAnalysis:
                     if value in mut_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot immutably borrow a value that is already mutably borrowed.")
 
                     sym = s.current_scope.get_symbol(arg.value, SymbolTypes.VariableSymbol)
-                    if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move a value that is not initialized.")
+                    if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"[2] Cannot move a value that is not initialized.")
                     ref_args |= {value}
 
     @staticmethod
@@ -585,7 +585,7 @@ class SemanticAnalysis:
                     Ast.FunctionArgumentAst(None, ast.rhs, None, False, ast.rhs._tok)
                 ], ast.op._tok)
             fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst("__set__", ast.op._tok), fn_call, ast.op._tok)
-            SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **kwargs)
+            SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **{**kwargs, "let": True})
 
             # Type check todo
             lhs_ty = TypeInfer.infer_expression(ast.lhs[0], s)
@@ -608,11 +608,11 @@ class SemanticAnalysis:
             for i, lhs in enumerate(ast.lhs):
                 fn_call = Ast.PostfixFunctionCallAst(
                     [], [
-                        Ast.FunctionArgumentAst(None, lhs, None, False, lhs._tok),
+                        Ast.FunctionArgumentAst(None, lhs, Ast.ParameterPassingConventionReferenceAst(False, -1), False, lhs._tok),
                         Ast.FunctionArgumentAst(None, ast.rhs.values[i], None, False, ast.rhs._tok),
                     ], ast.op._tok)
                 fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst("__set__", ast.op._tok), fn_call, ast.op._tok)
-                SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **kwargs)
+                SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **{**kwargs, "let": True})
 
         # Set this variable as initialized. All other memory issues will be handled by the function call analysis of the
         # "set" function.
