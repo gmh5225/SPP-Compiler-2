@@ -587,10 +587,10 @@ class SemanticAnalysis:
             fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst("__set__", ast.op._tok), fn_call, ast.op._tok)
             SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **{**kwargs, "let": True})
 
-            # Type check todo
+            # Type check
             lhs_ty = TypeInfer.infer_expression(ast.lhs[0], s)
             if rhs_ty != lhs_ty:
-                raise SystemExit(ErrFmt.err(ast.op._tok) + f"Cannot assign type '{rhs_ty}' to type '{lhs_ty}'.")
+                raise SystemExit(ErrFmt.err(ast.rhs._tok) + f"Cannot assign type '{rhs_ty}' to type '{lhs_ty}'.")
 
         # The tuple checks have to be done again, because for normal assignment they have to exist, and for assignment
         # from a let statement, the let statement analyser needs to check the tuple types are valid before settings the
@@ -613,6 +613,11 @@ class SemanticAnalysis:
                     ], ast.op._tok)
                 fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst("__set__", ast.op._tok), fn_call, ast.op._tok)
                 SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **{**kwargs, "let": True})
+
+                # Type check
+                lhs_ty = TypeInfer.infer_expression(lhs, s)
+                if rhs_ty.parts[-1].generic_arguments[i] != lhs_ty:
+                    raise SystemExit(ErrFmt.err(ast.rhs.values[i]._tok) + f"Cannot assign type '{rhs_ty.parts[-1].generic_arguments[i]}' to type '{lhs_ty}'.")
 
         # Set this variable as initialized. All other memory issues will be handled by the function call analysis of the
         # "set" function.
