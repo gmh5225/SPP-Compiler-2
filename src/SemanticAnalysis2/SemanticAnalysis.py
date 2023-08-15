@@ -349,8 +349,7 @@ class SemanticAnalysis:
                 raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Index {ast.op.identifier.integer} out of range for type '{lhs_type}'.")
 
         # Else, check the attribute exists on the LHS.
-
-        elif not s.current_scope.has_symbol(ast.op.identifier, SymbolTypes.VariableSymbol): #or s.current_scope.has_symbol("__MOCK_" + ast.op.identifier, SymbolTypes.TypeSymbol)):
+        elif not class_scope.has_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol): #or s.current_scope.has_symbol("__MOCK_" + ast.op.identifier, SymbolTypes.TypeSymbol)):
             what = "Attribute" if not kwargs.get("call", False) else "Method"
             raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"{what} '{ast.op.identifier}' not found on type '{lhs_type}'.")
         
@@ -365,6 +364,7 @@ class SemanticAnalysis:
         arg_ts   = []
 
         # TODO : partial moves not working at the moment
+        # TODO : moving attributes from a borrowed context don't seem to wort rn either
 
         for i, arg in enumerate(ast.op.arguments):
             # Check the argument is valid.
@@ -387,7 +387,7 @@ class SemanticAnalysis:
                     if value in mut_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move value '{value}' that is already mutably borrowed.")
 
                     sym = s.current_scope.get_symbol(value, SymbolTypes.VariableSymbol)
-                    if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move value '{value}' that is not initialized.")
+                    if not sym.mem_info.is_initialized: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move value '{value}' that is not initialized.")
                     sym.mem_info.is_initialized = False
 
             # Handle mutable borrows
@@ -407,7 +407,7 @@ class SemanticAnalysis:
                     # its fields, so only the outermost value needs to be checked.
                     if isinstance(value, Ast.IdentifierAst):
                         sym = s.current_scope.get_symbol(value, SymbolTypes.VariableSymbol)
-                        if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"[0] Cannot move a value that is not initialized.")
+                        if not sym.mem_info.is_initialized: raise SystemExit(ErrFmt.err(arg.value._tok) + f"[0] Cannot move a value that is not initialized.")
                         if not sym.is_mutable: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow from an immutable value.")
 
                     # If the outermost value is the result of a function call, then the value being returned cannot have
@@ -420,7 +420,7 @@ class SemanticAnalysis:
                     if value in mut_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow a value that is already mutably borrowed.")
                     if value in ref_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow a value that is already immutably borrowed.")
                     if not sym.is_mutable: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow from an immutable value.")
-                    if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"[1] Cannot move a value that is not initialized.")
+                    if not sym.mem_info.is_initialized: raise SystemExit(ErrFmt.err(arg.value._tok) + f"[1] Cannot move a value that is not initialized.")
                     mut_args |= {value}
 
             # Handle immutable borrows -- they are slightly more relaxed than mutable borrows, as they can overlap, and
@@ -585,7 +585,7 @@ class SemanticAnalysis:
                     Ast.FunctionArgumentAst(None, ast.rhs, None, False, ast.rhs._tok)
                 ], ast.op._tok)
             fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst("__set__", ast.op._tok), fn_call, ast.op._tok)
-            SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **{**kwargs, "let": True})
+            SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **kwargs)
 
             # Type check
             lhs_ty = TypeInfer.infer_expression(ast.lhs[0], s)
@@ -612,7 +612,7 @@ class SemanticAnalysis:
                         Ast.FunctionArgumentAst(None, ast.rhs.values[i], None, False, ast.rhs._tok),
                     ], ast.op._tok)
                 fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst("__set__", ast.op._tok), fn_call, ast.op._tok)
-                SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **{**kwargs, "let": True})
+                SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **kwargs)
 
                 # Type check
                 lhs_ty = TypeInfer.infer_expression(lhs, s)
