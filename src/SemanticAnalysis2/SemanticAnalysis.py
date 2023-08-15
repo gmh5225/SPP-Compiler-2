@@ -31,7 +31,6 @@ class SemanticAnalysis:
     def analyse_module_member(ast: Ast.ModuleMemberAst, s: ScopeHandler):
         # Analyse each module member
         match ast:
-            case Ast.FunctionPrototypeAst(): SemanticAnalysis.analyse_function_prototype(ast, s)
             case Ast.ClassPrototypeAst(): SemanticAnalysis.analyse_class_prototype(ast, s)
             case Ast.EnumPrototypeAst(): s.skip_scope()
             case Ast.SupPrototypeNormalAst(): SemanticAnalysis.analyse_sup_prototype(ast, s)
@@ -42,6 +41,7 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler):
+        print("WELL HELLO THERE", ast)
         special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
         function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.VariableSymbol) if not special else None
 
@@ -52,8 +52,7 @@ class SemanticAnalysis:
             function_symbol.static = True
 
         # Analyse all the decorators and parameters, and the return type
-        if not special:
-            [SemanticAnalysis.analyse_decorator(ast, d, s) for d in ast.decorators]
+        [SemanticAnalysis.analyse_decorator(ast, d, s) for d in ast.decorators]
         [SemanticAnalysis.analyse_parameter(p, s) for p in ast.parameters]
         TypeInfer.check_type(ast.return_type, s)
         ast.return_type = TypeInfer.infer_type(ast.return_type, s)
@@ -149,11 +148,11 @@ class SemanticAnalysis:
                 raise SystemExit(ErrFmt.err(owner.super_class._tok) + f"Super class '{owner.super_class}' not found.")
 
             # Make sure the method exists in the super class.
-            if not special and not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
+            if not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
                 raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' not found in super class '{owner.super_class}'.")
 
             # Make sure the method in the super-class is overridable -- virtual or abstract.
-            if not special and not any([k in super_class_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol).meta_data.keys() for k in ["virtual", "abstract"]]):
+            if not any([k in ["virtual", "abstract"] for k in super_class_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol).meta_data.keys()]):
                 raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' in super class '{owner.super_class}' is not virtual or abstract.")
 
         SemanticAnalysis.analyse_function_prototype(ast, s)
@@ -180,6 +179,7 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_decorator(apply_to: Ast.ModulePrototypeAst | Ast.FunctionPrototypeAst | Ast.ClassPrototypeAst | Ast.EnumPrototypeAst | Ast.SupTypedefAst | Ast.ClassAttributeAst, ast: Ast.DecoratorAst, s: ScopeHandler):
+        print(f"decorator {ast}")
         match [i.identifier for i in ast.identifier.parts]:
             case ["meta", "private"]: ...
             case ["meta", "public"]: ...
