@@ -41,7 +41,6 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler):
-        print("WELL HELLO THERE", ast)
         special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
         function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.VariableSymbol) if not special else None
 
@@ -179,7 +178,6 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_decorator(apply_to: Ast.ModulePrototypeAst | Ast.FunctionPrototypeAst | Ast.ClassPrototypeAst | Ast.EnumPrototypeAst | Ast.SupTypedefAst | Ast.ClassAttributeAst, ast: Ast.DecoratorAst, s: ScopeHandler):
-        print(f"decorator {ast}")
         match [i.identifier for i in ast.identifier.parts]:
             case ["meta", "private"]: ...
             case ["meta", "public"]: ...
