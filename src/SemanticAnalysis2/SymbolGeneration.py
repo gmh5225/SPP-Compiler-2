@@ -65,8 +65,6 @@ class SymbolGeneration:
         sym.meta_data["is_method"] = getattr(ast, "is_method", False)
         s.current_scope.add_symbol(sym)
 
-        print(ast)
-
         s.enter_scope(ast.identifier)
         [s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier))) for g in ast.generic_parameters]
         s.exit_scope()

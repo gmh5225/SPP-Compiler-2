@@ -358,6 +358,7 @@ class SemanticAnalysis:
     def analyse_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):
         # Verify the LHS is valid.
         SemanticAnalysis.analyse_expression(ast.lhs, s, call=True)
+        TypeInfer.infer_expression(ast, s)
 
         ref_args = set()
         mut_args = set()
@@ -569,14 +570,14 @@ class SemanticAnalysis:
             # the outermost identifier in a postfix member access operation. If the outermost of a member access is a
             # function call ie "a.b.c().d.e" will be "c()", then the mutability is irrelevant, as mutability is tied to
             # values not types.
-            # if isinstance(lhs, Ast.IdentifierAst):
-            #     sym = s.current_scope.get_symbol(lhs, SymbolTypes.VariableSymbol)
-            #     if not sym.is_mutable and sym.mem_info.is_initialized:
-            #         raise SystemExit(ErrFmt.err(lhs._tok) + f"Cannot assign to an immutable variable.")
+            if isinstance(lhs, Ast.IdentifierAst):
+                sym = s.current_scope.get_symbol(lhs, SymbolTypes.VariableSymbol)
+                if not sym.is_mutable and sym.mem_info.is_initialized:
+                    raise SystemExit(ErrFmt.err(lhs._tok) + f"Cannot assign to an immutable variable.")
 
         # Create a mock function call for the assignment, and analyse it. Do 1 per variable, so that the function call
         # analysis can handle the multiple function calls for tuples etc.
-        ty = TypeInfer.infer_expression(ast.rhs, s)
+        rhs_ty = TypeInfer.infer_expression(ast.rhs, s)
         if len(ast.lhs) == 1:
             fn_call = Ast.PostfixFunctionCallAst(
                 [], [
@@ -586,17 +587,22 @@ class SemanticAnalysis:
             fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst("__set__", ast.op._tok), fn_call, ast.op._tok)
             SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **kwargs)
 
+            # Type check todo
+            lhs_ty = TypeInfer.infer_expression(ast.lhs[0], s)
+            if rhs_ty != lhs_ty:
+                raise SystemExit(ErrFmt.err(ast.op._tok) + f"Cannot assign type '{rhs_ty}' to type '{lhs_ty}'.")
+
         # The tuple checks have to be done again, because for normal assignment they have to exist, and for assignment
         # from a let statement, the let statement analyser needs to check the tuple types are valid before settings the
         # types of the symbols in the table prior to assignment.
         else:
             # Ensure that the RHS is a tuple type.
-            if not ty.parts[-1].identifier == "Tup":
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot assign non-tuple type to a tuple. Found {ty}")
+            if not rhs_ty.parts[-1].identifier == "Tup":
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot assign non-tuple type to a tuple. Found {rhs_ty}")
 
             # Ensure that the tuple contains the correct number of elements.
-            if len(ty.parts[-1].generic_arguments) != len(ast.lhs):
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot assign tuple of length {len(ty.types)} to a tuple of length {len(ast.lhs)}.")
+            if len(rhs_ty.parts[-1].generic_arguments) != len(ast.lhs):
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot assign tuple of length {len(rhs_ty.types)} to a tuple of length {len(ast.lhs)}.")
 
             # Create a function prototype for each variable in the tuple.
             for i, lhs in enumerate(ast.lhs):
@@ -612,6 +618,8 @@ class SemanticAnalysis:
         # "set" function.
         for variable in ast.lhs:
             s.current_scope.get_symbol(variable, SymbolTypes.VariableSymbol).mem_info.is_initialized = True
+
+        # Extra checks for assignment: mutability and type
 
     @staticmethod
     def analyse_while_statement(ast: Ast.WhileStatementAst, s: ScopeHandler):

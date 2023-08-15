@@ -98,6 +98,9 @@ class TypeInfer:
 
     @staticmethod
     def infer_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+        if isinstance(ast.lhs, Ast.IdentifierAst) and ast.lhs.identifier == "__set__":
+            return CommonTypes.void()
+
         # To infer something like x.y.z(a, b), we need to infer x.y.z, then infer a and b, then infer the function call.
 
         ty = TypeInfer.infer_expression(ast.lhs, s, all=True)
@@ -113,6 +116,9 @@ class TypeInfer:
         errs = []
 
         s = s.global_scope.get_child_scope(ty)
+        if not s:
+            raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Unknown function '{ast.lhs}'.")
+
         overloads = [x for x in s.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
         for i, fn_type in enumerate([f.meta_data["fn_proto"] for f in overloads]):
             param_names = [param.identifier.identifier for param in fn_type.parameters]
@@ -187,6 +193,8 @@ class TypeInfer:
             check = not s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol)# and not s.current_scope.has_symbol("__MOCK_" + ast, SymbolTypes.TypeSymbol)
         elif sym_ty == SymbolTypes.TypeSymbol:
             check = not s.current_scope.has_symbol(ast, SymbolTypes.TypeSymbol)
+        if check:
+            return
 
         if check:
             # Get all the variable symbols that are in the scope. Define the most likely to be "-1" so that any symbol
