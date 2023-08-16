@@ -285,6 +285,12 @@ class DecoratorAst:
     arguments: list[FunctionArgumentAst]
     _tok: int
 
+    def __str__(self):
+        s = "@" + str(self.identifier)
+        s += ("[" + ", ".join([str(arg) for arg in self.generic_arguments]) + "]" if self.generic_arguments else "")
+        s += "(" + ", ".join([str(arg) for arg in self.arguments]) + ")"
+        return s
+
 @dataclass
 class BinaryExpressionAst:
     lhs: ExpressionAst
