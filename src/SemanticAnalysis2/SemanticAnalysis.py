@@ -69,22 +69,33 @@ class SemanticAnalysis:
         #     raise SystemExit(ErrFmt.err(g._tok) + "Generic parameter type cannot be inferred.")
 
         # Make sure abstract methods have no body
-        if not special and function_symbol.meta_data.get("abstract", False) and ast.body.statements:
-            raise SystemExit(
-                ErrFmt.err([d for d in ast.decorators if d.identifier.parts == ["meta", "abstractmethod"]][0]._tok) + "Method defined as abstract here\n...\n",
-                ErrFmt.err(ast.body.statements[0]._tok) + "Abstract methods cannot have a body.")
+        # if function_symbol.meta_data.get("abstract", False) and ast.body.statements:
+        #     raise SystemExit(
+        #         ErrFmt.err([d for d in ast.decorators if d.identifier.parts == ["meta", "abstractmethod"]][0]._tok) + "Method defined as abstract here\n...\n",
+        #         ErrFmt.err(ast.body.statements[0]._tok) + "Abstract methods cannot have a body.")
 
         # Analyse each statement
-        if not special and not function_symbol.meta_data.get("abstract", False) or special:
-            for statement in ast.body.statements:
-                SemanticAnalysis.analyse_statement(statement, s)
+        # if not special and not function_symbol.meta_data.get("abstract", False) or special:
+        for statement in ast.body.statements:
+            SemanticAnalysis.analyse_statement(statement, s)
 
         # Make sure the return type of the last statement matches the return type of the function, unless the method is
         # abstract, in which case it is allowed to not have a return statement.
         t = TypeInfer.infer_statement(ast.body.statements[-1], s) if ast.body.statements else CommonTypes.void()
-        if not special and t != ast.return_type and not function_symbol.meta_data.get("abstract", False):
-            err_ast = ast.body.statements[-1] if ast.body.statements else ast.body
-            raise SystemExit(ErrFmt.err(err_ast._tok) + f"Expected return type of function to be '{ast.return_type}', but got '{t}'.")
+
+        if str(ast.return_type) != "Void" and ast.body.statements and not isinstance(ast.body.statements[-1], Ast.ReturnStatementAst):
+            err_ast = ast.body.statements[-1]
+            raise SystemExit(
+                f"Function returning '{ast.return_type}' must end with a return statement" +
+                ErrFmt.err(ast.return_type._tok) + f"Function return type is '{ast.return_type}'\n..." +
+                ErrFmt.err(err_ast._tok) + f"Final statement is a '{type(err_ast).__name__}'.")
+
+        if t != ast.return_type and ast.body.statements: # and not function_symbol.meta_data.get("abstract", False):
+            err_ast = ast.body.statements[-1]
+            raise SystemExit(
+                "Mismatch between function return type and function's final statement" +
+                ErrFmt.err(ast.return_type._tok) + f"Function return type is '{ast.return_type}'\n..." +
+                ErrFmt.err(err_ast.value._tok) + f"Final statement returns type '{t}'.")
 
         s.prev_scope()
 
@@ -130,7 +141,18 @@ class SemanticAnalysis:
         match ast:
             case Ast.SupTypedefAst(): SemanticAnalysis.analyse_sup_typedef(ast, s)
             case Ast.SupMethodPrototypeAst(): SemanticAnalysis.analyse_sup_method_prototype(owner, ast, s)
-            case Ast.ClassPrototypeAst(): SemanticAnalysis.analyse_class_prototype(ast, s)
+            case Ast.ClassPrototypeAst():
+                if isinstance(owner, Ast.SupPrototypeInheritanceAst):
+                    super_class_scope = s.global_scope.get_child_scope(owner.super_class)
+                    reduced_identifier = Ast.IdentifierAst(ast.identifier.identifier.split("__MOCK_")[1], ast.identifier._tok)
+                    if not super_class_scope.has_symbol_exclusive(reduced_identifier, SymbolTypes.VariableSymbol):
+                        raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{reduced_identifier}' not found in super class '{owner.super_class}'.")
+
+                    # Make sure the method in the super-class is overridable -- virtual or abstract. TODO
+                    # if not any([k in ["virtual", "abstract"] for k in super_class_scope.get_symbol_exclusive(reduced_identifier, SymbolTypes.VariableSymbol).meta_data.keys()]):
+                    #     raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{reduced_identifier}' in super class '{owner.super_class}' is not virtual or abstract.")
+
+                SemanticAnalysis.analyse_class_prototype(ast, s)
             case Ast.LetStatementAst(): SemanticAnalysis.analyse_let_statement(ast, s)
             case Ast.SupPrototypeNormalAst(): SemanticAnalysis.analyse_sup_prototype(ast, s)
             case Ast.SupPrototypeInheritanceAst(): SemanticAnalysis.analyse_sup_prototype(ast, s)
@@ -147,12 +169,12 @@ class SemanticAnalysis:
                 raise SystemExit(ErrFmt.err(owner.super_class._tok) + f"Super class '{owner.super_class}' not found.")
 
             # Make sure the method exists in the super class.
-            if not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
-                raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' not found in super class '{owner.super_class}'.")
-
-            # Make sure the method in the super-class is overridable -- virtual or abstract.
-            if not any([k in ["virtual", "abstract"] for k in super_class_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol).meta_data.keys()]):
-                raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' in super class '{owner.super_class}' is not virtual or abstract.")
+            # if not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
+            #     raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' not found in super class '{owner.super_class}'.")
+            #
+            # # Make sure the method in the super-class is overridable -- virtual or abstract.
+            # if not any([k in ["virtual", "abstract"] for k in super_class_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol).meta_data.keys()]):
+            #     raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' in super class '{owner.super_class}' is not virtual or abstract.")
 
         SemanticAnalysis.analyse_function_prototype(ast, s)
 
@@ -178,27 +200,32 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_decorator(apply_to: Ast.ModulePrototypeAst | Ast.FunctionPrototypeAst | Ast.ClassPrototypeAst | Ast.EnumPrototypeAst | Ast.SupTypedefAst | Ast.ClassAttributeAst, ast: Ast.DecoratorAst, s: ScopeHandler):
-        match [i.identifier for i in ast.identifier.parts]:
-            case ["meta", "private"]: ...
-            case ["meta", "public"]: ...
-            case ["meta", "protected"]: ...
-            case ["meta", "virtualmethod"]:
-                if not isinstance(apply_to, Ast.FunctionPrototypeAst): raise SystemExit(ErrFmt.err(ast._tok) + "virtualmethod decorator can only be applied to functions.")
-                fun_symbol = s.current_scope.get_symbol(apply_to.identifier, SymbolTypes.VariableSymbol)
-                fun_symbol.meta_data["virtual"] = True
-            case ["meta", "abstractmethod"]:
-                if not isinstance(apply_to, Ast.FunctionPrototypeAst): raise SystemExit(ErrFmt.err(ast._tok) + "abstractmethod decorator can only be applied to functions.")
-                fun_symbol = s.current_scope.get_symbol(apply_to.identifier, SymbolTypes.VariableSymbol)
-                fun_symbol.meta_data["abstract"] = True
-            case ["meta", "staticmethod"]:
-                if not isinstance(apply_to, Ast.FunctionPrototypeAst): raise SystemExit(ErrFmt.err(ast._tok) + "staticmethod decorator can only be applied to functions.")
-                fun_symbol = s.current_scope.get_symbol(apply_to.identifier, SymbolTypes.VariableSymbol)
-                fun_symbol.meta_data["static"] = True
-            case ["meta", _]:
-                raise SystemExit(ErrFmt.err(ast._tok) + "Unknown meta decorator.")
-            case _:
-                # todo : normal decorator application
-                ...
+        # identifier = apply_to.identifier
+        # if isinstance(apply_to, Ast.ClassPrototypeAst):
+        #     identifier = Ast.IdentifierAst(identifier.identifier.replace("__MOCK_", ""), identifier._tok)
+        #
+        # match [i.identifier for i in ast.identifier.parts]:
+        #     case ["meta", "private"]: ...
+        #     case ["meta", "public"]: ...
+        #     case ["meta", "protected"]: ...
+        #     case ["meta", "virtualmethod"]:
+        #         # if not isinstance(apply_to, Ast.FunctionPrototypeAst): raise SystemExit(ErrFmt.err(ast._tok) + "virtualmethod decorator can only be applied to functions.")
+        #         fun_symbol = s.current_scope.get_symbol(identifier, SymbolTypes.VariableSymbol)
+        #         fun_symbol.meta_data["virtual"] = True
+        #     case ["meta", "abstractmethod"]:
+        #         # if not isinstance(apply_to, Ast.FunctionPrototypeAst): raise SystemExit(ErrFmt.err(ast._tok) + "abstractmethod decorator can only be applied to functions.")
+        #         fun_symbol = s.current_scope.get_symbol(identifier, SymbolTypes.VariableSymbol)
+        #         fun_symbol.meta_data["abstract"] = True
+        #     case ["meta", "staticmethod"]:
+        #         # if not isinstance(apply_to, Ast.FunctionPrototypeAst): raise SystemExit(ErrFmt.err(ast._tok) + "staticmethod decorator can only be applied to functions.")
+        #         fun_symbol = s.current_scope.get_symbol(identifier, SymbolTypes.VariableSymbol)
+        #         fun_symbol.meta_data["static"] = True
+        #     case ["meta", _]:
+        #         raise SystemExit(ErrFmt.err(ast._tok) + "Unknown meta decorator.")
+        #     case _:
+        #         # todo : normal decorator application
+        #         ...
+        ...
 
     @staticmethod
     def analyse_typedef(ast: Ast.TypedefStatementAst, s: ScopeHandler):
