@@ -87,8 +87,6 @@ class TypeInfer:
 
         if isinstance(ast.op.identifier, Ast.IdentifierAst):
             sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False)
-            if not sym:
-                raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Unknown member '{ast.op.identifier}' of type '{ty}'.")
             if isinstance(sym, SymbolTypes.VariableSymbol):
                 return sym.type
             return sym#, [s.type for s in sym]
@@ -117,7 +115,7 @@ class TypeInfer:
 
         s = s.global_scope.get_child_scope(ty)
         if not s:
-            raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Unknown function '{ast.lhs}'.")
+            raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Unknown method '{ast.lhs}(...)'.")
 
         overloads = [x for x in s.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
         for i, fn_type in enumerate([f.meta_data["fn_proto"] for f in overloads]):
