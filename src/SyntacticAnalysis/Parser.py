@@ -938,8 +938,8 @@ class Parser:
             c1 = self._current
             p1 = self._parse_token(TokenType.TkAt).parse_once()
             p2 = self._parse_decorator_identifier().parse_once()
-            p3 = self._parse_type_generic_arguments().parse_optional()
-            p4 = self._parse_function_call_arguments().parse_optional()
+            p3 = self._parse_type_generic_arguments().parse_optional() or []
+            p4 = self._parse_function_call_arguments().parse_optional() or []
             return Ast.DecoratorAst(p2, p3, p4, c1)
         return BoundParser(self, inner)
 
