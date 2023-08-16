@@ -551,12 +551,12 @@ class SemanticAnalysis:
             ty = TypeInfer.infer_expression(ast.value, s)
 
             # Ensure that the RHS is a tuple type.
-            if not ty.parts[-1].identifier == "Tup":
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot assign non-tuple type to a tuple. Found {ty}")
+            if not ty.parts[-1].identifier:
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a non-tuple type ({ty}) into to {len(ast.variables)} variables.")
 
             # Ensure that the tuple contains the correct number of elements.
             if len(ty.parts[-1].generic_arguments) != len(ast.variables):
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot assign tuple of length {len(ty.types)} to a tuple of length {len(ast.variables)}.")
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a {len(ty.parts[-1].generic_arguments)}-tuple to {len(ast.variables)} variables.")
 
             # Infer the type of each variable, and set it in the symbol table.
             for variable in ast.variables:
@@ -622,12 +622,13 @@ class SemanticAnalysis:
         # types of the symbols in the table prior to assignment.
         else:
             # Ensure that the RHS is a tuple type.
+            # Ensure that the RHS is a tuple type.
             if not rhs_ty.parts[-1].identifier == "Tup":
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot assign non-tuple type to a tuple. Found {rhs_ty}")
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a non-tuple type ({rhs_ty}) into to {len(ast.lhs)} variables.")
 
             # Ensure that the tuple contains the correct number of elements.
             if len(rhs_ty.parts[-1].generic_arguments) != len(ast.lhs):
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot assign tuple of length {len(rhs_ty.types)} to a tuple of length {len(ast.lhs)}.")
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a {len(rhs_ty.parts[-1].generic_arguments)}-tuple to {len(ast.lhs)} variables.")
 
             # Create a function prototype for each variable in the tuple.
             for i, lhs in enumerate(ast.lhs):
