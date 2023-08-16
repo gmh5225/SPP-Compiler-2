@@ -1056,6 +1056,7 @@ class Parser:
 
     def _parse_primary_expression(self) -> BoundParser:
         def inner():
+            p0 = self._parse_single_type_identifier_for_initialization().delay_parse()  # let x: std.Num{};
             p1 = self._parse_single_type_identifier().delay_parse()  # let x = std.Num.new();
             p2 = self._parse_identifier().delay_parse()  # let x = identifier
             p3 = self._parse_literal().delay_parse()  # let x = 123
@@ -1067,8 +1068,15 @@ class Parser:
             p9 = self._parse_statement_new_scope().delay_parse()
             p10 = self._parse_statement_yield().delay_parse()
             p11 = self._parse_statement_with().delay_parse()
-            p12 = (p7 | p8 | p9 | p10 | p11 | p1 | p2 | p3 | p4 | p5 | p6).parse_once()
+            p12 = (p7 | p8 | p9 | p10 | p11 | p0 | p1 | p2 | p3 | p4 | p5 | p6).parse_once()
             return p12
+        return BoundParser(self, inner)
+
+    def _parse_single_type_identifier_for_initialization(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_single_type_identifier().parse_once()
+            p2 = self._parse_postfix_operator_struct_initializer().parse_once()
+            return Ast.PostfixExpressionAst(p1, p2, p1._tok)
         return BoundParser(self, inner)
 
     def _parse_binary_expression(self, __lhs, __op, __rhs) -> BoundParser:
@@ -1872,10 +1880,10 @@ class Parser:
         def inner():
             p1 = self._parse_postfix_operator_member_access().delay_parse()
             p2 = self._parse_postfix_operator_function_call().delay_parse()
-            p3 = self._parse_postfix_operator_struct_initializer().delay_parse()
-            p4 = self._parse_token(TokenType.TkQst).delay_parse()
-            p8 = (p1 | p2 | p3 | p4).parse_once()
-            return p8
+            # p3 = self._parse_postfix_operator_struct_initializer().delay_parse()
+            p3 = self._parse_token(TokenType.TkQst).delay_parse()
+            p4 = (p1 | p2 | p3).parse_once()
+            return p4
         return BoundParser(self, inner)
 
     # Literals

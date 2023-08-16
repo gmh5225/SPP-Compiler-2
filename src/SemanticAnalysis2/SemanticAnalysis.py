@@ -239,7 +239,7 @@ class SemanticAnalysis:
         match ast:
             case Ast.IdentifierAst(): SemanticAnalysis.analyse_identifier(ast, s)
             case Ast.LambdaAst(): raise NotImplementedError("Lambda expressions are not implemented yet.")
-            case Ast.IfStatementAst(): SemanticAnalysis.analyse_if_statement(ast, s)
+            case Ast.IfStatementAst(): SemanticAnalysis.analyse_if_statement(ast, s, **kwargs)
             case Ast.WhileStatementAst(): SemanticAnalysis.analyse_while_statement(ast, s)
             case Ast.YieldStatementAst(): raise NotImplementedError("Yield expressions are not implemented yet.")
             case Ast.WithStatementAst(): SemanticAnalysis.analyse_with_statement(ast, s)
@@ -277,12 +277,8 @@ class SemanticAnalysis:
     def analyse_if_statement(ast: Ast.IfStatementAst, s: ScopeHandler, **kwargs):
         s.enter_scope("if")
 
-        # Analyse the condition and make sure its Boolean
+        # Analyse the condition expression, and each pattern
         SemanticAnalysis.analyse_expression(ast.condition, s)
-        if (cond_expr_ty := TypeInfer.infer_expression(ast.condition, s)) != CommonTypes.bool():
-            raise SystemExit(ErrFmt.err(ast.condition._tok) + f"Condition must be a 'Bool' type, not '{cond_expr_ty}'.")
-
-        # Analyse each pattern
         [SemanticAnalysis.analyse_pattern_statement(ast, b, s) for b in ast.branches]
 
         # If the 'if-statement' is being used for assignment, make sure the final statements in each branch have a
@@ -293,8 +289,8 @@ class SemanticAnalysis:
                 if (t := TypeInfer.infer_expression(b.body[-1], s)) != ret_type:
                     raise SystemExit(
                         "If an 'if-statement' is being used for assignment, all branches must return the same type" +
-                        ErrFmt.err(ast.branches[0].body[-1]._tok) + f"First branch returns type '{ret_type}'\n...\n" +
-                        ErrFmt.err(b.body[-1]._tok) + f"Branch {i} returns type '{t}'.")
+                        ErrFmt.err(ast.branches[0].body[-1]._tok) + f"First branch returns type '{ret_type}'\n..." +
+                        ErrFmt.err(b.body[-1]._tok) + f"Branch {i + 2} returns type '{t}'.")
 
         s.exit_scope()
 
@@ -311,9 +307,10 @@ class SemanticAnalysis:
 
         # Check the comparison function exists for each pattern in the pattern statement.
         pat_comp = ast.comparison_op or owner.comparison_op
-        for pat in ast.patterns:
-            bin_comp = Ast.BinaryExpressionAst(owner.condition, pat_comp, pat.value, pat_comp._tok)
-            SemanticAnalysis.analyse_expression(bin_comp, s)
+        if pat_comp:
+            for pat in ast.patterns:
+                bin_comp = Ast.BinaryExpressionAst(owner.condition, pat_comp, pat.value, pat_comp._tok)
+                SemanticAnalysis.analyse_expression(bin_comp, s)
 
         # Check the pattern guard
         if ast.guard:
@@ -586,6 +583,8 @@ class SemanticAnalysis:
         # A manual mutability check is performed here, because whilst the function call handles all the memory and
         # mutability checks, the "set" function doesn't exist, so the mutability check has to be done manually.
         for lhs in ast.lhs:
+            SemanticAnalysis.analyse_expression(lhs, s)
+
             # For postfix member access operations, check that the outermost identifier is mutable. Field mutability is
             # dictated by the mutability of the object itself, so only the outermost value needs to be checked.
             while isinstance(lhs, Ast.PostfixExpressionAst) and isinstance(lhs.op, Ast.PostfixMemberAccessAst):
@@ -602,6 +601,7 @@ class SemanticAnalysis:
 
         # Create a mock function call for the assignment, and analyse it. Do 1 per variable, so that the function call
         # analysis can handle the multiple function calls for tuples etc.
+        SemanticAnalysis.analyse_expression(ast.rhs, s, assignment=True)
         rhs_ty = TypeInfer.infer_expression(ast.rhs, s)
         if len(ast.lhs) == 1:
             fn_call = Ast.PostfixFunctionCallAst(

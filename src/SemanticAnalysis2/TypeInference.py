@@ -79,7 +79,11 @@ class TypeInfer:
     def infer_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs) -> Ast.TypeAst:
         ty = None
         if isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.op, Ast.PostfixMemberAccessAst):
-            ty = TypeInfer.infer_postfix_member_access(ast.lhs, s) if isinstance(ast.lhs, Ast.PostfixExpressionAst) else TypeInfer.infer_identifier(ast.lhs, s) if isinstance(ast.lhs, Ast.IdentifierAst) else TypeInfer.infer_type(ast.lhs, s)
+            match ast.lhs:
+                case Ast.PostfixExpressionAst(): ty = TypeInfer.infer_postfix_member_access(ast.lhs, s)
+                case Ast.IdentifierAst(): ty = TypeInfer.infer_identifier(ast.lhs, s)
+                case _: ty = TypeInfer.infer_type(ast.lhs, s)
+
         if isinstance(ast, Ast.IdentifierAst):
             ty = TypeInfer.infer_identifier(ast, s)
         ty = TypeInfer.infer_type(ty, s)
@@ -101,7 +105,7 @@ class TypeInfer:
 
         # To infer something like x.y.z(a, b), we need to infer x.y.z, then infer a and b, then infer the function call.
 
-        ty = TypeInfer.infer_expression(ast.lhs, s, all=True)
+
         arg_tys = [TypeInfer.infer_expression(arg.value, s) for arg in ast.op.arguments]
         arg_ccs = [arg.calling_convention for arg in ast.op.arguments]
 
@@ -113,8 +117,9 @@ class TypeInfer:
         sigs = []
         errs = []
 
+        ty = TypeInfer.infer_expression(ast.lhs, s, all=True)
         s = s.global_scope.get_child_scope(ty)
-        if not s:
+        if not s: # todo -> this error should be picked up in SemanticAnalysis?
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Unknown method '{ast.lhs}(...)'.")
 
         overloads = [x for x in s.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
