@@ -106,6 +106,8 @@ class SemanticAnalysis:
         ty = ast.type_annotation if not isinstance(ast.type_annotation.parts[0], Ast.SelfTypeAst) else Ast.IdentifierAst("Self", ast.type_annotation._tok)
         s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.identifier, ty, is_mutable=ast.is_mutable, is_initialized=True))
 
+        TypeInfer.check_type(ast.type_annotation, s)
+
         # Analyse the default value
         if ast.default_value:
             SemanticAnalysis.analyse_expression(ast.default_value, s)
@@ -355,10 +357,14 @@ class SemanticAnalysis:
         lhs_type = TypeInfer.infer_expression(ast.lhs, s)
         lhs_type = isinstance(lhs_type, Ast.TypeTupleAst) and CommonTypes.tuple(lhs_type.types) or lhs_type
 
-        class_scope = s.global_scope.get_child_scope(lhs_type)
-        if not class_scope:
+        sym = s.current_scope.get_symbol(lhs_type.parts[-1], SymbolTypes.TypeSymbol)
+        if not sym:
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Type '{lhs_type}' not found.")
 
+        class_scope = s.global_scope.get_child_scope(lhs_type)
+        if not class_scope:
+            # Its a generic type (no attributes or methods accessible until constraints are applied)
+            raise SystemExit(ErrFmt.err(ast.op._tok) + f"Generic member access not available unless constraints are applied.")
 
         # For numeric member access, ie "x.0", check the LHS is a tuple type, and that the number is a valid index for
         # the tuple.
@@ -466,7 +472,10 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
-        cls_ty = TypeInfer.check_type(ast.lhs, s).to_type()
+        cls_ty = TypeInfer.check_type(ast.lhs, s)
+        if isinstance(cls_ty, Ast.TypeSingleAst):
+            raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Cannot initialize generic type '{cls_ty}'.")
+        cls_ty = cls_ty.to_type()
 
         # Check that each variable being passed into the initializer is valid, ie hasn't been moved already.
         given_fields = [f.identifier.identifier for f in ast.op.fields if isinstance(f.identifier, Ast.IdentifierAst)]
@@ -658,27 +667,6 @@ class SemanticAnalysis:
         SemanticAnalysis.analyse_expression(ast.condition, s)
         [SemanticAnalysis.analyse_statement(st, s) for st in ast.body]
         s.exit_scope()
-
-    @staticmethod
-    def traverse_type(ast: Ast.TypeAst | Ast.GenericIdentifierAst, s: ScopeHandler):
-        match ast:
-            case Ast.GenericIdentifierAst():
-                yield ast.identifier
-                for t in ast.generic_arguments:
-                    yield from SemanticAnalysis.traverse_type(t.value, s)
-            case Ast.TypeSingleAst():
-                yield ast.parts[-1].identifier
-                for t in ast.parts:
-                    yield from SemanticAnalysis.traverse_type(t, s)
-            case Ast.TypeTupleAst():
-                for t in ast.types:
-                    yield from SemanticAnalysis.traverse_type(t, s)
-            case Ast.SelfTypeAst():
-                sym = s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol)
-                yield sym.type.parts[-1].identifier
-            case _:
-                print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{type(ast).__name__}' not yet supported for traversal. Report as bug.")
 
 def chain_generators(*gens):
     for gen in gens:

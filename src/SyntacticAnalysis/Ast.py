@@ -358,7 +358,7 @@ class TypeGenericParameterAst:
         return TypeSingleAst([GenericIdentifierAst(self.identifier.identifier, [], self.identifier._tok)], self.identifier._tok)
 
     def __str__(self):
-        return self.identifier.identifier
+        return ("..." if self.is_variadic else "") + self.identifier.identifier
 
 def TypeGenericParameterRequiredAst(identifier: IdentifierAst, constraints: list[TypeAst], _tok: int):
     return TypeGenericParameterAst(identifier, constraints, None, False, _tok)

@@ -1,5 +1,5 @@
 from difflib import SequenceMatcher
-from typing import Callable
+import inspect
 
 from src.SyntacticAnalysis import Ast
 from src.SyntacticAnalysis.Parser import ErrFmt
@@ -174,7 +174,72 @@ class TypeInfer:
     def check_type(ast: Ast.TypeAst, s: ScopeHandler) -> Ast.TypeAst:
         if isinstance(ast, Ast.TypeGenericArgumentAst):
             ast = ast.value
+
+        # Check generic arguments given to the type
+        sym = s.current_scope.get_symbol(ast.parts[-1], SymbolTypes.TypeSymbol)
+        given_generic_arguments = ast.parts[-1].generic_arguments
+        actual_generic_parameters = sym.type.generic_parameters if isinstance(sym.type, Ast.ClassPrototypeAst) else []
+        if len(given_generic_arguments) > len(actual_generic_parameters):
+            if actual_generic_parameters and actual_generic_parameters[-1].is_variadic:
+                pass
+            else:
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Too many generic arguments given to type '{sym.type}'.")
+        # if len(given_generic_arguments) < (missing_generics := TypeInfer.required_generic_parameters_for_cls(sym.type, s)):
+        #     raise SystemExit(ErrFmt.err(ast._tok) + f"Not enough generic arguments given to type '{sym.type}'. Missing {missing_generics}.")
+
         return TypeInfer.likely_symbols(ast, SymbolTypes.TypeSymbol, "type", s)
+
+    @staticmethod
+    def required_generic_parameters_for_cls(ast: Ast.TypeSingleAst, s: ScopeHandler) -> list[Ast.TypeGenericParameterAst]:
+        # Generic parameters can be inferred, for a class, if they are:
+        #   - The type, or part of the type, of an attribute.
+        #   - Part of another generic type.
+        generics = ast.parts[-1].generic_arguments # todo : other parts of the type ie Vec[T].Value[X]. T would be missing here (just flatten all parts' generics)
+        generics_names = [g.identifier for g in generics]
+
+        for attr_type in [attr.type_annotation for attr in ast.body.members]:
+            for t in TypeInfer.traverse_type(attr_type, s):
+                if t in generics_names:
+                    generics.pop(generics_names.index(t))
+                    generics_names.remove(t)
+        return generics
+
+    @staticmethod
+    def required_generic_parameters_for_fun(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> list[Ast.TypeGenericParameterAst]:
+        # Generic parameters can be inferred, for a function, if they are:
+        #   - The type, or part of the type, of a parameter.
+        #   - Part of another generic type.
+        generics = ast.generic_parameters
+        generics_names = [g.identifier for g in generics]
+
+        for ty in [param.type_annotation for param in ast.parameters] + [g for g in ast.generic_parameters]:
+            for t in TypeInfer.traverse_type(ty, s):
+                if t in generics_names:
+                    generics.pop(generics_names.index(t))
+                    generics_names.remove(t)
+        return generics
+
+    @staticmethod
+    def traverse_type(ast: Ast.TypeAst | Ast.GenericIdentifierAst, s: ScopeHandler):
+        match ast:
+            case Ast.GenericIdentifierAst():
+                yield ast.identifier
+                for t in ast.generic_arguments:
+                    yield from TypeInfer.traverse_type(t.value, s)
+            case Ast.TypeSingleAst():
+                yield ast.parts[-1].identifier
+                for t in ast.parts:
+                    yield from TypeInfer.traverse_type(t, s)
+            case Ast.TypeTupleAst():
+                for t in ast.types:
+                    yield from TypeInfer.traverse_type(t, s)
+            case Ast.SelfTypeAst():
+                sym = s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol)
+                yield sym.type.parts[-1].identifier
+            case _:
+                print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{type(ast).__name__}' not yet supported for traversal. Report as bug.")
+
 
     @staticmethod
     def infer_type(ast: Ast.TypeAst, s: ScopeHandler) -> Ast.TypeAst:
@@ -196,8 +261,6 @@ class TypeInfer:
             check = not s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol)# and not s.current_scope.has_symbol("__MOCK_" + ast, SymbolTypes.TypeSymbol)
         elif sym_ty == SymbolTypes.TypeSymbol:
             check = not s.current_scope.has_symbol(ast, SymbolTypes.TypeSymbol)
-        if check:
-            return
 
         if check:
             # Get all the variable symbols that are in the scope. Define the most likely to be "-1" so that any symbol
