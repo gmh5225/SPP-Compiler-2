@@ -1,6 +1,51 @@
 mod my_module_root.some_folder.inner_folder.module_name
 
-use std.vec3.Vec3
+cls Or {}
+sup Or {
+    @meta.virtualmethod
+    fn or(self: Or, other: Or) -> Self {
+        ret self
+    }
+}
+
+cls Add {}
+sup Add {
+    @meta.virtualmethod
+    fn add(self: Add, other: Add) -> Self {
+        ret self
+    }
+}
+
+cls Default {}
+sup Default {
+    @meta.virtualmethod
+    @meta.staticmethod
+    fn default(self: Default) -> Self {
+        ret self
+    }
+}
+
+cls Eq {}
+sup Eq {
+    @meta.virtualmethod
+    fn eq(self: Equal, other: Equal) -> Bool {
+        ret true
+    }
+}
+
+cls Bool {}
+sup Eq for Bool {
+    fn eq(self: Bool, other: Bool) -> Bool {
+        ret true
+    }
+}
+
+fn main1(a: Num) -> Num {
+    ret 1
+}
+fn main1(a: Str) -> Str {
+    ret "1"
+}
 
 cls Tup[...Ts] {}
 
@@ -24,14 +69,20 @@ cls Num {
 cls Vec[T] {
     a: Num
 }
-sup Vec {
+sup[T] Vec[T] {
     fn new() -> Vec {
-        ret Vec {a=1}
+        ret Vec{a=1}
     }
 }
 
-sup std.Default for Num {
-    fn default() -> Num {
+sup Or for Bool {
+    fn or(self: Bool, other: Bool) -> Bool {
+        ret Bool{}
+    }
+}
+
+sup Default for Num {
+    fn default(self: Default) -> Num {
         ret Num {
             b="",
             d=0,
@@ -40,12 +91,30 @@ sup std.Default for Num {
     }
 }
 
-sup std.Default for Str {
-    fn default() -> Str {
+sup Default for Str {
+    fn default(self: Default) -> Str {
         ret Str {
             c=0,
             f=false
         }
+    }
+}
+
+sup Add for Num {
+    fn add(self: Num, other: Num) -> Num {
+        ret Num {
+            b="",
+            d=0,
+            e="false"
+        }
+    }
+}
+
+
+cls Vec3 {}
+sup Vec3 {
+    fn new() -> Vec3 {
+        ret Vec3 {}
     }
 }
 
@@ -56,8 +125,35 @@ cls ClassA {
     c: Vec
 }
 
+fn function_test_1(a: Num, b: Num, c: Num, d: Num) -> Str {
+    let x = 1
+    ret "123"
+}
+
+fn function_test_1(a: Str) -> Bool {
+    ret true
+}
+
+fn h(a: Num, b: Num, c: Num, d: Num) -> Bool {
+    ret true
+}
+
+fn i(a: &Num, b: &Num, c: &Num) -> Num {
+    ret 1
+}
+
+cls Cont {
+    a: Num
+    b: Num
+    c: Num
+    d: Num
+}
+
 sup ClassA {
     fn new() -> ClassA {
+        let k = 1
+        let d = i(&k, &k, &mut k)
+
         let p = 1
         let q = 1
 
@@ -68,7 +164,11 @@ sup ClassA {
         }
 
         let a = 1
-        let x = function_test_1(a)
+        let mut x0 = function_test_1(1, 2, 3, 4)
+        let x1 = function_test_1("false")
+
+        x0 = 1
+
         let y = a.b.c.e
 
         let z = 123_124_999
@@ -81,65 +181,47 @@ sup ClassA {
     }
 }
 
-sup std.ops.Add for ClassA {
-    use X as ClassA
-
+sup ClassA {
     @meta.private
     fn add(self: &ClassA, other: ClassA) -> ClassA {
         let p = 123
-        let q = function_test_4(&mut p, 123)
         let r = p
-
-        use T as X
 
         ret ClassA {
             a=self.a,
             b=self.b,
-            d=self.c
+            c=self.c
         }
     }
 }
 
-enum EnumType {
-    variantA,
-    variantB,
-    variantC
-}
 
 
-fn function_test_1(a: Num, b: Num, c: Num = 0, ...d: Num) -> Num {
-    let x = function_test_1(400, 500, c=200)
-    ret x
-}
 
-fn function_test_2[T, U=T, ...V](a: T, b: U, ...args: V) -> Num where [T, U: Default, T: Vec, T.Item: Copy, V: Num] if a > 0 {
-    fn some_value() -> Void {}
-
-    let x = function_test_2(400, 500)
-    let y = 1 + 2 * 3 - 4 / 5 % 6 ^ 7 & 8 | 9 || 10 && 11 == 12 != 13 < 14 > 15 <= 16 >= 17 |> 18 <| 19
+fn function_test_2[T, U=T, ...V](a: T, b: U, ...args: V) -> Num where [T, U: Default, T: Vec, T.Item: Copy, V: Num] {
+    let y = 1
 
     let a = y
 
-    let qq = (0, 1)
-    let ww = 0
-    let ss = 0
-    qq, ww, ss = ((2, 3), 3, 5)
+    let mut qq = (0, 1)
+    let mut ww = 0
+    let mut ss = 0
+    qq, ww, ss = (("2", 3), 3, 5)
 
-    let b = 1 || "hello" || false || true || (1, 2, 3)
-    let c = [&x](x, y) => { x + y }
-    let d = SomeType{a, b}
-    let e = 0 + ... + args
-    let f = function_test_1(_, 2, 3, _, 5)
-    let g = if some_value() == {
-        0 => { 1 }
-        1 => { 2 }
+
+    let d = SomeType{}
+    let g = if true == {
+        0 { "1" }
+        1 { "2" }
+        else { 3 }
     }
+
     let h = {
         let x = 1
         let y = 2
         x + y
     }
-    ret b
+    ret 1
 }
 
 cls Output {
@@ -151,56 +233,35 @@ cls Output {
     f: Num
 }
 
-sup Output {
-    use Inner[T, U] as Map[T, U]
-}
+sup Output {}
 
 cls OtherType {
     a: Num
     b: Num
 }
 
+sup Str {
+    fn generate(self: &Num) -> Num {
+        let x = 123
+        f(&x)
+        f(x)
+
+        ret Num {
+            b="",
+            d=0,
+            e="false"
+        }
+    }
+}
+
+
+fn g() -> Num {
+    ret 123
+}
+
+
+
 fn function_test_3[T](mut a: &mut Num, mut b: Str, c: Vec) -> Str {
-    let x = function_test_3[T](400, 500)
-
-    while true {
-        let x = 1
-        let y = 2
-        x + y
-    }
-    else {
-        io.out("hello")
-    }
-
-    with x.generate() as y {
-        let z = y
-    }
-
-    use InnerType as OtherType
-
-    let mut variable = function_test_1() else {
-        let x = 1
-        let y = 2
-        x + y
-    }
-
-    {
-        let x = 1
-        let y = 2
-        x + y
-    }
-
-    let temp: Str
-
-    let b = function_test_1()
-    let c = a.b.c.d.e.f
-    let d = OtherType{a=10, b=20, else=OtherType.def(), sup=(Num.new())}
-
-    yield 1
-    yield 2
-    ret 3
-
-    let z = (0, 1, 2, 3)
-    let y = z.0
-    ret Str {}
+    function_test_1(123, "r")
+    ret "13"
 }

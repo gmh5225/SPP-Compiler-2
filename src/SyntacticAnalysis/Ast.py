@@ -47,6 +47,15 @@ class IdentifierAst:
     def __str__(self):
         return self.identifier
 
+    def __add__(self, other: str) -> IdentifierAst:
+        return IdentifierAst(self.identifier + other, self._tok)
+
+    def __radd__(self, other: str) -> IdentifierAst:
+        return IdentifierAst(other + self.identifier, self._tok)
+
+    def to_generic_identifier(self) -> GenericIdentifierAst:
+        return GenericIdentifierAst(self.identifier, [], self._tok)
+
 @dataclass
 class ModuleIdentifierAst:
     parts: list[IdentifierAst]
@@ -276,6 +285,12 @@ class DecoratorAst:
     arguments: list[FunctionArgumentAst]
     _tok: int
 
+    def __str__(self):
+        s = "@" + str(self.identifier)
+        s += ("[" + ", ".join([str(arg) for arg in self.generic_arguments]) + "]" if self.generic_arguments else "")
+        s += "(" + ", ".join([str(arg) for arg in self.arguments]) + ")"
+        return s
+
 @dataclass
 class BinaryExpressionAst:
     lhs: ExpressionAst
@@ -343,7 +358,7 @@ class TypeGenericParameterAst:
         return TypeSingleAst([GenericIdentifierAst(self.identifier.identifier, [], self.identifier._tok)], self.identifier._tok)
 
     def __str__(self):
-        return self.identifier.identifier
+        return ("..." if self.is_variadic else "") + self.identifier.identifier
 
 def TypeGenericParameterRequiredAst(identifier: IdentifierAst, constraints: list[TypeAst], _tok: int):
     return TypeGenericParameterAst(identifier, constraints, None, False, _tok)
@@ -487,6 +502,9 @@ class SupPrototypeNormalAst:
     where_block: Optional[WhereBlockAst]
     body: SupImplementationAst
     _tok: int
+
+    def __str__(self):
+        return str(self.identifier)
 
 @dataclass
 class SupPrototypeInheritanceAst(SupPrototypeNormalAst):

@@ -1,5 +1,5 @@
 from difflib import SequenceMatcher
-from typing import Callable
+import inspect
 
 from src.SyntacticAnalysis import Ast
 from src.SyntacticAnalysis.Parser import ErrFmt
@@ -79,16 +79,18 @@ class TypeInfer:
     def infer_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs) -> Ast.TypeAst:
         ty = None
         if isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.op, Ast.PostfixMemberAccessAst):
-            ty = TypeInfer.infer_postfix_member_access(ast.lhs, s) if isinstance(ast.lhs, Ast.PostfixExpressionAst) else TypeInfer.infer_identifier(ast.lhs, s) if isinstance(ast.lhs, Ast.IdentifierAst) else TypeInfer.infer_type(ast.lhs, s)
+            match ast.lhs:
+                case Ast.PostfixExpressionAst(): ty = TypeInfer.infer_postfix_member_access(ast.lhs, s)
+                case Ast.IdentifierAst(): ty = TypeInfer.infer_identifier(ast.lhs, s)
+                case _: ty = TypeInfer.infer_type(ast.lhs, s)
+
         if isinstance(ast, Ast.IdentifierAst):
             ty = TypeInfer.infer_identifier(ast, s)
         ty = TypeInfer.infer_type(ty, s)
         cls = s.global_scope.get_child_scope(ty)
 
         if isinstance(ast.op.identifier, Ast.IdentifierAst):
-            sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False) or cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.FunctionSymbol, error=False)
-            if not sym:
-                raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Unknown member '{ast.op.identifier}' of type '{ty}'.")
+            sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False)
             if isinstance(sym, SymbolTypes.VariableSymbol):
                 return sym.type
             return sym#, [s.type for s in sym]
@@ -98,9 +100,12 @@ class TypeInfer:
 
     @staticmethod
     def infer_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+        if isinstance(ast.lhs, Ast.IdentifierAst) and ast.lhs.identifier == "__set__":
+            return CommonTypes.void()
+
         # To infer something like x.y.z(a, b), we need to infer x.y.z, then infer a and b, then infer the function call.
 
-        syms = TypeInfer.infer_expression(ast.lhs, s, all=True)
+
         arg_tys = [TypeInfer.infer_expression(arg.value, s) for arg in ast.op.arguments]
         arg_ccs = [arg.calling_convention for arg in ast.op.arguments]
 
@@ -112,14 +117,20 @@ class TypeInfer:
         sigs = []
         errs = []
 
-        for i, fn_type in enumerate(sym.type for sym in syms):
+        ty = TypeInfer.infer_expression(ast.lhs, s, all=True)
+        s = s.global_scope.get_child_scope(ty)
+        if not s: # todo -> this error should be picked up in SemanticAnalysis?
+            raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Unknown method '{ast.lhs}(...)'.")
+
+        overloads = [x for x in s.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
+        for i, fn_type in enumerate([f.meta_data["fn_proto"] for f in overloads]):
             param_names = [param.identifier.identifier for param in fn_type.parameters]
             param_tys = [param.type_annotation for param in fn_type.parameters]
             param_ccs = [param.calling_convention for param in fn_type.parameters]
             sigs.append(str(fn_type))
 
             # Skip first argument type for non-static functions
-            if syms[i].is_method and not syms[i].static:
+            if overloads[i].meta_data.get("is_method", False) and not overloads[i].meta_data.get("is_static", False):
                 param_tys = param_tys[1:]
                 param_ccs = param_ccs[1:]
 
@@ -160,14 +171,75 @@ class TypeInfer:
         return TypeInfer.likely_symbols(ast, SymbolTypes.VariableSymbol, "identifier", s)
 
     @staticmethod
-    def infer_identifier_for_call(ast: Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
-        return TypeInfer.likely_symbols(ast, SymbolTypes.FunctionSymbol, "function", s)
-
-    @staticmethod
     def check_type(ast: Ast.TypeAst, s: ScopeHandler) -> Ast.TypeAst:
         if isinstance(ast, Ast.TypeGenericArgumentAst):
             ast = ast.value
+
+        # Check generic arguments given to the type
+        sym = s.current_scope.get_symbol(ast.parts[-1], SymbolTypes.TypeSymbol)
+        given_generic_arguments = ast.parts[-1].generic_arguments
+        actual_generic_parameters = sym.type.generic_parameters if isinstance(sym.type, Ast.ClassPrototypeAst) else []
+        if len(given_generic_arguments) > len(actual_generic_parameters):
+            if actual_generic_parameters and actual_generic_parameters[-1].is_variadic:
+                pass
+            else:
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Too many generic arguments given to type '{sym.type}'.")
+        # if len(given_generic_arguments) < (missing_generics := TypeInfer.required_generic_parameters_for_cls(sym.type, s)):
+        #     raise SystemExit(ErrFmt.err(ast._tok) + f"Not enough generic arguments given to type '{sym.type}'. Missing {missing_generics}.")
+
         return TypeInfer.likely_symbols(ast, SymbolTypes.TypeSymbol, "type", s)
+
+    @staticmethod
+    def required_generic_parameters_for_cls(ast: Ast.TypeSingleAst, s: ScopeHandler) -> list[Ast.TypeGenericParameterAst]:
+        # Generic parameters can be inferred, for a class, if they are:
+        #   - The type, or part of the type, of an attribute.
+        #   - Part of another generic type.
+        generics = ast.parts[-1].generic_arguments # todo : other parts of the type ie Vec[T].Value[X]. T would be missing here (just flatten all parts' generics)
+        generics_names = [g.identifier for g in generics]
+
+        for attr_type in [attr.type_annotation for attr in ast.body.members]:
+            for t in TypeInfer.traverse_type(attr_type, s):
+                if t in generics_names:
+                    generics.pop(generics_names.index(t))
+                    generics_names.remove(t)
+        return generics
+
+    @staticmethod
+    def required_generic_parameters_for_fun(ast: Ast.FunctionPrototypeAst, s: ScopeHandler) -> list[Ast.TypeGenericParameterAst]:
+        # Generic parameters can be inferred, for a function, if they are:
+        #   - The type, or part of the type, of a parameter.
+        #   - Part of another generic type.
+        generics = ast.generic_parameters
+        generics_names = [g.identifier for g in generics]
+
+        for ty in [param.type_annotation for param in ast.parameters] + [g for g in ast.generic_parameters]:
+            for t in TypeInfer.traverse_type(ty, s):
+                if t in generics_names:
+                    generics.pop(generics_names.index(t))
+                    generics_names.remove(t)
+        return generics
+
+    @staticmethod
+    def traverse_type(ast: Ast.TypeAst | Ast.GenericIdentifierAst, s: ScopeHandler):
+        match ast:
+            case Ast.GenericIdentifierAst():
+                yield ast.identifier
+                for t in ast.generic_arguments:
+                    yield from TypeInfer.traverse_type(t.value, s)
+            case Ast.TypeSingleAst():
+                yield ast.parts[-1].identifier
+                for t in ast.parts:
+                    yield from TypeInfer.traverse_type(t, s)
+            case Ast.TypeTupleAst():
+                for t in ast.types:
+                    yield from TypeInfer.traverse_type(t, s)
+            case Ast.SelfTypeAst():
+                sym = s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol)
+                yield sym.type.parts[-1].identifier
+            case _:
+                print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{type(ast).__name__}' not yet supported for traversal. Report as bug.")
+
 
     @staticmethod
     def infer_type(ast: Ast.TypeAst, s: ScopeHandler) -> Ast.TypeAst:
@@ -179,23 +251,31 @@ class TypeInfer:
     def likely_symbols(ast: Ast.IdentifierAst | Ast.TypeAst, sym_ty: type, what: str, s: ScopeHandler) -> Ast.TypeAst:
         # If the symbol isn't in the current of any parent scope, then it doesn't exist, so throw an error, and give any
         # possible matches.
-        check = s.current_scope.has_symbol(ast if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1] if isinstance(ast, Ast.TypeSingleAst) else ast.identifier, sym_ty)
-        if not check and sym_ty == SymbolTypes.VariableSymbol:
-            check |= s.current_scope.has_symbol(ast if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1] if isinstance(ast, Ast.TypeSingleAst) else ast.identifier, SymbolTypes.FunctionSymbol)
+        # check = s.current_scope.has_symbol(ast if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1] if isinstance(ast, Ast.TypeSingleAst) else ast.identifier, sym_ty)
+        # check = SemanticAnalysis.analyse_identifier(ast if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1] if isinstance(ast, Ast.TypeSingleAst) else ast.identifier, s, no_throw=True)
+        if isinstance(ast, Ast.TypeSingleAst):
+            ast = ast.parts[-1].to_identifier()
 
-        if not check:
+        check = False
+        if sym_ty == SymbolTypes.VariableSymbol:
+            check = not s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol)# and not s.current_scope.has_symbol("__MOCK_" + ast, SymbolTypes.TypeSymbol)
+        elif sym_ty == SymbolTypes.TypeSymbol:
+            check = not s.current_scope.has_symbol(ast, SymbolTypes.TypeSymbol)
+
+        if check:
             # Get all the variable symbols that are in the scope. Define the most likely to be "-1" so that any symbol
             # will be more likely than it.
 
             similar_symbols = [sym for sym in s.current_scope.all_symbols(sym_ty) if type(sym) == sym_ty]
-            if sym_ty == SymbolTypes.VariableSymbol:
-                similar_symbols += [sym for sym in s.current_scope.all_symbols(SymbolTypes.FunctionSymbol) if type(sym) == SymbolTypes.FunctionSymbol]
 
             most_likely = (-1.0, "")
             ast_identifier = ast.identifier if isinstance(ast, Ast.IdentifierAst) else str(ast)
 
             # Iterate through each symbol, and find the one that is most similar to the identifier.
             for sym in similar_symbols:
+                if sym.name.identifier.startswith("__") or sym.name.identifier in ["call_ref", "call_mut", "call_one"]:
+                    continue
+
                 # Get the ratio of similarity between the identifier and the symbol name.
                 ratio = max([
                     SequenceMatcher(None, sym.name.identifier, ast_identifier).ratio(),
@@ -214,9 +294,6 @@ class TypeInfer:
             else:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown {what} '{ast}'.")
 
-        if what == "type":
-            return s.current_scope.get_symbol(ast.parts[-1], SymbolTypes.TypeSymbol).type
-        try:
-            return s.current_scope.get_symbol(ast, SymbolTypes.VariableSymbol).type
-        except:
-            return s.current_scope.get_symbol(ast, SymbolTypes.FunctionSymbol)
+        if sym_ty == SymbolTypes.VariableSymbol:
+            return s.current_scope.get_symbol(ast, SymbolTypes.VariableSymbol, error=False).type
+        return s.current_scope.get_symbol(ast, SymbolTypes.TypeSymbol).type

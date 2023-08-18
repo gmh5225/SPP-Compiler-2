@@ -5,7 +5,7 @@ from src.LexicalAnalysis.Tokens import TokenType, Token
 from src.SyntacticAnalysis import Ast
 from src.SyntacticAnalysis.Parser import ErrFmt
 
-from src.SemanticAnalysis2.SymbolTable import ScopeHandler, SymbolTypes, VariableSymbolMemoryStatus
+from src.SemanticAnalysis2.SymbolTable import ScopeHandler, SymbolTypes
 from src.SemanticAnalysis2.CommonTypes import CommonTypes
 from src.SemanticAnalysis2.TypeInference import TypeInfer
 
@@ -31,23 +31,24 @@ class SemanticAnalysis:
     def analyse_module_member(ast: Ast.ModuleMemberAst, s: ScopeHandler):
         # Analyse each module member
         match ast:
-            case Ast.FunctionPrototypeAst(): SemanticAnalysis.analyse_function_prototype(ast, s)
             case Ast.ClassPrototypeAst(): SemanticAnalysis.analyse_class_prototype(ast, s)
             case Ast.EnumPrototypeAst(): s.skip_scope()
             case Ast.SupPrototypeNormalAst(): SemanticAnalysis.analyse_sup_prototype(ast, s)
             case Ast.SupPrototypeInheritanceAst(): SemanticAnalysis.analyse_sup_prototype(ast, s)
+            case Ast.LetStatementAst(): SemanticAnalysis.analyse_let_statement(ast, s)
             case _:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown module member {ast} being analysed. Report as bug.")
 
     @staticmethod
     def analyse_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler):
-        function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.FunctionSymbol)[0]
+        special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
+        function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.VariableSymbol) if not special else None
+
         s.next_scope()
 
         # Mark global methods as "static" ie don't have a "self" parameter
-        if s.current_scope == s.global_scope:
-            fun_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.FunctionSymbol)[0]
-            fun_symbol.static = True
+        if not special and s.current_scope == s.global_scope:
+            function_symbol.static = True
 
         # Analyse all the decorators and parameters, and the return type
         [SemanticAnalysis.analyse_decorator(ast, d, s) for d in ast.decorators]
@@ -68,23 +69,33 @@ class SemanticAnalysis:
         #     raise SystemExit(ErrFmt.err(g._tok) + "Generic parameter type cannot be inferred.")
 
         # Make sure abstract methods have no body
-        if function_symbol.abstract and ast.body.statements:
-            raise SystemExit(
-                ErrFmt.err([d for d in ast.decorators if d.identifier.parts == ["meta", "abstractmethod"]][0]._tok) + "Method defined as abstract here\n...\n",
-                ErrFmt.err(ast.body.statements[0]._tok) + "Abstract methods cannot have a body.")
+        # if function_symbol.meta_data.get("abstract", False) and ast.body.statements:
+        #     raise SystemExit(
+        #         ErrFmt.err([d for d in ast.decorators if d.identifier.parts == ["meta", "abstractmethod"]][0]._tok) + "Method defined as abstract here\n...\n",
+        #         ErrFmt.err(ast.body.statements[0]._tok) + "Abstract methods cannot have a body.")
 
         # Analyse each statement
-        if not function_symbol.abstract:
-            for statement in ast.body.statements:
-                SemanticAnalysis.analyse_statement(statement, s)
+        # if not special and not function_symbol.meta_data.get("abstract", False) or special:
+        for statement in ast.body.statements:
+            SemanticAnalysis.analyse_statement(statement, s)
 
         # Make sure the return type of the last statement matches the return type of the function, unless the method is
-        # abstract, in which case it is allowed to not have a return statement
-        [SemanticAnalysis.analyse_statement(st, s) for st in ast.body.statements]
+        # abstract, in which case it is allowed to not have a return statement.
         t = TypeInfer.infer_statement(ast.body.statements[-1], s) if ast.body.statements else CommonTypes.void()
-        if t != ast.return_type and not function_symbol.abstract:
-            err_ast = ast.body.statements[-1] if ast.body.statements else ast.body
-            raise SystemExit(ErrFmt.err(err_ast._tok) + f"Expected return type of function to be {ast.return_type}, but got {t}.")
+
+        if str(ast.return_type) != "Void" and ast.body.statements and not isinstance(ast.body.statements[-1], Ast.ReturnStatementAst):
+            err_ast = ast.body.statements[-1]
+            raise SystemExit(
+                f"Function returning '{ast.return_type}' must end with a return statement" +
+                ErrFmt.err(ast.return_type._tok) + f"Function return type is '{ast.return_type}'\n..." +
+                ErrFmt.err(err_ast._tok) + f"Final statement is a '{type(err_ast).__name__}'.")
+
+        if t != ast.return_type and ast.body.statements: # and not function_symbol.meta_data.get("abstract", False):
+            err_ast = ast.body.statements[-1]
+            raise SystemExit(
+                "Mismatch between function return type and function's final statement" +
+                ErrFmt.err(ast.return_type._tok) + f"Function return type is '{ast.return_type}'\n..." +
+                ErrFmt.err(err_ast.value._tok) + f"Final statement returns type '{t}'.")
 
         s.prev_scope()
 
@@ -93,7 +104,9 @@ class SemanticAnalysis:
         # Analyse the parameter type, and Add the parameter to the current scope.
         ast.type_annotation = TypeInfer.infer_type(ast.type_annotation, s)
         ty = ast.type_annotation if not isinstance(ast.type_annotation.parts[0], Ast.SelfTypeAst) else Ast.IdentifierAst("Self", ast.type_annotation._tok)
-        s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.identifier, ty, VariableSymbolMemoryStatus(), ast.is_mutable))
+        s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.identifier, ty, is_mutable=ast.is_mutable, is_initialized=True))
+
+        TypeInfer.check_type(ast.type_annotation, s)
 
         # Analyse the default value
         if ast.default_value:
@@ -130,22 +143,40 @@ class SemanticAnalysis:
         match ast:
             case Ast.SupTypedefAst(): SemanticAnalysis.analyse_sup_typedef(ast, s)
             case Ast.SupMethodPrototypeAst(): SemanticAnalysis.analyse_sup_method_prototype(owner, ast, s)
+            case Ast.ClassPrototypeAst():
+                if isinstance(owner, Ast.SupPrototypeInheritanceAst):
+                    super_class_scope = s.global_scope.get_child_scope(owner.super_class)
+                    reduced_identifier = Ast.IdentifierAst(ast.identifier.identifier.split("__MOCK_")[1], ast.identifier._tok)
+                    if not super_class_scope.has_symbol_exclusive(reduced_identifier, SymbolTypes.VariableSymbol):
+                        raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{reduced_identifier}' not found in super class '{owner.super_class}'.")
+
+                    # Make sure the method in the super-class is overridable -- virtual or abstract. TODO
+                    # if not any([k in ["virtual", "abstract"] for k in super_class_scope.get_symbol_exclusive(reduced_identifier, SymbolTypes.VariableSymbol).meta_data.keys()]):
+                    #     raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{reduced_identifier}' in super class '{owner.super_class}' is not virtual or abstract.")
+
+                SemanticAnalysis.analyse_class_prototype(ast, s)
+            case Ast.LetStatementAst(): SemanticAnalysis.analyse_let_statement(ast, s)
+            case Ast.SupPrototypeNormalAst(): SemanticAnalysis.analyse_sup_prototype(ast, s)
+            case Ast.SupPrototypeInheritanceAst(): SemanticAnalysis.analyse_sup_prototype(ast, s)
+            case _:
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown sup member '{type(ast).__name__}' being analysed. Report as bug.")
 
     @staticmethod
     def analyse_sup_method_prototype(owner: Ast.SupPrototypeAst, ast: Ast.SupMethodPrototypeAst, s: ScopeHandler):
         if isinstance(owner, Ast.SupPrototypeInheritanceAst):
             super_class_scope = s.global_scope.get_child_scope(owner.super_class)
+            special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
 
             if not super_class_scope:
                 raise SystemExit(ErrFmt.err(owner.super_class._tok) + f"Super class '{owner.super_class}' not found.")
 
             # Make sure the method exists in the super class.
-            if not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.FunctionSymbol):
-                raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' not found in super class '{owner.super_class}'.")
-
-            # Make sure the method in the super-class is overridable -- virtual or abstract.
-            if not super_class_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.FunctionSymbol)[0].overridable():
-                raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' in super class '{owner.super_class}' is not virtual or abstract.")
+            # if not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
+            #     raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' not found in super class '{owner.super_class}'.")
+            #
+            # # Make sure the method in the super-class is overridable -- virtual or abstract.
+            # if not any([k in ["virtual", "abstract"] for k in super_class_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol).meta_data.keys()]):
+            #     raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' in super class '{owner.super_class}' is not virtual or abstract.")
 
         SemanticAnalysis.analyse_function_prototype(ast, s)
 
@@ -171,27 +202,32 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_decorator(apply_to: Ast.ModulePrototypeAst | Ast.FunctionPrototypeAst | Ast.ClassPrototypeAst | Ast.EnumPrototypeAst | Ast.SupTypedefAst | Ast.ClassAttributeAst, ast: Ast.DecoratorAst, s: ScopeHandler):
-        match [i.identifier for i in ast.identifier.parts]:
-            case ["meta", "private"]: ...
-            case ["meta", "public"]: ...
-            case ["meta", "protected"]: ...
-            case ["meta", "virtualmethod"]:
-                if not isinstance(apply_to, Ast.FunctionPrototypeAst): raise SystemExit(ErrFmt.err(ast._tok) + "virtualmethod decorator can only be applied to functions.")
-                fun_symbol = s.current_scope.get_symbol(apply_to.identifier, SymbolTypes.FunctionSymbol)[0]
-                fun_symbol.virtual = True
-            case ["meta", "abstractmethod"]:
-                if not isinstance(apply_to, Ast.FunctionPrototypeAst): raise SystemExit(ErrFmt.err(ast._tok) + "abstractmethod decorator can only be applied to functions.")
-                fun_symbol = s.current_scope.get_symbol(apply_to.identifier, SymbolTypes.FunctionSymbol)[0]
-                fun_symbol.abstract = True
-            case ["meta", "staticmethod"]:
-                if not isinstance(apply_to, Ast.FunctionPrototypeAst): raise SystemExit(ErrFmt.err(ast._tok) + "staticmethod decorator can only be applied to functions.")
-                fun_symbol = s.current_scope.get_symbol(apply_to.identifier, SymbolTypes.FunctionSymbol)[0]
-                fun_symbol.static = True
-            case ["meta", _]:
-                raise SystemExit(ErrFmt.err(ast._tok) + "Unknown meta decorator.")
-            case _:
-                # todo : normal decorator application
-                ...
+        # identifier = apply_to.identifier
+        # if isinstance(apply_to, Ast.ClassPrototypeAst):
+        #     identifier = Ast.IdentifierAst(identifier.identifier.replace("__MOCK_", ""), identifier._tok)
+        #
+        # match [i.identifier for i in ast.identifier.parts]:
+        #     case ["meta", "private"]: ...
+        #     case ["meta", "public"]: ...
+        #     case ["meta", "protected"]: ...
+        #     case ["meta", "virtualmethod"]:
+        #         # if not isinstance(apply_to, Ast.FunctionPrototypeAst): raise SystemExit(ErrFmt.err(ast._tok) + "virtualmethod decorator can only be applied to functions.")
+        #         fun_symbol = s.current_scope.get_symbol(identifier, SymbolTypes.VariableSymbol)
+        #         fun_symbol.meta_data["virtual"] = True
+        #     case ["meta", "abstractmethod"]:
+        #         # if not isinstance(apply_to, Ast.FunctionPrototypeAst): raise SystemExit(ErrFmt.err(ast._tok) + "abstractmethod decorator can only be applied to functions.")
+        #         fun_symbol = s.current_scope.get_symbol(identifier, SymbolTypes.VariableSymbol)
+        #         fun_symbol.meta_data["abstract"] = True
+        #     case ["meta", "staticmethod"]:
+        #         # if not isinstance(apply_to, Ast.FunctionPrototypeAst): raise SystemExit(ErrFmt.err(ast._tok) + "staticmethod decorator can only be applied to functions.")
+        #         fun_symbol = s.current_scope.get_symbol(identifier, SymbolTypes.VariableSymbol)
+        #         fun_symbol.meta_data["static"] = True
+        #     case ["meta", _]:
+        #         raise SystemExit(ErrFmt.err(ast._tok) + "Unknown meta decorator.")
+        #     case _:
+        #         # todo : normal decorator application
+        #         ...
+        ...
 
     @staticmethod
     def analyse_typedef(ast: Ast.TypedefStatementAst, s: ScopeHandler):
@@ -201,17 +237,17 @@ class SemanticAnalysis:
         s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ast.new_type.parts[-1].to_identifier(), old_type_sym.type, old_type_sym.sup_scopes))
 
     @staticmethod
-    def analyse_expression(ast: Ast.ExpressionAst, s: ScopeHandler):
+    def analyse_expression(ast: Ast.ExpressionAst, s: ScopeHandler, **kwargs):
         match ast:
             case Ast.IdentifierAst(): SemanticAnalysis.analyse_identifier(ast, s)
             case Ast.LambdaAst(): raise NotImplementedError("Lambda expressions are not implemented yet.")
-            case Ast.IfStatementAst(): SemanticAnalysis.analyse_if_statement(ast, s)
+            case Ast.IfStatementAst(): SemanticAnalysis.analyse_if_statement(ast, s, **kwargs)
             case Ast.WhileStatementAst(): SemanticAnalysis.analyse_while_statement(ast, s)
             case Ast.YieldStatementAst(): raise NotImplementedError("Yield expressions are not implemented yet.")
             case Ast.WithStatementAst(): SemanticAnalysis.analyse_with_statement(ast, s)
             case Ast.InnerScopeAst(): SemanticAnalysis.analyse_inner_scope(ast, s)
             case Ast.BinaryExpressionAst(): SemanticAnalysis.analyse_binary_expression(ast, s)
-            case Ast.PostfixExpressionAst(): SemanticAnalysis.analyse_postfix_expression(ast, s)
+            case Ast.PostfixExpressionAst(): SemanticAnalysis.analyse_postfix_expression(ast, s, **kwargs)
             case Ast.AssignmentExpressionAst(): SemanticAnalysis.analyse_assignment_expression(ast, s)
             case Ast.PlaceholderAst(): raise NotImplementedError("Placeholder expressions are not implemented yet.")
             case Ast.TypeSingleAst(): TypeInfer.check_type(ast, s)
@@ -220,31 +256,31 @@ class SemanticAnalysis:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown expression {ast} being analysed. Report as bug.")
 
     @staticmethod
-    def analyse_postfix_expression(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
+    def analyse_postfix_expression(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):
         match ast.op:
-            case Ast.PostfixMemberAccessAst(): SemanticAnalysis.analyse_postfix_member_access(ast, s)
+            case Ast.PostfixMemberAccessAst(): SemanticAnalysis.analyse_postfix_member_access(ast, s, **kwargs)
             case Ast.PostfixFunctionCallAst(): SemanticAnalysis.analyse_postfix_function_call(ast, s)
             case Ast.PostfixStructInitializerAst(): SemanticAnalysis.analyse_postfix_struct_initializer(ast, s)
             case _: raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown postfix expression {ast} being analysed. Report as bug.")
 
     @staticmethod
-    def analyse_identifier(ast: Ast.IdentifierAst, s: ScopeHandler):
+    def analyse_identifier(ast: Ast.IdentifierAst, s: ScopeHandler, **kwargs):
         # Special assignment dummy method to check the statement and avoid code duplication.
         if ast.identifier == "__set__":
             return
-        if not (s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol) or s.current_scope.has_symbol(ast, SymbolTypes.FunctionSymbol)):
-            raise SystemExit(ErrFmt.err(ast._tok) + f"Identifier '{ast}' not found in scope.")
+        if not s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol):
+            # if not s.current_scope.has_symbol("__MOCK_" + ast, SymbolTypes.TypeSymbol):
+                if not kwargs.get("no_throw", False):
+                    raise SystemExit(ErrFmt.err(ast._tok) + f"Identifier '{ast}' not found in scope.")
+                return False
+        return True
 
     @staticmethod
     def analyse_if_statement(ast: Ast.IfStatementAst, s: ScopeHandler, **kwargs):
         s.enter_scope("if")
 
-        # Analyse the condition and make sure its Boolean
+        # Analyse the condition expression, and each pattern
         SemanticAnalysis.analyse_expression(ast.condition, s)
-        if (cond_expr_ty := TypeInfer.infer_expression(ast.condition, s)) != CommonTypes.bool():
-            raise SystemExit(ErrFmt.err(ast.condition._tok) + f"Condition must be a 'Bool' type, not '{cond_expr_ty}'.")
-
-        # Analyse each pattern
         [SemanticAnalysis.analyse_pattern_statement(ast, b, s) for b in ast.branches]
 
         # If the 'if-statement' is being used for assignment, make sure the final statements in each branch have a
@@ -255,8 +291,8 @@ class SemanticAnalysis:
                 if (t := TypeInfer.infer_expression(b.body[-1], s)) != ret_type:
                     raise SystemExit(
                         "If an 'if-statement' is being used for assignment, all branches must return the same type" +
-                        ErrFmt.err(ast.branches[0].body[-1]._tok) + f"First branch returns type '{ret_type}'\n...\n" +
-                        ErrFmt.err(b.body[-1]._tok) + f"Branch {i} returns type '{t}'.")
+                        ErrFmt.err(ast.branches[0].body[-1]._tok) + f"First branch returns type '{ret_type}'\n..." +
+                        ErrFmt.err(b.body[-1]._tok) + f"Branch {i + 2} returns type '{t}'.")
 
         s.exit_scope()
 
@@ -273,9 +309,10 @@ class SemanticAnalysis:
 
         # Check the comparison function exists for each pattern in the pattern statement.
         pat_comp = ast.comparison_op or owner.comparison_op
-        for pat in ast.patterns:
-            bin_comp = Ast.BinaryExpressionAst(owner.condition, pat_comp, pat.value, pat_comp._tok)
-            SemanticAnalysis.analyse_expression(bin_comp, s)
+        if pat_comp:
+            for pat in ast.patterns:
+                bin_comp = Ast.BinaryExpressionAst(owner.condition, pat_comp, pat.value, pat_comp._tok)
+                SemanticAnalysis.analyse_expression(bin_comp, s)
 
         # Check the pattern guard
         if ast.guard:
@@ -303,7 +340,7 @@ class SemanticAnalysis:
     def analyse_binary_expression(ast: Ast.BinaryExpressionAst, s: ScopeHandler):
         # Remodel the binary expression into a function call, then analyse the function call. Start with constructing a
         # postfix call to the correct method name. For example, for "x + y", begin with constructing "x.add".
-        pos = ast._tok
+        pos = ast.op._tok
         fn = Ast.IdentifierAst(Ast.BIN_FN[ast.op.tok.token_type], pos)
         fn = Ast.PostfixMemberAccessAst(fn, pos)
         fn = Ast.PostfixExpressionAst(ast.lhs, fn, pos)
@@ -316,14 +353,18 @@ class SemanticAnalysis:
         SemanticAnalysis.analyse_expression(fn_call, s)
 
     @staticmethod
-    def analyse_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
+    def analyse_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):
         lhs_type = TypeInfer.infer_expression(ast.lhs, s)
-        # lhs_type = TypeInfer.infer_type(lhs_type, s)
         lhs_type = isinstance(lhs_type, Ast.TypeTupleAst) and CommonTypes.tuple(lhs_type.types) or lhs_type
+
+        sym = s.current_scope.get_symbol(lhs_type.parts[-1], SymbolTypes.TypeSymbol)
+        if not sym:
+            raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Type '{lhs_type}' not found.")
 
         class_scope = s.global_scope.get_child_scope(lhs_type)
         if not class_scope:
-            raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Type '{lhs_type}' not found.")
+            # Its a generic type (no attributes or methods accessible until constraints are applied)
+            raise SystemExit(ErrFmt.err(ast.op._tok) + f"Generic member access not available unless constraints are applied.")
 
         # For numeric member access, ie "x.0", check the LHS is a tuple type, and that the number is a valid index for
         # the tuple.
@@ -336,19 +377,22 @@ class SemanticAnalysis:
                 raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Index {ast.op.identifier.integer} out of range for type '{lhs_type}'.")
 
         # Else, check the attribute exists on the LHS.
-        elif not (class_scope.has_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol) or class_scope.has_symbol_exclusive(ast.op.identifier, SymbolTypes.FunctionSymbol)):
-            raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Attribute '{ast.op.identifier}' not found in type '{lhs_type}'.")
+        elif not class_scope.has_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol): #or s.current_scope.has_symbol("__MOCK_" + ast.op.identifier, SymbolTypes.TypeSymbol)):
+            what = "Attribute" if not kwargs.get("call", False) else "Method"
+            raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"{what} '{ast.op.identifier}' not found on type '{lhs_type}'.")
         
     @staticmethod
     def analyse_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):
         # Verify the LHS is valid.
-        SemanticAnalysis.analyse_expression(ast.lhs, s)
+        SemanticAnalysis.analyse_expression(ast.lhs, s, call=True)
+        TypeInfer.infer_expression(ast, s)
 
         ref_args = set()
         mut_args = set()
         arg_ts   = []
 
         # TODO : partial moves not working at the moment
+        # TODO : moving attributes from a borrowed context don't seem to wort rn either
 
         for i, arg in enumerate(ast.op.arguments):
             # Check the argument is valid.
@@ -371,7 +415,7 @@ class SemanticAnalysis:
                     if value in mut_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move value '{value}' that is already mutably borrowed.")
 
                     sym = s.current_scope.get_symbol(value, SymbolTypes.VariableSymbol)
-                    if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move value '{value}' that is not initialized.")
+                    if not sym.mem_info.is_initialized: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move value '{value}' that is not initialized.")
                     sym.mem_info.is_initialized = False
 
             # Handle mutable borrows
@@ -391,7 +435,7 @@ class SemanticAnalysis:
                     # its fields, so only the outermost value needs to be checked.
                     if isinstance(value, Ast.IdentifierAst):
                         sym = s.current_scope.get_symbol(value, SymbolTypes.VariableSymbol)
-                        if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move a value that is not initialized.")
+                        if not sym.mem_info.is_initialized: raise SystemExit(ErrFmt.err(arg.value._tok) + f"[0] Cannot move a value that is not initialized.")
                         if not sym.is_mutable: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow from an immutable value.")
 
                     # If the outermost value is the result of a function call, then the value being returned cannot have
@@ -404,7 +448,7 @@ class SemanticAnalysis:
                     if value in mut_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow a value that is already mutably borrowed.")
                     if value in ref_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow a value that is already immutably borrowed.")
                     if not sym.is_mutable: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow from an immutable value.")
-                    if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move a value that is not initialized.")
+                    if not sym.mem_info.is_initialized: raise SystemExit(ErrFmt.err(arg.value._tok) + f"[1] Cannot move a value that is not initialized.")
                     mut_args |= {value}
 
             # Handle immutable borrows -- they are slightly more relaxed than mutable borrows, as they can overlap, and
@@ -423,12 +467,15 @@ class SemanticAnalysis:
                     if value in mut_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot immutably borrow a value that is already mutably borrowed.")
 
                     sym = s.current_scope.get_symbol(arg.value, SymbolTypes.VariableSymbol)
-                    if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move a value that is not initialized.")
+                    if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"[2] Cannot move a value that is not initialized.")
                     ref_args |= {value}
 
     @staticmethod
     def analyse_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
-        cls_ty = TypeInfer.check_type(ast.lhs, s).to_type()
+        cls_ty = TypeInfer.check_type(ast.lhs, s)
+        if isinstance(cls_ty, Ast.TypeSingleAst):
+            raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Cannot initialize generic type '{cls_ty}'.")
+        cls_ty = cls_ty.to_type()
 
         # Check that each variable being passed into the initializer is valid, ie hasn't been moved already.
         given_fields = [f.identifier.identifier for f in ast.op.fields if isinstance(f.identifier, Ast.IdentifierAst)]
@@ -456,6 +503,7 @@ class SemanticAnalysis:
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Cannot find definition for class '{cls_ty}'.")
 
         actual_fields = [v.name.identifier for v in cls_definition_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol)]
+        actual_fields = [a for a in actual_fields if str(a) not in ["call_ref", "call_mut", "call_one"]]
 
         # If a fields has been given twice, then raise an error
         if given_twice := any_elem([f for f in ast.op.fields if isinstance(f.identifier, Ast.IdentifierAst) and given_fields.count(f.identifier.identifier) > 1]):
@@ -465,13 +513,13 @@ class SemanticAnalysis:
         # an error for the first unknown field.
         difference = set(given_fields) - set(actual_fields)
         if difference and (unknown_field := difference.pop()):
-            raise SystemExit(ErrFmt.err(ast.op.fields[given_fields.index(unknown_field)]._tok) + f"Struct initializer for '{cls_ty}' contains unknown fields: '{unknown_field}'.")
+            raise SystemExit(ErrFmt.err(ast.op.fields[given_fields.index(unknown_field)]._tok) + f"Struct initializer for '{cls_ty}' contains unknown field: '{unknown_field}'.")
 
         # If there are less given fields than actual fields, then the default object must be given. If it hasn't been
         # given, then an error is raised.
         if len(given_fields) < len(actual_fields) and not default_obj_given:
             # todo : add the class definition to the error message
-            raise SystemExit(ErrFmt.err(ast.op._tok) + f"Struct initializer for '{cls_ty}' is missing fields: '{','.join(set(actual_fields) - set(given_fields))}'.")
+            raise SystemExit(ErrFmt.err(ast._tok) + f"Struct initializer for '{cls_ty}' is missing fields: '{', '.join(set(actual_fields) - set(given_fields))}'.")
 
         # Handle the default object given (if it is given). Make sure it is the correct type, and not a borrowed object
         # from a parameter.
@@ -504,7 +552,7 @@ class SemanticAnalysis:
 
         # For a single variable, infer its type and set it in the symbol table.
         if len(ast.variables) == 1:
-            s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.variables[0].identifier, let_statement_type, VariableSymbolMemoryStatus(), ast.variables[0].is_mutable))
+            s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.variables[0].identifier, let_statement_type, is_mutable=ast.variables[0].is_mutable))
 
         # Handle the tuple assignment case. There are a few special checks that need to take place, mostly concerning
         # destructuring.
@@ -512,17 +560,17 @@ class SemanticAnalysis:
             ty = TypeInfer.infer_expression(ast.value, s)
 
             # Ensure that the RHS is a tuple type.
-            if not ty.parts[-1].identifier == "Tup":
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot assign non-tuple type to a tuple. Found {ty}")
+            if not ty.parts[-1].identifier:
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a non-tuple type ({ty}) into to {len(ast.variables)} variables.")
 
             # Ensure that the tuple contains the correct number of elements.
             if len(ty.parts[-1].generic_arguments) != len(ast.variables):
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot assign tuple of length {len(ty.types)} to a tuple of length {len(ast.variables)}.")
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a {len(ty.parts[-1].generic_arguments)}-tuple to {len(ast.variables)} variables.")
 
             # Infer the type of each variable, and set it in the symbol table.
             for variable in ast.variables:
                 t = TypeInfer.infer_expression(ty.parts[-1].generic_arguments[ast.variables.index(variable)], s)
-                s.current_scope.add_symbol(SymbolTypes.VariableSymbol(variable.identifier, t, VariableSymbolMemoryStatus(), variable.is_mutable))
+                s.current_scope.add_symbol(SymbolTypes.VariableSymbol(variable.identifier, t, is_mutable=variable.is_mutable))
 
         # Handle the "else" clause for the let statement. Check that the type returned from the "else" block is valid.
         if ast.if_null:
@@ -544,6 +592,8 @@ class SemanticAnalysis:
         # A manual mutability check is performed here, because whilst the function call handles all the memory and
         # mutability checks, the "set" function doesn't exist, so the mutability check has to be done manually.
         for lhs in ast.lhs:
+            SemanticAnalysis.analyse_expression(lhs, s)
+
             # For postfix member access operations, check that the outermost identifier is mutable. Field mutability is
             # dictated by the mutability of the object itself, so only the outermost value needs to be checked.
             while isinstance(lhs, Ast.PostfixExpressionAst) and isinstance(lhs.op, Ast.PostfixMemberAccessAst):
@@ -560,42 +610,56 @@ class SemanticAnalysis:
 
         # Create a mock function call for the assignment, and analyse it. Do 1 per variable, so that the function call
         # analysis can handle the multiple function calls for tuples etc.
-        ty = TypeInfer.infer_expression(ast.rhs, s)
+        SemanticAnalysis.analyse_expression(ast.rhs, s, assignment=True)
+        rhs_ty = TypeInfer.infer_expression(ast.rhs, s)
         if len(ast.lhs) == 1:
             fn_call = Ast.PostfixFunctionCallAst(
                 [], [
-                    Ast.FunctionArgumentAst(None, ast.lhs[0], None, False, ast.lhs[0]._tok),
+                    Ast.FunctionArgumentAst(None, ast.lhs[0], Ast.ParameterPassingConventionReferenceAst(False, -1), False, ast.lhs[0]._tok),
                     Ast.FunctionArgumentAst(None, ast.rhs, None, False, ast.rhs._tok)
                 ], ast.op._tok)
             fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst("__set__", ast.op._tok), fn_call, ast.op._tok)
             SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **kwargs)
+
+            # Type check
+            lhs_ty = TypeInfer.infer_expression(ast.lhs[0], s)
+            if rhs_ty != lhs_ty:
+                raise SystemExit(ErrFmt.err(ast.rhs._tok) + f"Cannot assign type '{rhs_ty}' to type '{lhs_ty}'.")
 
         # The tuple checks have to be done again, because for normal assignment they have to exist, and for assignment
         # from a let statement, the let statement analyser needs to check the tuple types are valid before settings the
         # types of the symbols in the table prior to assignment.
         else:
             # Ensure that the RHS is a tuple type.
-            if not ty.parts[-1].identifier == "Tup":
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot assign non-tuple type to a tuple. Found {ty}")
+            # Ensure that the RHS is a tuple type.
+            if not rhs_ty.parts[-1].identifier == "Tup":
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a non-tuple type ({rhs_ty}) into to {len(ast.lhs)} variables.")
 
             # Ensure that the tuple contains the correct number of elements.
-            if len(ty.parts[-1].generic_arguments) != len(ast.lhs):
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot assign tuple of length {len(ty.types)} to a tuple of length {len(ast.lhs)}.")
+            if len(rhs_ty.parts[-1].generic_arguments) != len(ast.lhs):
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a {len(rhs_ty.parts[-1].generic_arguments)}-tuple to {len(ast.lhs)} variables.")
 
             # Create a function prototype for each variable in the tuple.
             for i, lhs in enumerate(ast.lhs):
                 fn_call = Ast.PostfixFunctionCallAst(
                     [], [
-                        Ast.FunctionArgumentAst(None, lhs, None, False, lhs._tok),
+                        Ast.FunctionArgumentAst(None, lhs, Ast.ParameterPassingConventionReferenceAst(False, -1), False, lhs._tok),
                         Ast.FunctionArgumentAst(None, ast.rhs.values[i], None, False, ast.rhs._tok),
                     ], ast.op._tok)
                 fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst("__set__", ast.op._tok), fn_call, ast.op._tok)
                 SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **kwargs)
 
+                # Type check
+                lhs_ty = TypeInfer.infer_expression(lhs, s)
+                if rhs_ty.parts[-1].generic_arguments[i] != lhs_ty:
+                    raise SystemExit(ErrFmt.err(ast.rhs.values[i]._tok) + f"Cannot assign type '{rhs_ty.parts[-1].generic_arguments[i]}' to type '{lhs_ty}'.")
+
         # Set this variable as initialized. All other memory issues will be handled by the function call analysis of the
         # "set" function.
         for variable in ast.lhs:
             s.current_scope.get_symbol(variable, SymbolTypes.VariableSymbol).mem_info.is_initialized = True
+
+        # Extra checks for assignment: mutability and type
 
     @staticmethod
     def analyse_while_statement(ast: Ast.WhileStatementAst, s: ScopeHandler):
@@ -603,27 +667,6 @@ class SemanticAnalysis:
         SemanticAnalysis.analyse_expression(ast.condition, s)
         [SemanticAnalysis.analyse_statement(st, s) for st in ast.body]
         s.exit_scope()
-
-    @staticmethod
-    def traverse_type(ast: Ast.TypeAst | Ast.GenericIdentifierAst, s: ScopeHandler):
-        match ast:
-            case Ast.GenericIdentifierAst():
-                yield ast.identifier
-                for t in ast.generic_arguments:
-                    yield from SemanticAnalysis.traverse_type(t.value, s)
-            case Ast.TypeSingleAst():
-                yield ast.parts[-1].identifier
-                for t in ast.parts:
-                    yield from SemanticAnalysis.traverse_type(t, s)
-            case Ast.TypeTupleAst():
-                for t in ast.types:
-                    yield from SemanticAnalysis.traverse_type(t, s)
-            case Ast.SelfTypeAst():
-                sym = s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol)
-                yield sym.type.parts[-1].identifier
-            case _:
-                print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{type(ast)}' not yet supported for traversal. Report as bug.")
 
 def chain_generators(*gens):
     for gen in gens:
