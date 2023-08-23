@@ -1049,9 +1049,7 @@ class Parser:
             c1 = self._current
             p1 = self._parse_primary_expression().parse_once()
             p2 = self._parse_operator_identifier_postfix().parse_zero_or_more()
-            for op in p2:
-                p1 = Ast.PostfixExpressionAst(p1, op, c1)
-            return p1
+            return functools.reduce(lambda p, op: Ast.PostfixExpressionAst(p, op, c1), p2, p1)
         return BoundParser(self, inner)
 
     def _parse_primary_expression(self) -> BoundParser:

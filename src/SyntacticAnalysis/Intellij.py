@@ -36,6 +36,8 @@ class Intellij:
                     line = line.replace("self._parse_", "")
                     line = camelize(line).strip()
                     if not line: continue
+                    if line.startswith("#"): continue
+                    if line == "self.Current": continue
 
                     line = line[0].upper() + line[1:]
 
@@ -68,6 +70,7 @@ class Intellij:
                     if not parse_function[:parse_function.find("(")] in ["Token", "Lexeme"]:
                         intellij_parse_string += parse_function[:parse_function.find("(")]
 
+                    print(how_to_parse)
                     intellij_parse_string += {
                         "parseOnce": " ",
                         "parseOptional": "? ",
@@ -75,7 +78,7 @@ class Intellij:
                         "parseOneOrMore": "+ "
                     }[how_to_parse[:how_to_parse.find("(")].split(" ")[0]]
                 except Exception as e:
-                    pass
+                    raise e
 
             out += intellij_parse_string.strip() + "\n"
         return out
@@ -91,4 +94,4 @@ class Intellij:
 if __name__ == "__main__":
     i = Intellij()
     s = i.convert_to_grammar_kit_parser_code()
-    print(s)
+    # print(s)
