@@ -45,7 +45,7 @@ class ErrFmt:
         return ansi_escape.sub('', line)
     
     @staticmethod
-    def err(start_token_index: int, end_token_index = -1) -> str:
+    def err(start_token_index: int, extend_tok_len = -1) -> str:
         while ErrFmt.TOKENS[start_token_index].token_type in [TokenType.TkNewLine, TokenType.TkWhitespace]:
             start_token_index += 1
 
@@ -56,6 +56,7 @@ class ErrFmt:
         error_position = start_token_index
         if ErrFmt.TOKENS[error_position].token_type == TokenType.TkEOF:
             error_position -= 1
+            extend_tok_len -= 1
         if ErrFmt.TOKENS[error_position].token_type == TokenType.TkEOF and ErrFmt.TOKENS[error_position - 1] == TokenType.TkNewLine:
             start_token_index -= 1 # todo : not -1, need to minus off the number of newlines before the EOF
 
@@ -100,7 +101,7 @@ class ErrFmt:
 
         # The number of "^" characters is the length of the current tokens metadata (ie the symbol or length of keyword
         # / lexeme). Append the repeated "^" characters to the spaces, and then add the error message to the string.
-        error_length = max(1, len(ErrFmt.TOKENS[error_position].token_metadata))
+        error_length = max(1, len(ErrFmt.TOKENS[error_position].token_metadata)) if extend_tok_len < 0 else extend_tok_len - error_position
         number_margin_len = len(ErrFmt.escape_ansi(line_number)) - 2
 
         top_line_padding_string = "".join([
@@ -267,7 +268,7 @@ class Parser:
     def __init__(self, tokens: list[Token]):
         self._tokens = tokens
         self._current = 0
-        
+
         ErrFmt.TOKENS = self._tokens
 
     def parse(self) -> Ast.ProgramAst:
@@ -313,7 +314,7 @@ class Parser:
             c1 = self._current
             p1 = self._parse_module_prototype().parse_once()
             p2 = self._parse_eof().parse_once()
-            return Ast.ProgramAst(p1, c1)
+            return Ast.ProgramAst(p1, p2, c1)
         return BoundParser(self, inner)
 
     def _parse_eof(self) -> BoundParser:
@@ -717,45 +718,31 @@ class Parser:
     def _parse_function_call_arguments(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkParenL).parse_once()
-            p2 = self._parse_function_call_arguments_normal_then_named().parse_optional() or []
+            p2 = self._parse_function_call_arguments_internal().parse_optional() or []
             p3 = self._parse_token(TokenType.TkParenR).parse_once()
             return p2
         return BoundParser(self, inner)
 
-    def _parse_function_call_arguments_normal_then_named(self) -> BoundParser:
+    def _parse_function_call_argument_internal(self) -> BoundParser:
         def inner():
-            p1 = self._parse_function_call_normal_arguments().delay_parse()
-            p2 = self._parse_function_call_named_arguments().delay_parse()
+            p1 = self._parse_function_call_normal_argument().delay_parse()
+            p2 = self._parse_function_call_named_argument().delay_parse()
             p3 = (p2 | p1).parse_once()
             return p3
         return BoundParser(self, inner)
 
-    def _parse_function_call_normal_arguments(self) -> BoundParser:
-        def inner():
-            p3 = self._parse_function_call_normal_argument().parse_once()
-            p4 = self._parse_function_call_rest_of_normal_arguments().parse_optional() or []
-            return [p3, *p4]
-        return BoundParser(self, inner)
-
-    def _parse_function_call_rest_of_normal_arguments(self) -> BoundParser:
+    def _parse_function_call_arguments_internal_next(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkComma).parse_once()
-            p2 = self._parse_function_call_arguments_normal_then_named().parse_once()
+            p2 = self._parse_function_call_argument_internal().parse_once()
             return p2
         return BoundParser(self, inner)
 
-    def _parse_function_call_named_arguments(self) -> BoundParser:
+    def _parse_function_call_arguments_internal(self) -> BoundParser:
         def inner():
-            p3 = self._parse_function_call_named_argument().parse_once()
-            p4 = self._parse_function_call_next_named_argument().parse_zero_or_more()
-            return [p3, *p4]
-        return BoundParser(self, inner)
-
-    def _parse_function_call_next_named_argument(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.TkComma).parse_once()
-            p2 = self._parse_function_call_named_argument().parse_once()
-            return p2
+            p1 = self._parse_function_call_argument_internal().parse_once()
+            p2 = self._parse_function_call_arguments_internal_next().parse_zero_or_more()
+            return [p1, *p2]
         return BoundParser(self, inner)
 
     def _parse_function_call_normal_argument(self) -> BoundParser:
@@ -770,110 +757,74 @@ class Parser:
     def _parse_function_call_named_argument(self) -> BoundParser:
         def inner():
             c1 = self._current
-            p1 = self._parse_function_call_named_argument_identifier().parse_once()
+            p1 = self._parse_identifier().parse_once()
             p2 = self._parse_token(TokenType.TkAssign).parse_once()
             p3 = self._parse_parameter_passing_convention().parse_optional()
             p4 = self._parse_non_assignment_expression().parse_once()
             return Ast.FunctionArgumentNamedAst(p1, p3, p4, c1)
         return BoundParser(self, inner)
 
-    def _parse_function_call_named_argument_identifier(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_identifier().parse_once()
-            return p1
-        return BoundParser(self, inner)
-
     # Function Parameters
 
     def _parse_function_parameters(self) -> BoundParser:
+        """
+        All variants of a function parameter can be parsed here n times, and the semantic analysis will verify that the
+        order of parameters is [required -> optional -> variadic]. This simplifies the parser heavily.
+        """
         def inner():
             p1 = self._parse_token(TokenType.TkParenL).parse_once()
-            p2 = self._parse_function_parameters_required_then_optional().parse_optional() or []
+            p2 = self._parse_function_parameters_internal().parse_optional() or []
             p3 = self._parse_token(TokenType.TkParenR).parse_once()
             return p2
         return BoundParser(self, inner)
 
-    def _parse_function_parameters_required_then_optional(self) -> BoundParser:
+    def _parse_function_parameter_internal(self) -> BoundParser:
         def inner():
-            p1 = self._parse_function_required_parameters().delay_parse()
-            p2 = self._parse_function_optional_parameters().delay_parse()
-            p3 = self._parse_function_variadic_parameters().delay_parse()
+            p1 = self._parse_function_parameter_required().delay_parse()
+            p2 = self._parse_function_parameter_optional().delay_parse()
+            p3 = self._parse_function_parameter_variadic().delay_parse()
             p4 = (p3 | p2 | p1).parse_once()
             return p4
         return BoundParser(self, inner)
 
-    def _parse_function_parameters_optional_then_variadic(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_function_optional_parameters().delay_parse()
-            p2 = self._parse_function_variadic_parameters().delay_parse()
-            p3 = (p2 | p1).parse_once()
-            return p3
-        return BoundParser(self, inner)
-
-    def _parse_function_required_parameters(self) -> BoundParser:
-        def inner():
-            p3 = self._parse_function_required_parameter().parse_once()
-            p4 = self._parse_function_rest_of_required_parameters().parse_optional() or []
-            return [p3, *p4]
-        return BoundParser(self, inner)
-
-    def _parse_function_rest_of_required_parameters(self) -> BoundParser:
+    def _parse_function_parameters_internal_next(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkComma).parse_once()
-            p2 = self._parse_function_parameters_required_then_optional().parse_once()
+            p2 = self._parse_function_parameter_internal().parse_once()
             return p2
         return BoundParser(self, inner)
 
-    def _parse_function_optional_parameters(self) -> BoundParser:
+    def _parse_function_parameters_internal(self) -> BoundParser:
         def inner():
-            p3 = self._parse_function_optional_parameter().parse_once()
-            p4 = self._parse_function_rest_of_optional_parameters().parse_optional() or []
-            return [p3, *p4]
+            p1 = self._parse_function_parameter_internal().parse_once()
+            p2 = self._parse_function_parameters_internal_next().parse_zero_or_more()
+            return [p1, *p2]
         return BoundParser(self, inner)
 
-    def _parse_function_rest_of_optional_parameters(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.TkComma).parse_once()
-            p2 = self._parse_function_parameters_optional_then_variadic().parse_once()
-            return p2
-        return BoundParser(self, inner)
-
-    def _parse_function_variadic_parameters(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_function_variadic_parameter().parse_once()
-            return [p1]
-        return BoundParser(self, inner)
-
-    def _parse_function_required_parameter(self) -> BoundParser:
+    def _parse_function_parameter_required(self) -> BoundParser:
         def inner():
             c1 = self._current
             p1 = self._parse_token(TokenType.KwMut).parse_optional() is not None
-            p2 = self._parse_function_parameter_identifier().parse_once()
+            p2 = self._parse_identifier().parse_once()
             p3 = self._parse_token(TokenType.TkColon).parse_once()
             p4 = self._parse_parameter_passing_convention().parse_optional()
             p5 = self._parse_type_identifier().parse_once()
             return Ast.FunctionParameterRequiredAst(p1, p2, p4, p5, c1)
         return BoundParser(self, inner)
 
-    def _parse_function_optional_parameter(self) -> BoundParser:
+    def _parse_function_parameter_optional(self) -> BoundParser:
         def inner():
-            p1 = self._parse_function_required_parameter().parse_once()
+            p1 = self._parse_function_parameter_required().parse_once()
             p2 = self._parse_token(TokenType.TkAssign).parse_once()
             p3 = self._parse_non_assignment_expression().parse_once()
             return Ast.FunctionParameterOptionalAst(p1, p3)
         return BoundParser(self, inner)
 
-    def _parse_function_variadic_parameter(self) -> BoundParser:
+    def _parse_function_parameter_variadic(self) -> BoundParser:
         def inner():
             p1 = self._parse_operator_identifier_variadic().parse_once()
-            p2 = self._parse_function_required_parameter().parse_once()
+            p2 = self._parse_function_parameter_required().parse_once()
             return Ast.FunctionParameterVariadicAst(p2)
-        return BoundParser(self, inner)
-
-    def _parse_function_parameter_identifier(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_identifier().parse_once()
-            return p1
         return BoundParser(self, inner)
 
     # Type Constraints & Value Guard
@@ -1169,7 +1120,7 @@ class Parser:
         def inner():
             c1 = self._current
             p1 = self._parse_token(TokenType.KwMut).parse_optional()
-            p2 = self._parse_function_parameter_identifier().parse_once()
+            p2 = self._parse_identifier().parse_once()
             return Ast.LambdaParameterAst(p1, p2, c1)
         return BoundParser(self, inner)
 
@@ -1316,55 +1267,41 @@ class Parser:
     def _parse_type_generic_arguments(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkBrackL).parse_once()
-            p2 = self._parse_type_generic_arguments_normal_then_named().parse_optional() or []
+            p2 = self._parse_type_generic_arguments_internal().parse_optional() or []
             p3 = self._parse_token(TokenType.TkBrackR).parse_once()
             return p2
         return BoundParser(self, inner)
 
-    def _parse_type_generic_arguments_normal_then_named(self) -> BoundParser:
+    def _parse_type_generic_argument_internal(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_generic_normal_arguments().delay_parse()
-            p2 = self._parse_type_generic_named_arguments().delay_parse()
+            p1 = self._parse_type_generic_argument_normal().delay_parse()
+            p2 = self._parse_type_generic_argument_named().delay_parse()
             p3 = (p2 | p1).parse_once()
             return p3
         return BoundParser(self, inner)
 
-    def _parse_type_generic_normal_arguments(self) -> BoundParser:
+    def _parse_type_generic_argument_internal_next(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_generic_normal_argument().parse_once()
-            p2 = self._parse_type_generic_rest_of_normal_arguments().parse_optional() or []
+            p1 = self._parse_token(TokenType.TkComma).parse_once()
+            p2 = self._parse_type_generic_argument_internal().parse_once()
+            return p2
+        return BoundParser(self, inner)
+
+    def _parse_type_generic_arguments_internal(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_type_generic_argument_internal().parse_once()
+            p2 = self._parse_type_generic_argument_internal_next().parse_zero_or_more()
             return [p1, *p2]
         return BoundParser(self, inner)
 
-    def _parse_type_generic_rest_of_normal_arguments(self) -> BoundParser:
-        def inner():
-            p3 = self._parse_token(TokenType.TkComma).parse_once()
-            p4 = self._parse_type_generic_arguments_normal_then_named().parse_once()
-            return p4
-        return BoundParser(self, inner)
-
-    def _parse_type_generic_named_arguments(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_type_generic_named_argument().parse_once()
-            p2 = self._parse_type_generic_next_named_argument().parse_zero_or_more()
-            return [p1, *p2]
-        return BoundParser(self, inner)
-
-    def _parse_type_generic_next_named_argument(self) -> BoundParser:
-        def inner():
-            p3 = self._parse_token(TokenType.TkComma).parse_once()
-            p4 = self._parse_type_generic_named_argument().parse_once()
-            return p4
-        return BoundParser(self, inner)
-
-    def _parse_type_generic_normal_argument(self) -> BoundParser:
+    def _parse_type_generic_argument_normal(self) -> BoundParser:
         def inner():
             c1 = self._current
             p1 = self._parse_type_identifier().parse_once()
             return Ast.TypeGenericArgumentNormalAst(p1, c1)
         return BoundParser(self, inner)
 
-    def _parse_type_generic_named_argument(self) -> BoundParser:
+    def _parse_type_generic_argument_named(self) -> BoundParser:
         def inner():
             c1 = self._current
             p1 = self._parse_upper_identifier().parse_once()
@@ -1378,97 +1315,55 @@ class Parser:
     def _parse_type_generic_parameters(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkBrackL).parse_once()
-            p2 = self._parse_type_generic_parameters_required_then_optional().parse_optional() or []
+            p2 = self._parse_type_generic_parameters_internal().parse_optional() or []
             p3 = self._parse_token(TokenType.TkBrackR).parse_once()
             return p2
         return BoundParser(self, inner)
 
-    def _parse_type_generic_parameters_required_then_optional(self) -> BoundParser:
+    def _parse_type_generic_parameter_internal(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_generic_required_parameters().delay_parse()
-            p2 = self._parse_type_generic_optional_parameters().delay_parse()
-            p3 = self._parse_type_generic_variadic_parameters().delay_parse()
+            p1 = self._parse_type_generic_parameter_required().delay_parse()
+            p2 = self._parse_type_generic_parameter_optional().delay_parse()
+            p3 = self._parse_type_generic_parameter_variadic().delay_parse()
             p4 = (p3 | p2 | p1).parse_once()
             return p4
         return BoundParser(self, inner)
 
-    def _parse_type_generic_parameters_optional_then_variadic(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_type_generic_optional_parameters().delay_parse()
-            p2 = self._parse_type_generic_variadic_parameters().delay_parse()
-            p3 = (p2 | p1).parse_once()
-            return p3
-        return BoundParser(self, inner)
-
-    def _parse_type_generic_required_parameters(self) -> BoundParser:
-        def inner():
-            p3 = self._parse_type_generic_required_parameter().parse_once()
-            p4 = self._parse_type_generic_rest_of_required_parameters().parse_optional() or []
-            return [p3, *p4]
-        return BoundParser(self, inner)
-
-    def _parse_type_generic_rest_of_required_parameters(self) -> BoundParser:
+    def _parse_type_generic_parameter_internal_next(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkComma).parse_once()
-            p2 = self._parse_type_generic_parameters_required_then_optional().parse_once()
+            p2 = self._parse_type_generic_parameter_internal().parse_once()
             return p2
         return BoundParser(self, inner)
 
-    def _parse_type_generic_optional_parameters(self) -> BoundParser:
+    def _parse_type_generic_parameters_internal(self) -> BoundParser:
         def inner():
-            p3 = self._parse_type_generic_optional_parameter().parse_once()
-            p4 = self._parse_type_generic_rest_of_optional_parameters().parse_optional() or []
-            return [p3, *p4]
+            p1 = self._parse_type_generic_parameter_internal().parse_once()
+            p2 = self._parse_type_generic_parameter_internal_next().parse_zero_or_more()
+            return [p1, *p2]
         return BoundParser(self, inner)
 
-    def _parse_type_generic_rest_of_optional_parameters(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.TkComma).parse_once()
-            p2 = self._parse_type_generic_parameters_optional_then_variadic().parse_once()
-            return p2
-        return BoundParser(self, inner)
-
-    def _parse_type_generic_required_parameter(self) -> BoundParser:
+    def _parse_type_generic_parameter_required(self) -> BoundParser:
         def inner():
             c1 = self._current
-            p1 = self._parse_type_generic_parameter_identifier().parse_once()
+            p1 = self._parse_upper_identifier().parse_once()
             p2 = self._parse_type_generic_parameter_inline_constraint().parse_optional() or []
             return Ast.TypeGenericParameterRequiredAst(p1, p2, c1)
         return BoundParser(self, inner)
 
-    def _parse_type_generic_optional_parameter(self) -> BoundParser:
+    def _parse_type_generic_parameter_optional(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_generic_required_parameter().parse_once()
+            p1 = self._parse_type_generic_parameter_required().parse_once()
             p2 = self._parse_token(TokenType.TkAssign).parse_once()
             p3 = self._parse_type_identifier().parse_once()
             return Ast.TypeGenericParameterOptionalAst(p1, p3)
         return BoundParser(self, inner)
 
-    def _parse_type_generic_variadic_parameters(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_type_generic_variadic_parameter().parse_once()
-            p2 = self._parse_type_generic_rest_of_variadic_parameters().parse_optional() or []
-            return [p1, *p2]
-        return BoundParser(self, inner)
-
-    def _parse_type_generic_variadic_parameter(self) -> BoundParser:
+    def _parse_type_generic_parameter_variadic(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkTripleDot).parse_once()
-            p2 = self._parse_type_generic_required_parameter().parse_once()
+            p2 = self._parse_type_generic_parameter_required().parse_once()
             return Ast.TypeGenericParameterVariadicAst(p2)
-        return BoundParser(self, inner)
-
-    def _parse_type_generic_rest_of_variadic_parameters(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_token(TokenType.TkComma).parse_once()
-            p2 = self._parse_type_generic_variadic_parameter().parse_once()
-            return p2
-        return BoundParser(self, inner)
-
-    def _parse_type_generic_parameter_identifier(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_upper_identifier().parse_once()
-            return p1
         return BoundParser(self, inner)
 
     def _parse_type_generic_parameter_inline_constraint(self) -> BoundParser:

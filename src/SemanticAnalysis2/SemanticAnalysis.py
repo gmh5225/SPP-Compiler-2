@@ -1,4 +1,3 @@
-import inspect
 from typing import Iterable, Optional, TypeVar
 
 from src.LexicalAnalysis.Tokens import TokenType, Token
@@ -40,6 +39,59 @@ class SemanticAnalysis:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown module member {ast} being analysed. Report as bug.")
 
     @staticmethod
+    def analyse_function_parameters(asts: list[Ast.FunctionParameterAst], s: ScopeHandler):
+        current_param_type = "required"
+        for p in asts:
+            if current_param_type == "optional" and not (p.default_value or p.is_variadic):
+                first_optional_parameter = next((p for p in asts if p.default_value), None)
+                final_token_1 = asts[asts.index(first_optional_parameter) + 1]._tok if first_optional_parameter != asts[-1] else p.type_annotation._tok
+                final_token_2 = asts[asts.index(p) + 1]._tok if p != asts[-1] else p.type_annotation._tok
+                raise SystemExit(
+                    "Optional parameters must come after required parameters." +
+                    ErrFmt.err(first_optional_parameter._tok, final_token_1) + "First optional parameter\n..." +
+                    ErrFmt.err(p._tok, final_token_2) + "Current parameter.")
+
+            if current_param_type == "variadic":
+                last_optional_parameter = next((p for p in asts[::-1] if p.default_value), None)
+                final_token_1 = asts[asts.index(last_optional_parameter) + 1]._tok if last_optional_parameter != asts[-1] else p.type_annotation._tok
+                final_token_2 = asts[asts.index(p) + 1]._tok if p != asts[-1] else p.type_annotation._tok
+                raise SystemExit(
+                    "Variadic parameters must come after required parameters." +
+                    ErrFmt.err(last_optional_parameter._tok, final_token_1) + "Last optional parameter\n..." +
+                    ErrFmt.err(p._tok, final_token_2) + "Current parameter.")
+
+            if p.default_value: current_param_type = "optional"
+            if p.is_variadic  : current_param_type = "variadic"
+
+        for p in asts:
+            SemanticAnalysis.analyse_parameter(p, s)
+
+    @staticmethod
+    def analyse_type_generic_parameters(asts: list[Ast.TypeGenericParameterAst], s: ScopeHandler):
+        current_generic_param_type = "required"
+        for g in asts:
+            if current_generic_param_type == "optional" and not g.default:
+                first_optional_parameter = next((p for p in asts if p.default), None)
+                final_token_1 = asts[asts.index(first_optional_parameter) + 1]._tok if first_optional_parameter != asts[-1] else g._tok
+                final_token_2 = asts[asts.index(g) + 1]._tok if g != asts[-1] else g._tok
+                raise SystemExit(
+                    "Optional generic parameters must come after required generic parameters." +
+                    ErrFmt.err(first_optional_parameter._tok, final_token_1) + "First optional generic parameter\n..." +
+                    ErrFmt.err(g._tok, final_token_2) + "Current generic parameter.")
+
+            if current_generic_param_type == "variadic" and not g.is_variadic:
+                last_optional_parameter = next((p for p in asts[::-1] if p.default), None)
+                final_token_1 = asts[asts.index(last_optional_parameter) + 1]._tok if last_optional_parameter != asts[-1] else g._tok
+                final_token_2 = asts[asts.index(g) + 1]._tok if g != asts[-1] else g._tok
+                raise SystemExit(
+                    "Variadic generic parameters must come after required generic parameters." +
+                    ErrFmt.err(last_optional_parameter._tok, final_token_1) + "Last optional generic parameter\n..." +
+                    ErrFmt.err(g._tok, final_token_2) + "Current generic parameter.")
+
+            if g.default    : current_generic_param_type = "optional"
+            if g.is_variadic: current_generic_param_type = "variadic"
+
+    @staticmethod
     def analyse_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler):
         special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
         function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.VariableSymbol) if not special else None
@@ -50,9 +102,11 @@ class SemanticAnalysis:
         if not special and s.current_scope == s.global_scope:
             function_symbol.static = True
 
+
         # Analyse all the decorators and parameters, and the return type
         [SemanticAnalysis.analyse_decorator(ast, d, s) for d in ast.decorators]
-        [SemanticAnalysis.analyse_parameter(p, s) for p in ast.parameters]
+        SemanticAnalysis.analyse_function_parameters(ast.parameters, s)
+        SemanticAnalysis.analyse_type_generic_parameters(ast.generic_parameters, s)
         TypeInfer.check_type(ast.return_type, s)
         ast.return_type = TypeInfer.infer_type(ast.return_type, s)
 
@@ -117,6 +171,8 @@ class SemanticAnalysis:
         s.next_scope()
         # for g in ast.generic_parameters:
         #     s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier)))
+
+        SemanticAnalysis.analyse_type_generic_parameters(ast.generic_parameters, s)
         [SemanticAnalysis.analyse_decorator(ast, d, s) for d in ast.decorators]
         [SemanticAnalysis.analyse_class_member(m, s) for m in ast.body.members]
         s.prev_scope()
@@ -129,6 +185,8 @@ class SemanticAnalysis:
     @staticmethod
     def analyse_sup_prototype(ast: Ast.SupPrototypeAst, s: ScopeHandler):
         s.next_scope()
+        SemanticAnalysis.analyse_type_generic_parameters(ast.generic_parameters, s)
+
         if type(ast) == Ast.SupPrototypeInheritanceAst:
             TypeInfer.check_type(ast.super_class, s)
             for type_part in ast.super_class.parts if ast.super_class else []:
@@ -251,9 +309,28 @@ class SemanticAnalysis:
             case Ast.AssignmentExpressionAst(): SemanticAnalysis.analyse_assignment_expression(ast, s)
             case Ast.PlaceholderAst(): raise NotImplementedError("Placeholder expressions are not implemented yet.")
             case Ast.TypeSingleAst(): TypeInfer.check_type(ast, s)
+            case Ast.ArrayLiteralAst(): SemanticAnalysis.analyse_array_literal(ast, s)
+            case Ast.TupleLiteralAst(): SemanticAnalysis.analyse_tuple_literal(ast, s)
             case _:
                 if type(ast) in Ast.LiteralAst.__args__ or type(ast) in Ast.NumberLiteralAst.__args__: return
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown expression {ast} being analysed. Report as bug.")
+
+    @staticmethod
+    def analyse_array_literal(ast: Ast.ArrayLiteralAst, s: ScopeHandler):
+        for e in ast.values:
+            SemanticAnalysis.analyse_expression(e, s)
+        t0 = TypeInfer.infer_expression(ast.values[0], s)
+        for e in ast.values[1:]:
+            if t0 != (t1 := TypeInfer.infer_expression(e, s)):
+                raise SystemExit(
+                    "Array elements must all be the same type:" +
+                    ErrFmt.err(ast.values[0]._tok) + f"First element is type '{t0}'\n..." +
+                    ErrFmt.err(e._tok) + f"Element is type '{t1}'.")
+
+    @staticmethod
+    def analyse_tuple_literal(ast: Ast.TupleLiteralAst, s: ScopeHandler):
+        for e in ast.values:
+            SemanticAnalysis.analyse_expression(e, s)
 
     @staticmethod
     def analyse_postfix_expression(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):
@@ -476,6 +553,9 @@ class SemanticAnalysis:
         if isinstance(cls_ty, Ast.TypeSingleAst):
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Cannot initialize generic type '{cls_ty}'.")
         cls_ty = cls_ty.to_type()
+
+        # Generic parameters check
+        # SemanticAnalysis.analyse_type_generic_arguments(ast.lhs.parts[-1].generic_arguments, s)
 
         # Check that each variable being passed into the initializer is valid, ie hasn't been moved already.
         given_fields = [f.identifier.identifier for f in ast.op.fields if isinstance(f.identifier, Ast.IdentifierAst)]

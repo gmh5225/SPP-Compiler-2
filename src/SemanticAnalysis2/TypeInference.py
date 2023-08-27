@@ -26,7 +26,7 @@ class TypeInfer:
             case Ast.TypeSingleAst(): return ast
             case Ast.BoolLiteralAst(): return CommonTypes.bool()
             case Ast.StringLiteralAst(): return CommonTypes.string()
-            case Ast.ArrayLiteralAst(): return CommonTypes.array(TypeInfer.infer_expression(ast.elements[0], s))
+            case Ast.ArrayLiteralAst(): return CommonTypes.array(TypeInfer.infer_expression(ast.values[0], s))
             case Ast.RegexLiteralAst(): return CommonTypes.regex()
             case Ast.TupleLiteralAst(): return CommonTypes.tuple([TypeInfer.infer_expression(e, s) for e in ast.values])
             case Ast.NumberLiteralBase02Ast(): return CommonTypes.num()
@@ -141,7 +141,7 @@ class TypeInfer:
 
             # Check if the function is callable with the given argument types.
             if any([arg_ty != param_ty for arg_ty, param_ty in zip(arg_tys, param_tys)]):
-                errs.append(f"Expected arguments of types {', '.join([str(ty) for ty in param_tys])}, but got {', '.join([str(ty) for ty in arg_tys])}.")
+                errs.append(f"Expected arguments of types [{', '.join([str(ty) for ty in param_tys])}], but got [{', '.join([str(ty) for ty in arg_tys])}].")
                 continue
 
             # Check the calling conventions match. A &mut argument cal collapse into an & parameter, but the __eq__
@@ -184,20 +184,30 @@ class TypeInfer:
                 pass
             else:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Too many generic arguments given to type '{sym.type}'.")
-        # if len(given_generic_arguments) < (missing_generics := TypeInfer.required_generic_parameters_for_cls(sym.type, s)):
+        # if len(given_generic_arguments) < len(missing_generics := TypeInfer.required_generic_parameters_for_cls(sym.type, s)):
         #     raise SystemExit(ErrFmt.err(ast._tok) + f"Not enough generic arguments given to type '{sym.type}'. Missing {missing_generics}.")
 
         return TypeInfer.likely_symbols(ast, SymbolTypes.TypeSymbol, "type", s)
 
     @staticmethod
-    def required_generic_parameters_for_cls(ast: Ast.TypeSingleAst, s: ScopeHandler) -> list[Ast.TypeGenericParameterAst]:
+    def required_generic_parameters_for_cls(ast: Ast.TypeSingleAst | Ast.ClassPrototypeAst, s: ScopeHandler) -> list[Ast.TypeGenericParameterAst]:
         # Generic parameters can be inferred, for a class, if they are:
         #   - The type, or part of the type, of an attribute.
         #   - Part of another generic type.
-        generics = ast.parts[-1].generic_arguments # todo : other parts of the type ie Vec[T].Value[X]. T would be missing here (just flatten all parts' generics)
-        generics_names = [g.identifier for g in generics]
+        if isinstance(ast, Ast.TypeSingleAst):
+            return []
 
-        for attr_type in [attr.type_annotation for attr in ast.body.members]:
+        print(ast.identifier)
+        print(hash(ast))
+        print([c.id for c in s.global_scope.children])
+        print("-" * 50)
+
+        generics = ast.generic_parameters # todo : other parts of the type ie Vec[T].Value[X]. T would be missing here (just flatten all parts' generics)
+        generics_names = [g.identifier for g in generics]
+        sym = s.global_scope.get_child_scope(ast.identifier)
+
+        attrs = sym.all_symbols(SymbolTypes.VariableSymbol)
+        for attr_type in [attr.type_annotation for attr in attrs]:
             for t in TypeInfer.traverse_type(attr_type, s):
                 if t in generics_names:
                     generics.pop(generics_names.index(t))

@@ -10,6 +10,7 @@ from src.LexicalAnalysis.Tokens import Token, TokenType
 @dataclass
 class ProgramAst:
     module: ModulePrototypeAst
+    eof: TokenAst
     _tok: int
 
 @dataclass

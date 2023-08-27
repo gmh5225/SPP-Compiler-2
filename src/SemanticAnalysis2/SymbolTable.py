@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Hashable, Optional, TypeVar, Callable
 
 from src.SyntacticAnalysis import Ast
+from src.SyntacticAnalysis.Parser import ErrFmt
 
 
 T = TypeVar("T")
@@ -130,6 +131,10 @@ class Scope:
             parent.children.append(self)
 
     def add_symbol(self, symbol: SymbolTypes.Symbol):
+        if self.symbol_table.has(symbol.name, SymbolTypes.TypeSymbol):
+            raise SystemExit(f"Symbol '{symbol.name}' already exists." +
+                ErrFmt.err(self.symbol_table.get(symbol.name, SymbolTypes.TypeSymbol).type.identifier._tok) + "Symbol defined here\n..." +
+                ErrFmt.err(symbol.type.identifier._tok) + "Symbol redefined here")
         self.symbol_table.add(symbol)
 
     def get_symbol(self, name: Hashable, expected_sym_type: type[T], error=True) -> T:
