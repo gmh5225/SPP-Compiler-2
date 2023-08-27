@@ -16,10 +16,11 @@
 
 ### Other
 - Objects that super-impose `Async` will always be returned immediately.
+- The `Async` type has a function for handling yielding.
 - For example, both `Gen[T]` and `Fut[T]` super-impose `Async`, so they will always return immediately.
 
 ## Yielding
 - The special property of yielding is that it is *guaranteed* that control will return to the caller.
 - This means that yielding references out of a function is safe, and doesn't violate second-class reference rules.
 - The return type will remain just be the type the reference corresponds to, so `yield &5` would `yield` a `Num` object.
-- 
+- All yield statements must use the same convention (`&`, `&mut`, or no convention ie move).
