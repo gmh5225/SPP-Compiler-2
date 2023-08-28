@@ -176,7 +176,11 @@ class TypeInfer:
             ast = ast.value
 
         # Check generic arguments given to the type
-        sym = s.current_scope.get_symbol(ast.parts[-1], SymbolTypes.TypeSymbol)
+        try:
+            sym = s.current_scope.get_symbol(ast.parts[-1], SymbolTypes.TypeSymbol)
+        except Exception:
+            raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown type '{ast}'.")
+
         given_generic_arguments = ast.parts[-1].generic_arguments
         actual_generic_parameters = sym.type.generic_parameters if isinstance(sym.type, Ast.ClassPrototypeAst) else []
         if len(given_generic_arguments) > len(actual_generic_parameters):
