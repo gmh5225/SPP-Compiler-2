@@ -299,6 +299,9 @@ class BinaryExpressionAst:
     rhs: ExpressionAst
     _tok: int
 
+    def __str__(self):
+        return str(self.lhs) + " " + str(self.op) + " " + str(self.rhs)
+
 @dataclass
 class AssignmentExpressionAst:
     lhs: list[ExpressionAst]
@@ -327,11 +330,19 @@ class PostfixExpressionAst:
 class PlaceholderAst:
     _tok: int
 
+    def __str__(self):
+        return "_"
+
 @dataclass
 class LambdaParameterAst:
     is_mutable: bool
     identifier: IdentifierAst
     _tok: int
+
+    def __str__(self):
+        s = "mut " if self.is_mutable else ""
+        s += str(self.identifier)
+        return s
 
 @dataclass
 class LambdaCaptureItemAst:
@@ -340,12 +351,24 @@ class LambdaCaptureItemAst:
     capture: IdentifierAst
     _tok: int
 
+    def __str__(self):
+        s = (str(self.identifier) + " = ") if self.identifier else ""
+        s += str(self.calling_convention) if self.calling_convention else ""
+        s += str(self.capture)
+        return s
+
 @dataclass
 class LambdaAst:
     captures: list[LambdaCaptureItemAst]
     parameters: list[LambdaParameterAst]
-    body: ExpressionAst
+    body: list[StatementAst]
     _tok: int
+
+    def __str__(self):
+        s = "[" + ", ".join([str(capture) for capture in self.captures]) + "]" if self.captures else ""
+        s += "(" + ", ".join([str(param) for param in self.parameters]) + ") -> "
+        s += "{" + "\n".join([str(statement) for statement in self.body]) + "}\n"
+        return s
 
 @dataclass
 class TypeGenericParameterAst:
@@ -438,9 +461,9 @@ class IfStatementAst:
 
     def __str__(self):
         s = "if "
-        s += str(self.condition) + " {"
+        s += str(self.condition) + " {\n"
         s += " " + str(self.comparison_op) + " " if self.comparison_op else " "
-        s += "\n".join([str(branch) for branch in self.branches]) + "}"
+        s += "\n".join([str(branch) for branch in self.branches]) + "}\n"
         return s
 
 @dataclass
@@ -473,6 +496,13 @@ class WhileStatementAst:
     else_: Optional[InnerScopeAst]
     _tok: int
 
+    def __str__(self):
+        s = "while "
+        s += str(self.condition) + " {\n"
+        s += "\n".join([str(statement) for statement in self.body]) + "}"
+        s += (" else { " + str(self.else_) + " }") if self.else_ else "\n"
+        return s
+
 @dataclass
 class WithStatementAst:
     value: ExpressionAst
@@ -480,25 +510,45 @@ class WithStatementAst:
     body: list[StatementAst]
     _tok: int
 
+    def __str__(self):
+        s = "with "
+        s += str(self.value)
+        s += ((" as " + str(self.alias)) if self.alias else "") + " {\n"
+        s += "\n".join([str(statement) for statement in self.body]) + "}\n"
+        return s
+
 @dataclass
 class ReturnStatementAst:
-    value: list[ExpressionAst]
+    value: Optional[ExpressionAst]
     _tok: int
 
     def __str__(self):
-        return "ReturnStatementAst"
+        s = "return "
+        s += str(self.value) if self.value else ""
+        return s
 
 @dataclass
 class YieldStatementAst:
     convention: Optional[ParameterPassingConventionReferenceAst]
-    value: list[ExpressionAst]
+    value: Optional[ExpressionAst]
     _tok: int
+
+    def __str__(self):
+        s = "yield "
+        s += str(self.convention) if self.convention else ""
+        s += str(self.value) if self.value else ""
+        return s
 
 @dataclass
 class TypedefStatementAst:
     new_type: TypeAst
     old_type: TypeAst
     _tok: int
+
+    def __str__(self):
+        s = "use "
+        s += str(self.new_type) + " as " + str(self.old_type)
+        return s
 
 @dataclass
 class LetStatementAst:
@@ -521,6 +571,11 @@ class InnerScopeAst:
     body: list[StatementAst]
     _tok: int
 
+    def __str__(self):
+        s = "{\n"
+        s += "\n".join([str(statement) for statement in self.body]) + "}\n"
+        return s
+
 @dataclass
 class LocalVariableAst:
     is_mutable: bool
@@ -528,7 +583,7 @@ class LocalVariableAst:
     _tok: int
 
     def __str__(self):
-        s ="mut " if self.is_mutable else ""
+        s = "mut " if self.is_mutable else ""
         s += str(self.identifier)
         return s
 
@@ -634,10 +689,16 @@ class NumberLiteralBase16Ast:
     value: str
     _tok: int
 
+    def __str__(self):
+        return self.value
+
 @dataclass
 class NumberLiteralBase02Ast:
     value: str
     _tok: int
+
+    def __str__(self):
+        return self.value
 
 @dataclass
 class NumberExponentAst:
@@ -646,7 +707,8 @@ class NumberExponentAst:
     _tok: int
 
     def __str__(self):
-        s = self.sign.tok.token_metadata + self.value
+        s = self.sign.tok.token_metadata if self.sign else ""
+        s += self.value
         return s
 
 @dataclass

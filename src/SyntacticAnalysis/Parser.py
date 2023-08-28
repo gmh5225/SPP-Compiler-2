@@ -1058,8 +1058,8 @@ class Parser:
             p1 = self._parse_lambda_capture_list().parse_optional()
             p2 = self._parse_lambda_parameters().parse_once()
             p3 = self._parse_token(TokenType.TkArrowR).parse_once()
-            p4 = self._parse_lambda_implementation().parse_once()
-            return Ast.LambdaAst(p1, p2, p4, c1)
+            p4 = self._parse_statement_new_scope().parse_once()
+            return Ast.LambdaAst(p1, p2, p4.body, c1)
         return BoundParser(self, inner)
 
     def _parse_lambda_capture_list(self) -> BoundParser:
@@ -1122,12 +1122,6 @@ class Parser:
             p1 = self._parse_token(TokenType.KwMut).parse_optional()
             p2 = self._parse_identifier().parse_once()
             return Ast.LambdaParameterAst(p1, p2, c1)
-        return BoundParser(self, inner)
-
-    def _parse_lambda_implementation(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_non_assignment_expression().parse_once()
-            return p1
         return BoundParser(self, inner)
 
     # Type Identifiers
