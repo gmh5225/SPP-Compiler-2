@@ -40,12 +40,14 @@ class SymbolTypes:
         type: Ast.TypeAst
         mem_info: VariableSymbolMemoryStatus
         is_mutable: bool
+        is_comptime: bool
 
         def __init__(self, name: Ast.IdentifierAst, type: Ast.TypeAst, **kwargs):
             self.name = name
             self.type = type
             self.mem_info = VariableSymbolMemoryStatus()
             self.is_mutable = kwargs.get("is_mutable", False)
+            self.is_comptime = kwargs.get("is_comptime", False)
             self.meta_data = {}
 
             self.mem_info.is_initialized = kwargs.get("is_initialized", False)

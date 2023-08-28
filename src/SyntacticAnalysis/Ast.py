@@ -361,6 +361,9 @@ class TypeGenericParameterAst:
     def __str__(self):
         return ("..." if self.is_variadic else "") + self.identifier.identifier
 
+    def __hash__(self):
+        return hash(self.identifier)
+
 def TypeGenericParameterRequiredAst(identifier: IdentifierAst, constraints: list[TypeAst], _tok: int):
     return TypeGenericParameterAst(identifier, constraints, None, False, _tok)
 
@@ -401,6 +404,14 @@ class TypeSingleAst:
     def __eq__(self, other):
         return isinstance(other, TypeSingleAst) and self.parts == other.parts
 
+    def loose_eq(self, other):
+        # Match on identifiers, but not generic arguments
+        if not isinstance(other, TypeSingleAst): return False
+        for this_p, that_p in zip(self.parts, other.parts):
+            if type(this_p) != type(that_p): return False
+            if isinstance(this_p, GenericIdentifierAst) and this_p.identifier != that_p.identifier: return False
+        return True
+
     def __hash__(self):
         return hash(tuple(self.parts))
 
@@ -425,6 +436,13 @@ class IfStatementAst:
     branches: list[PatternStatementAst]
     _tok: int
 
+    def __str__(self):
+        s = "if "
+        s += str(self.condition) + " {"
+        s += " " + str(self.comparison_op) + " " if self.comparison_op else " "
+        s += "\n".join([str(branch) for branch in self.branches]) + "}"
+        return s
+
 @dataclass
 class PatternStatementAst:
     comparison_op: Optional[TokenAst]
@@ -433,10 +451,20 @@ class PatternStatementAst:
     body: list[StatementAst]
     _tok: int
 
+    def __str__(self):
+        s = str(self.comparison_op) if self.comparison_op else ""
+        s += ", ".join([str(pattern) for pattern in self.patterns])
+        s += (" && " + str(self.guard)) if self.guard else ""
+        s += " { " + "\n".join([str(statement) for statement in self.body]) + " }"
+        return s
+
 @dataclass
 class PatternAst:
     value: ExpressionAst
     _tok: int
+
+    def __str__(self):
+        return str(self.value)
 
 @dataclass
 class WhileStatementAst:
@@ -480,6 +508,14 @@ class LetStatementAst:
     if_null: Optional[InnerScopeAst]
     _tok: int
 
+    def __str__(self):
+        s = "let "
+        s += ", ".join([str(var) for var in self.variables])
+        s += " = " if self.value else ": "
+        s += str(self.value) if self.value else str(self.type_annotation)
+        s += " else { " + str(self.if_null) + " }" if self.if_null else ""
+        return s
+
 @dataclass
 class InnerScopeAst:
     body: list[StatementAst]
@@ -490,6 +526,11 @@ class LocalVariableAst:
     is_mutable: bool
     identifier: IdentifierAst
     _tok: int
+
+    def __str__(self):
+        s ="mut " if self.is_mutable else ""
+        s += str(self.identifier)
+        return s
 
 @dataclass
 class SupImplementationAst:

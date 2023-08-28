@@ -144,7 +144,7 @@ class TypeInfer:
                 continue
 
             # Check if the function is callable with the given argument types.
-            if any([arg_ty != param_ty for arg_ty, param_ty in zip(arg_tys, param_tys)]):
+            if any([not arg_ty.loose_eq(param_ty) for arg_ty, param_ty in zip(arg_tys, param_tys)]):
                 mismatch_index = [i for i, (arg_ty, param_ty) in enumerate(zip(arg_tys, param_tys)) if arg_ty != param_ty][0]
                 errs.append(f"Expected argument {mismatch_index + 1} to be of type '{param_tys[mismatch_index]}', but got '{arg_tys[mismatch_index]}'.")
                 continue
@@ -206,20 +206,23 @@ class TypeInfer:
         # Generic parameters can be inferred, for a class, if they are:
         #   - The type, or part of the type, of an attribute.
         #   - Part of another generic type.
-        if isinstance(ast, Ast.TypeSingleAst):
-            return []
 
-        print(ast.identifier)
-        print(hash(ast))
-        print([c.id for c in s.global_scope.children])
-        print("-" * 50)
+        if isinstance(ast, Ast.TypeSingleAst):
+            sym = s.current_scope.get_symbol(ast.parts[-1], SymbolTypes.TypeSymbol)
+            ast = sym.type
+            if sym is None: return []
+
+        # print(ast.identifier)
+        # print(hash(ast))
+        # print([c.id for c in s.global_scope.children])
+        # print("-" * 50)
 
         generics = ast.generic_parameters # todo : other parts of the type ie Vec[T].Value[X]. T would be missing here (just flatten all parts' generics)
         generics_names = [g.identifier for g in generics]
-        sym = s.global_scope.get_child_scope(ast.identifier)
+        sym = s.global_scope.get_child_scope(ast.to_type())
 
         attrs = sym.all_symbols(SymbolTypes.VariableSymbol)
-        for attr_type in [attr.type_annotation for attr in attrs]:
+        for attr_type in [attr.type for attr in attrs]:
             for t in TypeInfer.traverse_type(attr_type, s):
                 if t in generics_names:
                     generics.pop(generics_names.index(t))
@@ -247,11 +250,13 @@ class TypeInfer:
             case Ast.GenericIdentifierAst():
                 yield ast.identifier
                 for t in ast.generic_arguments:
-                    yield from TypeInfer.traverse_type(t.value, s)
+                    yield from TypeInfer.traverse_type(t, s)
             case Ast.TypeSingleAst():
                 yield ast.parts[-1].identifier
                 for t in ast.parts:
                     yield from TypeInfer.traverse_type(t, s)
+            case Ast.TypeGenericArgumentAst():
+                yield from TypeInfer.traverse_type(ast.value, s)
             case Ast.TypeTupleAst():
                 for t in ast.types:
                     yield from TypeInfer.traverse_type(t, s)

@@ -34,12 +34,17 @@ class SemanticAnalysis:
             case Ast.EnumPrototypeAst(): s.skip_scope()
             case Ast.SupPrototypeNormalAst(): SemanticAnalysis.analyse_sup_prototype(ast, s)
             case Ast.SupPrototypeInheritanceAst(): SemanticAnalysis.analyse_sup_prototype(ast, s)
-            case Ast.LetStatementAst(): SemanticAnalysis.analyse_let_statement(ast, s)
+            case Ast.LetStatementAst(): pass  # SemanticAnalysis.analyse_let_statement(ast, s)
             case _:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown module member {ast} being analysed. Report as bug.")
 
     @staticmethod
     def analyse_function_parameters(asts: list[Ast.FunctionParameterAst], s: ScopeHandler):
+        # check no duplicate parameter names
+        for i, p in enumerate(asts):
+            if p.identifier in [q.identifier for q in asts[i + 1:]]:
+                raise SystemExit(ErrFmt.err(p._tok) + f"Duplicate parameter name '{p.identifier}'.")
+
         current_param_type = "required"
         for p in asts:
             if current_param_type == "optional" and not (p.default_value or p.is_variadic):
@@ -68,6 +73,11 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_type_generic_parameters(asts: list[Ast.TypeGenericParameterAst], s: ScopeHandler):
+        # check no duplicate generic parameter names
+        for i, g in enumerate(asts):
+            if g.identifier and g.identifier in [h.identifier for h in asts[i + 1:]]:
+                raise SystemExit(ErrFmt.err(g._tok) + f"Duplicate generic parameter name '{g.identifier}'.")
+
         current_generic_param_type = "required"
         for g in asts:
             if current_generic_param_type == "optional" and not g.default:
@@ -213,7 +223,7 @@ class SemanticAnalysis:
                     #     raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{reduced_identifier}' in super class '{owner.super_class}' is not virtual or abstract.")
 
                 SemanticAnalysis.analyse_class_prototype(ast, s)
-            case Ast.LetStatementAst(): SemanticAnalysis.analyse_let_statement(ast, s)
+            case Ast.LetStatementAst(): pass  # SemanticAnalysis.analyse_let_statement(ast, s)
             case Ast.SupPrototypeNormalAst(): SemanticAnalysis.analyse_sup_prototype(ast, s)
             case Ast.SupPrototypeInheritanceAst(): SemanticAnalysis.analyse_sup_prototype(ast, s)
             case _:
@@ -492,6 +502,7 @@ class SemanticAnalysis:
                     if value in mut_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move value '{value}' that is already mutably borrowed.")
 
                     sym = s.current_scope.get_symbol(value, SymbolTypes.VariableSymbol)
+
                     if not sym.mem_info.is_initialized: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move value '{value}' that is not initialized.")
                     sym.mem_info.is_initialized = False
 
@@ -547,6 +558,7 @@ class SemanticAnalysis:
                     if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"[2] Cannot move a value that is not initialized.")
                     ref_args |= {value}
 
+
     @staticmethod
     def analyse_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
         cls_ty = TypeInfer.check_type(ast.lhs, s)
@@ -556,6 +568,13 @@ class SemanticAnalysis:
 
         # Generic parameters check
         # SemanticAnalysis.analyse_type_generic_arguments(ast.lhs.parts[-1].generic_arguments, s)
+        actual_generics = TypeInfer.required_generic_parameters_for_cls(cls_ty, s)
+        given_generics = ast.lhs.parts[-1].generic_arguments
+        generics_difference = set(actual_generics) - set(given_generics)
+        if len(given_generics) < len(actual_generics):
+            raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Generic parameters missing for type '{cls_ty}': '{', '.join([str(g) for g in generics_difference])}'.")
+        if len(given_generics) > len(actual_generics):
+            raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Too many generic parameters given for type '{cls_ty}': '{', '.join(str(g) for g in generics_difference)}'.")
 
         # Check that each variable being passed into the initializer is valid, ie hasn't been moved already.
         given_fields = [f.identifier.identifier for f in ast.op.fields if isinstance(f.identifier, Ast.IdentifierAst)]
@@ -582,7 +601,7 @@ class SemanticAnalysis:
         if cls_definition_scope is None:
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Cannot find definition for class '{cls_ty}'.")
 
-        actual_fields = [v.name.identifier for v in cls_definition_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol) if not v.mem_info.is_initialized]
+        actual_fields = [v.name.identifier for v in cls_definition_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol) if not v.is_comptime]
         actual_fields = [a for a in actual_fields if str(a) not in ["call_ref", "call_mut", "call_one"]]
 
         # If a fields has been given twice, then raise an error
@@ -624,15 +643,26 @@ class SemanticAnalysis:
         # the same semantics as a function call, so treat it like that. Ultimately, "let x = 5" becomes "let x: Num" and
         # "x.set(5)", which is then analysed as a function call. There are some extra checks for the "let" though.
 
+        # The symbol is allowed to already exist in the scope, ie "let x = 1" can be followed by "let x = false". If the
+        # pre-defined symbol is comptime however, then the symbol has already been generated, to ignore the extra
+        # for lhs in ast.variables:
+        #     if s.current_scope.has_symbol(lhs.identifier, SymbolTypes.VariableSymbol) and s.current_scope.get_symbol(lhs.identifier, SymbolTypes.VariableSymbol).is_comptime:
+        #         raise SystemExit(ErrFmt.err(lhs._tok) + f"Cannot re-define comptime variable '{lhs.identifier}'.")
+
+
         # Check that the type of the variable is not "Void". This is because "Void" values don't exist, and therefore
         # cannot be assigned to a variable.
         let_statement_type = TypeInfer.infer_type(ast.type_annotation, s) if ast.type_annotation else TypeInfer.infer_expression(ast.value, s)
         if let_statement_type == CommonTypes.void():
             raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot define a variable with 'Void' type.")
 
+        new_syms = []
+
         # For a single variable, infer its type and set it in the symbol table.
         if len(ast.variables) == 1:
-            s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.variables[0].identifier, let_statement_type, is_mutable=ast.variables[0].is_mutable))
+            sym = SymbolTypes.VariableSymbol(ast.variables[0].identifier, let_statement_type, is_mutable=ast.variables[0].is_mutable)
+            new_syms.append(sym)
+            s.current_scope.add_symbol(sym)
 
         # Handle the tuple assignment case. There are a few special checks that need to take place, mostly concerning
         # destructuring.
@@ -650,7 +680,9 @@ class SemanticAnalysis:
             # Infer the type of each variable, and set it in the symbol table.
             for variable in ast.variables:
                 t = TypeInfer.infer_expression(ty.parts[-1].generic_arguments[ast.variables.index(variable)], s)
-                s.current_scope.add_symbol(SymbolTypes.VariableSymbol(variable.identifier, t, is_mutable=variable.is_mutable))
+                sym = SymbolTypes.VariableSymbol(variable.identifier, t, is_mutable=variable.is_mutable)
+                new_syms.append(sym)
+                s.current_scope.add_symbol(sym)
 
         # Handle the "else" clause for the let statement. Check that the type returned from the "else" block is valid.
         if ast.if_null:
@@ -666,6 +698,10 @@ class SemanticAnalysis:
         if ast.value:
             mock_assignment = Ast.AssignmentExpressionAst([x.identifier for x in ast.variables], Ast.TokenAst(Token("=", TokenType.TkAssign), ast._tok), ast.value, ast._tok)
             SemanticAnalysis.analyse_assignment_expression(mock_assignment, s, let=True)
+
+        for sym in new_syms:
+            sym.mem_info.is_initialized = True
+
 
     @staticmethod
     def analyse_assignment_expression(ast: Ast.AssignmentExpressionAst, s: ScopeHandler, **kwargs):
@@ -685,12 +721,12 @@ class SemanticAnalysis:
             # values not types.
             if isinstance(lhs, Ast.IdentifierAst):
                 sym = s.current_scope.get_symbol(lhs, SymbolTypes.VariableSymbol)
-                if not sym.is_mutable and sym.mem_info.is_initialized:
+                if not sym.is_mutable and sym.mem_info.is_initialized and not sym.is_comptime:
                     raise SystemExit(ErrFmt.err(lhs._tok) + f"Cannot assign to an immutable variable.")
 
         # Create a mock function call for the assignment, and analyse it. Do 1 per variable, so that the function call
-        # analysis can handle the multiple function calls for tuples etc.
-        SemanticAnalysis.analyse_expression(ast.rhs, s, assignment=True)
+        # analysis can handle the multiple function calls for tuples etc. Don't analyse the RHS, because the mock
+        # function call will analyse the RHS value(s) as arguments, and double-analysis will lead to double-moves etc.
         rhs_ty = TypeInfer.infer_expression(ast.rhs, s)
         if len(ast.lhs) == 1:
             fn_call = Ast.PostfixFunctionCallAst(

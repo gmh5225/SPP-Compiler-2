@@ -71,7 +71,7 @@ class SymbolGeneration:
 
     @staticmethod
     def generate_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeHandler, hidden: bool = False):
-        ty = Ast.TypeSingleAst([Ast.GenericIdentifierAst(ast.identifier.identifier, [None for _ in range(len(ast.generic_parameters))], ast._tok)], ast._tok)
+        ty = Ast.TypeSingleAst([Ast.GenericIdentifierAst(ast.identifier.identifier, [], ast._tok)], ast._tok)
         s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ty.parts[-1].to_identifier(), ast))
         s.enter_scope(ty, hidden=hidden)
         [s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier))) for g in ast.generic_parameters]
@@ -112,7 +112,8 @@ class SymbolGeneration:
 
     @staticmethod
     def generate_sup_fn_let_statement(ast: Ast.LetStatementAst, s: ScopeHandler):
-        s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.variables[0].identifier, ast.type_annotation, is_mutable=False))
+        sym = SymbolTypes.VariableSymbol(ast.variables[0].identifier, ast.type_annotation, is_mutable=False, is_comptime=True)
+        s.current_scope.add_symbol(sym)
 
     @staticmethod
     def generate_sup_method_prototype(ast: Ast.SupMethodPrototypeAst, s: ScopeHandler):
