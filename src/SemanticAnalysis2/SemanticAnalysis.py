@@ -584,7 +584,6 @@ class SemanticAnalysis:
 
         actual_fields = [v.name.identifier for v in cls_definition_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol) if not v.mem_info.is_initialized]
         actual_fields = [a for a in actual_fields if str(a) not in ["call_ref", "call_mut", "call_one"]]
-        print("-" * 100)
 
         # If a fields has been given twice, then raise an error
         if given_twice := any_elem([f for f in ast.op.fields if isinstance(f.identifier, Ast.IdentifierAst) and given_fields.count(f.identifier.identifier) > 1]):

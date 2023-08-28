@@ -127,7 +127,11 @@ class TypeInfer:
             param_names = [param.identifier.identifier for param in fn_type.parameters]
             param_tys = [param.type_annotation for param in fn_type.parameters]
             param_ccs = [param.calling_convention for param in fn_type.parameters]
-            sigs.append(str(fn_type))
+
+            str_fn_type = str(fn_type)
+            str_fn_type = str_fn_type[str_fn_type.index("("):].strip()
+            sigs.append(str_fn_type)
+
 
             # Skip first argument type for non-static functions
             if overloads[i].meta_data.get("is_method", False) and not overloads[i].meta_data.get("is_static", False):
@@ -141,13 +145,15 @@ class TypeInfer:
 
             # Check if the function is callable with the given argument types.
             if any([arg_ty != param_ty for arg_ty, param_ty in zip(arg_tys, param_tys)]):
-                errs.append(f"Expected arguments of types [{', '.join([str(ty) for ty in param_tys])}], but got [{', '.join([str(ty) for ty in arg_tys])}].")
+                mismatch_index = [i for i, (arg_ty, param_ty) in enumerate(zip(arg_tys, param_tys)) if arg_ty != param_ty][0]
+                errs.append(f"Expected argument {mismatch_index + 1} to be of type '{param_tys[mismatch_index]}', but got '{arg_tys[mismatch_index]}'.")
                 continue
 
             # Check the calling conventions match. A &mut argument cal collapse into an & parameter, but the __eq__
             # implementation handles this.
             if any([arg_cc != param_cc for arg_cc, param_cc in zip(arg_ccs, param_ccs)]):
-                errs.append(f"Expected arguments with calling conventions [{', '.join([str(cc) for cc in param_ccs])}], but got [{', '.join([str(cc) for cc in arg_ccs])}].")
+                mismatch_index = [i for i, (arg_cc, param_cc) in enumerate(zip(arg_ccs, param_ccs)) if arg_cc != param_cc][0]
+                errs.append(f"Expected argument {mismatch_index + 1} to be passed by '{param_ccs[mismatch_index]}', but got '{arg_ccs[mismatch_index]}'.")
                 continue
 
             # If we get here, we have found the function we are looking for.
@@ -160,7 +166,9 @@ class TypeInfer:
         for i in range(len(sigs)):
             output.append(f"{sigs[i]}: {errs[i]}")
 
-        raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Could not find function '{ast.lhs}' with the given arguments.\nAvailable signatures{NL.join(output)}")
+        raise SystemExit(
+            ErrFmt.err(ast.lhs._tok) +
+            f"Could not find function '{ast.lhs}' with the given arguments.\nAvailable signatures{NL.join(output)}")
 
     @staticmethod
     def infer_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
