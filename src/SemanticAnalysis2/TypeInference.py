@@ -1,3 +1,4 @@
+import copy
 from difflib import SequenceMatcher
 import inspect
 
@@ -100,8 +101,12 @@ class TypeInfer:
 
     @staticmethod
     def infer_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+        scope = s
         if isinstance(ast.lhs, Ast.IdentifierAst) and ast.lhs.identifier == "__set__":
             return CommonTypes.void()
+
+        # Generics
+        # print(ast.op.type_arguments)
 
         # To infer something like x.y.z(a, b), we need to infer x.y.z, then infer a and b, then infer the function call.
 
@@ -156,7 +161,14 @@ class TypeInfer:
                 errs.append(f"Expected argument {mismatch_index + 1} to be passed by '{param_ccs[mismatch_index]}', but got '{arg_ccs[mismatch_index]}'.")
                 continue
 
-            # If we get here, we have found the function we are looking for.
+            # If we get here, we have found the function we are looking for. Walk through the type and replace generics
+            # with their corresponding type arguments.
+            # print("-" * 50)
+            # return_type = copy.deepcopy(fn_type.return_type)
+            # for t in TypeInfer.traverse_type(return_type, scope):
+            #     sym = s.get_symbol(Ast.IdentifierAst(t, -1), SymbolTypes.TypeSymbol)
+            #     print(sym)
+
             return fn_type.return_type
 
         NL = "\n\t- "
@@ -218,11 +230,14 @@ class TypeInfer:
         # print("-" * 50)
 
         generics = ast.generic_parameters # todo : other parts of the type ie Vec[T].Value[X]. T would be missing here (just flatten all parts' generics)
-        generics_names = [g.identifier for g in generics]
+        generics_names = [g.identifier.identifier for g in generics]
         sym = s.global_scope.get_child_scope(ast.to_type())
 
-        attrs = sym.all_symbols(SymbolTypes.VariableSymbol)
-        for attr_type in [attr.type for attr in attrs]:
+
+        # For each attribute of the class, if the type is the generic or composes the generic ie Vec[T], then the type
+        # is inferrable, and is therefore not required. Remove it from the list of required generics.
+        attrs = sym.all_symbols_exclusive(SymbolTypes.VariableSymbol)
+        for attr_name, attr_type in [(attr.name, attr.type) for attr in attrs]:
             for t in TypeInfer.traverse_type(attr_type, s):
                 if t in generics_names:
                     generics.pop(generics_names.index(t))

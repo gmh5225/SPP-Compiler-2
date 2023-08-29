@@ -479,7 +479,7 @@ class SemanticAnalysis:
         arg_ts   = []
 
         # TODO : partial moves not working at the moment
-        # TODO : moving attributes from a borrowed context don't seem to wort rn either
+        # TODO : moving attributes from a borrowed context don't seem to work right now either
 
         for i, arg in enumerate(ast.op.arguments):
             # Check the argument is valid.
@@ -571,6 +571,7 @@ class SemanticAnalysis:
         actual_generics = TypeInfer.required_generic_parameters_for_cls(cls_ty, s)
         given_generics = ast.lhs.parts[-1].generic_arguments
         generics_difference = set(actual_generics) - set(given_generics)
+
         if len(given_generics) < len(actual_generics):
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Generic parameters missing for type '{cls_ty}': '{', '.join([str(g) for g in generics_difference])}'.")
         if len(given_generics) > len(actual_generics):

@@ -209,6 +209,10 @@ class Scope:
             syms += self.parent.all_symbols(expected_sym_type)
         return syms
 
+    def all_symbols_names(self, expected_sym_type: type) -> list[str]:
+        syms = self.all_symbols(expected_sym_type)
+        return [str(s.name) for s in syms]
+
     def all_symbols_exclusive(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
         combined_symbol_tables = [a for a in self.symbol_table.symbols.values() if isinstance(a, expected_sym_type)]
         for sup_scope in self.sup_scopes:
