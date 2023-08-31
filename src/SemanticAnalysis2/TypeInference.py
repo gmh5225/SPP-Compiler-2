@@ -1,3 +1,4 @@
+import copy
 from difflib import SequenceMatcher
 from typing import Generator
 import inspect
@@ -188,7 +189,10 @@ class TypeInfer:
             #     sym = s.get_symbol(Ast.IdentifierAst(t, -1), SymbolTypes.TypeSymbol)
             #     print(sym)
 
-            return fn_type.return_type
+            return_type = copy.deepcopy(fn_type.return_type)
+            for g, h in ast.op.generic_map.items():
+                TypeInfer.substitute_generic_type(return_type, g, h.parts[-1].identifier)
+            return return_type
 
         NL = "\n\t- "
         sigs.insert(0, "")
@@ -303,7 +307,6 @@ class TypeInfer:
                     sym = s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol)
                     yield sym.type.parts[-1].identifier, level
                 case _:
-                    print(ast)
                     print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
                     raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{type(ast).__name__}' not yet supported for traversal. Report as bug.")
         yield from inner(ast, s, 0)
@@ -437,17 +440,22 @@ class TypeInfer:
 
     @staticmethod
     def substitute_generic_type(ty: Ast.TypeAst, q1: str, q2: str):
-        if isinstance(ty, Ast.TypeSingleAst):
+        if isinstance(ty, Ast.IdentifierAst):
+            if ty.identifier == q1:
+                ty.identifier = q2
+        if isinstance(ty, Ast.TypeGenericArgumentAst):
+            TypeInfer.substitute_generic_type(ty.value, q1, q2)
+        elif isinstance(ty, Ast.GenericIdentifierAst):
+            if ty.identifier == q1:
+                ty.identifier = q2
+            for j, q in enumerate(ty.generic_arguments):
+                TypeInfer.substitute_generic_type(q, q1, q2)
+        elif isinstance(ty, Ast.TypeSingleAst):
             for i, p in enumerate(ty.parts):
-                if p.identifier == q1:
-                    ty.parts[i] = Ast.IdentifierAst(q2, ty._tok).to_generic_identifier()
-                else:
-                    TypeInfer.substitute_generic_type(p, q1, q2)
-                for j, q in enumerate(p.generic_arguments):
-                    if q.identifier == q1:
-                        ty.parts[i].generic_arguments[j] = Ast.IdentifierAst(q2, ty._tok).to_generic_identifier()
-                    else:
-                        TypeInfer.substitute_generic_type(q, q1, q2)
-        elif isinstance(ty, Ast.TypeTupleAst):
-            for i, p in enumerate(ty.types):
                 TypeInfer.substitute_generic_type(p, q1, q2)
+        elif isinstance(ty, Ast.TypeTupleAst):
+            for p in ty.types:
+                TypeInfer.substitute_generic_type(p, q1, q2)
+        else:
+            print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
+            raise SystemExit(ErrFmt.err(ty._tok) + f"Unknown 'Ast.{type(ty).__name__}' being inferred. Report as bug.")
