@@ -631,20 +631,26 @@ class SemanticAnalysis:
             if default_obj_ty != cls_ty:
                 raise SystemExit(ErrFmt.err(default_obj_given._tok) + f"Default object given to struct initializer is not of type '{cls_ty}'.")
 
+        # Register all the generic parameters of the class as None in the generic map.
+        sym = s.current_scope.get_symbol(cls_ty.parts[-1], SymbolTypes.TypeSymbol)
+        gs = sym.type.generic_parameters
+        for g in gs:
+            ast.op.generic_map[g.identifier.identifier] = None
+
         # Check each field given is the correct type. Sort the two field lists, as they are going to be iterated at the
         # same time, so their order has to be the same.
         for given, actual in zip(sorted(given_fields), sorted(actual_fields)):
             given_ty = TypeInfer.infer_expression(ast.op.fields[given_fields.index(given)].value or ast.op.fields[given_fields.index(given)].identifier, s)
             actual_ty = cls_definition_scope.get_symbol(Ast.IdentifierAst(actual, -1), SymbolTypes.VariableSymbol).type
+            acc_sym = cls_definition_scope.get_symbol(actual_ty.parts[-1], SymbolTypes.TypeSymbol)
 
-            # Generics
+            # Fill in the inferrable generics from the attributes being given
             # -> TODO : shift this to type comparison where-ever that is?
             # -> TODO : also traverse the type tree and replace generic parameters with their actual types
-            acc_sym = cls_definition_scope.get_symbol(actual_ty.parts[-1], SymbolTypes.TypeSymbol)
+
             if type(acc_sym.type) == Ast.TypeSingleAst:
-                id = actual_ty.parts[-1].identifier
-                ast.op.generic_map[id] = given_ty
-                given_ty = acc_sym.type # TODO : don't just replace the type, but replace its generic arguments recursively
+                gi = actual_ty.parts[-1].identifier
+                ast.op.generic_map[gi] = given_ty
 
             if not TypeInfer.types_equal_account_for_generic(ast.op.fields[sorted(given_fields).index(given)], actual, given_ty, actual_ty, ast.op.generic_map, s):
                 err_pos = (ast.op.fields[given_fields.index(given)].identifier or ast.op.fields[given_fields.index(given)].value)._tok
