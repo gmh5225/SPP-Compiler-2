@@ -1,5 +1,5 @@
-import copy
 from difflib import SequenceMatcher
+from typing import Generator
 import inspect
 
 from src.SyntacticAnalysis import Ast
@@ -149,7 +149,7 @@ class TypeInfer:
                 continue
 
             # Check if the function is callable with the given argument types.
-            if any([not arg_ty.loose_eq(param_ty) for arg_ty, param_ty in zip(arg_tys, param_tys)]):
+            if any([arg_ty != param_ty for arg_ty, param_ty in zip(arg_tys, param_tys)]):
                 mismatch_index = [i for i, (arg_ty, param_ty) in enumerate(zip(arg_tys, param_tys)) if arg_ty != param_ty][0]
                 errs.append(f"Expected argument {mismatch_index + 1} to be of type '{param_tys[mismatch_index]}', but got '{arg_tys[mismatch_index]}'.")
                 continue
@@ -239,6 +239,7 @@ class TypeInfer:
         attrs = sym.all_symbols_exclusive(SymbolTypes.VariableSymbol)
         for attr_name, attr_type in [(attr.name, attr.type) for attr in attrs]:
             for t in TypeInfer.traverse_type(attr_type, s):
+                t = t[0]
                 if t in generics_names:
                     generics.pop(generics_names.index(t))
                     generics_names.remove(t)
@@ -254,33 +255,36 @@ class TypeInfer:
 
         for ty in [param.type_annotation for param in ast.parameters] + [g for g in ast.generic_parameters]:
             for t in TypeInfer.traverse_type(ty, s):
+                t = t[0]
                 if t in generics_names:
                     generics.pop(generics_names.index(t))
                     generics_names.remove(t)
         return generics
 
     @staticmethod
-    def traverse_type(ast: Ast.TypeAst | Ast.GenericIdentifierAst, s: ScopeHandler):
-        match ast:
-            case Ast.GenericIdentifierAst():
-                yield ast.identifier
-                for t in ast.generic_arguments:
-                    yield from TypeInfer.traverse_type(t, s)
-            case Ast.TypeSingleAst():
-                yield ast.parts[-1].identifier
-                for t in ast.parts:
-                    yield from TypeInfer.traverse_type(t, s)
-            case Ast.TypeGenericArgumentAst():
-                yield from TypeInfer.traverse_type(ast.value, s)
-            case Ast.TypeTupleAst():
-                for t in ast.types:
-                    yield from TypeInfer.traverse_type(t, s)
-            case Ast.SelfTypeAst():
-                sym = s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol)
-                yield sym.type.parts[-1].identifier
-            case _:
-                print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{type(ast).__name__}' not yet supported for traversal. Report as bug.")
+    def traverse_type(ast: Ast.TypeAst | Ast.GenericIdentifierAst, s: ScopeHandler) -> Generator[tuple[Ast.IdentifierAst, int], None, None]:
+        def inner(ast, s, level) -> Generator[tuple[Ast.IdentifierAst, int], None, None]:
+            match ast:
+                case Ast.GenericIdentifierAst():
+                    yield ast.identifier, level
+                    for t in ast.generic_arguments:
+                        yield from inner(t, s, level + 1)
+                case Ast.TypeSingleAst():
+                    yield ast.parts[-1].identifier, level
+                    for t in ast.parts:
+                        yield from inner(t, s, level + 1)
+                case Ast.TypeGenericArgumentAst():
+                    yield from inner(ast.value, s, level + 1)
+                case Ast.TypeTupleAst():
+                    for t in ast.types:
+                        yield from inner(t, s, level + 1)
+                case Ast.SelfTypeAst():
+                    sym = s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol)
+                    yield sym.type.parts[-1].identifier, level
+                case _:
+                    print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
+                    raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{type(ast).__name__}' not yet supported for traversal. Report as bug.")
+        yield from inner(ast, s, 0)
 
 
     @staticmethod
@@ -339,3 +343,90 @@ class TypeInfer:
         if sym_ty == SymbolTypes.VariableSymbol:
             return s.current_scope.get_symbol(ast, SymbolTypes.VariableSymbol, error=False).type
         return s.current_scope.get_symbol(ast, SymbolTypes.TypeSymbol).type
+
+    @staticmethod
+    def types_equal_account_for_generic(a1, a2, t1: Ast.TypeAst, t2: Ast.TypeAst, generic_map: dict[Ast.IdentifierAst, Ast.TypeAst], s: ScopeHandler) -> bool:
+        t1, t2=  t2, t1
+        if isinstance(t1, Ast.TypeSingleAst) and isinstance(t2, Ast.TypeSingleAst):
+            # - Traverse each part of each type (dot separated)
+            # - Traverse each inner part of the part (generic arguments etc)
+            # - Generic handling
+            #   - If the part is a generic, and in the generic map. If it is, check if the type is the same.
+            #   - If the part is a generic, and not in the generic map, add it to the generic map, with the corresponding type.
+            #   - Skip the RHS type's corresponding part (type argument).
+            # - Non generic handling
+            #   - If the part is not a generic, check if the part is the same.
+            #   - If the part is not the same, return False.
+
+            for p1, p2 in zip(t1.parts, t2.parts):
+                for q1, q2 in zip(TypeInfer.traverse_type(p1, s), TypeInfer.traverse_type(p2, s)):
+                    q1, l1 = q1
+                    q2, l2 = q2
+
+                    # Non-Generic
+                    # If the LHS is not a generic type parameter, then the LHS requires a direct match to the RHS. For
+                    # example, 'Str' must match 'Str'. The parameter and arguments are direct type matches.
+                    # TODO : allow for subtyping here.
+                    if q1 not in generic_map and q1 != q2:
+                        return False
+
+                    # Bound Generic
+                    # If the LHS is in the generic map, but the RHS type argument is not the correct (ie it is already
+                    # known that 'T' is 'Str', but 'T' is being bound to 'Int'), then instead of returning False, throw
+                    # an error, because this is a more specific error / specialised case.
+                    # TODO : the ast being errored on isn't quite correct: highlight the correct generic argument
+                    if q1 in generic_map and generic_map[q1] and q2 != generic_map[q1] and q2 not in generic_map:
+                        ty = a1.value.lhs.parts[-1]
+                        sym = s.current_scope.get_symbol(ty, SymbolTypes.TypeSymbol)
+                        gs = sym.type.generic_parameters
+                        gi = gs.index(Ast.TypeGenericParameterAst(Ast.IdentifierAst(q1, -1), [], None, False, -1))
+                        ge = a1.value.lhs.parts[-1].generic_arguments[gi]
+                        raise SystemExit(ErrFmt.err(ge._tok) + f"Generic type '{q1}' is already bound to '{generic_map[q1]}', but is being re-bound to '{q2}'.")
+
+                    if q1 in generic_map and generic_map[q1] and q2 != generic_map[q1] and q2 in generic_map:
+                        TypeInfer.substitute_generic_type(t2, q1, q2)
+
+                    # Unbound Generic
+                    # If the LHS is an "unbound" generic, ie it's the first occurrence of an inferrable generic, then
+                    # add it to the generic map, and bind it to the RHS type argument. Then skip the rest of q2 because
+                    # it is the RHS type argument -- this is the same as jumping q2 to its sibling node rather than its
+                    # first child node.
+                    elif q1 in generic_map:
+                        generic_map[q1] = q2
+                        # skip the q2 to sibling node. because Vec[T, Str] compared to Vec[Opt[Num], Str]. clearly the
+                        # 2nd one is Vec[Opt[Num], Str] required an extra skip over Num, so that T matches Opt[Num].
+                        # this is the same as jumping q2 to its sibling node rather than its first child node.
+                        lx = -1
+                        while True:
+                            if lx == l2:
+                                break
+                            q2, lx = next(TypeInfer.traverse_type(p2, s))
+
+                        # next, perform a substitution on the RHS type argument, so that all occurrences of the generic
+                        # type parameter (LHS) are replaced with the RHS type argument.
+                        TypeInfer.substitute_generic_type(t2, q1, q2)
+
+        elif isinstance(t1, Ast.TypeTupleAst) and isinstance(t2, Ast.TypeTupleAst):
+            return all([TypeInfer.types_equal_account_for_generic(a1, a2, t1, t2, generic_map, s) for t1, t2 in zip(t1.types, t2.types)])
+
+        else:
+            raise SystemExit(ErrFmt.err(t1._tok) + f"Unknown type '{t1}' being inferred. Report as bug.")
+
+        return True
+
+    @staticmethod
+    def substitute_generic_type(ty: Ast.TypeAst, q1: str, q2: str):
+        if isinstance(ty, Ast.TypeSingleAst):
+            for i, p in enumerate(ty.parts):
+                if p.identifier == q1:
+                    ty.parts[i] = Ast.IdentifierAst(q2, ty._tok).to_generic_identifier()
+                else:
+                    TypeInfer.substitute_generic_type(p, q1, q2)
+                for j, q in enumerate(p.generic_arguments):
+                    if q.identifier == q1:
+                        ty.parts[i].generic_arguments[j] = Ast.IdentifierAst(q2, ty._tok).to_generic_identifier()
+                    else:
+                        TypeInfer.substitute_generic_type(q, q1, q2)
+        elif isinstance(ty, Ast.TypeTupleAst):
+            for i, p in enumerate(ty.types):
+                TypeInfer.substitute_generic_type(p, q1, q2)

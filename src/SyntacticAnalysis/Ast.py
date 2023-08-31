@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import hashlib
 from typing import Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from src.LexicalAnalysis.Tokens import Token, TokenType
+
+# TODO : Default ._tok to -1
+# TODO : Rename ._tok to .pos
 
 
 @dataclass
@@ -387,6 +390,9 @@ class TypeGenericParameterAst:
     def __hash__(self):
         return hash(self.identifier)
 
+    def __eq__(self, other):
+        return isinstance(other, TypeGenericParameterAst) and self.identifier == other.identifier and self.constraints == other.constraints and self.is_variadic == other.is_variadic
+
 def TypeGenericParameterRequiredAst(identifier: IdentifierAst, constraints: list[TypeAst], _tok: int):
     return TypeGenericParameterAst(identifier, constraints, None, False, _tok)
 
@@ -426,14 +432,6 @@ class TypeSingleAst:
 
     def __eq__(self, other):
         return isinstance(other, TypeSingleAst) and self.parts == other.parts
-
-    def loose_eq(self, other):
-        # Match on identifiers, but not generic arguments
-        if not isinstance(other, TypeSingleAst): return False
-        for this_p, that_p in zip(self.parts, other.parts):
-            if type(this_p) != type(that_p): return False
-            if isinstance(this_p, GenericIdentifierAst) and this_p.identifier != that_p.identifier: return False
-        return True
 
     def __hash__(self):
         return hash(tuple(self.parts))
@@ -621,6 +619,7 @@ class PostfixFunctionCallAst:
     type_arguments: list[TypeGenericArgumentAst]
     arguments: list[FunctionArgumentAst]
     _tok: int
+    generic_map: dict[IdentifierAst, TypeAst] = field(default_factory=dict)
 
     def __str__(self):
         s = "[" + ", ".join([str(arg) for arg in self.type_arguments]) + "]" if self.type_arguments else ""
@@ -645,6 +644,7 @@ class PostfixMemberAccessAst:
 class PostfixStructInitializerAst:
     fields: list[PostfixStructInitializerFieldAst]
     _tok: int
+    generic_map: dict[IdentifierAst, TypeAst] = field(default_factory=dict)
 
     def __str__(self):
         s = "{" + ", ".join([str(field) for field in self.fields]) + "}"

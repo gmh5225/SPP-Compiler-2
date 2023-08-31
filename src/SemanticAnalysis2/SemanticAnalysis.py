@@ -577,6 +577,9 @@ class SemanticAnalysis:
         if len(given_generics) > len(actual_generics):
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Too many generic parameters given for type '{cls_ty}': '{', '.join(str(g) for g in generics_difference)}'.")
 
+        # After verifying all the generics are given correctly, their types need to be registered in the generic map, so
+        # type checking can happen correctly. todo
+
         # Check that each variable being passed into the initializer is valid, ie hasn't been moved already.
         given_fields = [f.identifier.identifier for f in ast.op.fields if isinstance(f.identifier, Ast.IdentifierAst)]
         for given_field in ast.op.fields:
@@ -632,10 +635,19 @@ class SemanticAnalysis:
         # same time, so their order has to be the same.
         for given, actual in zip(sorted(given_fields), sorted(actual_fields)):
             given_ty = TypeInfer.infer_expression(ast.op.fields[given_fields.index(given)].value or ast.op.fields[given_fields.index(given)].identifier, s)
-            actual_ty = cls_definition_scope.get_symbol(Ast.IdentifierAst(identifier=actual, _tok=-1), SymbolTypes.VariableSymbol).type
+            actual_ty = cls_definition_scope.get_symbol(Ast.IdentifierAst(actual, -1), SymbolTypes.VariableSymbol).type
 
-            if given_ty != actual_ty:
-                err_pos = (ast.op.fields[given_fields.index(given)].value or ast.op.fields[given_fields.index(given)].identifier)._tok
+            # Generics
+            # -> TODO : shift this to type comparison where-ever that is?
+            # -> TODO : also traverse the type tree and replace generic parameters with their actual types
+            acc_sym = cls_definition_scope.get_symbol(actual_ty.parts[-1], SymbolTypes.TypeSymbol)
+            if type(acc_sym.type) == Ast.TypeSingleAst:
+                id = actual_ty.parts[-1].identifier
+                ast.op.generic_map[id] = given_ty
+                given_ty = acc_sym.type # TODO : don't just replace the type, but replace its generic arguments recursively
+
+            if not TypeInfer.types_equal_account_for_generic(ast.op.fields[sorted(given_fields).index(given)], actual, given_ty, actual_ty, ast.op.generic_map, s):
+                err_pos = (ast.op.fields[given_fields.index(given)].identifier or ast.op.fields[given_fields.index(given)].value)._tok
                 raise SystemExit(ErrFmt.err(err_pos) + f"Field '{given}' given to struct initializer is type '{given_ty}', but should be '{actual_ty}'.")
 
     @staticmethod
