@@ -8,6 +8,7 @@ from src.LexicalAnalysis.Tokens import Token, TokenType
 
 # TODO : Default ._tok to -1
 # TODO : Rename ._tok to .pos
+# TODO : Add a parent access?
 
 
 @dataclass
@@ -633,6 +634,7 @@ class PostfixFunctionCallAst:
 class PostfixMemberAccessAst:
     identifier: IdentifierAst | int
     _tok: int
+    generic_map: dict[IdentifierAst, TypeAst] = field(default_factory=dict)
 
     def __str__(self):
         return "." + str(self.identifier)

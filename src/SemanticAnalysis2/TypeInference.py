@@ -95,6 +95,13 @@ class TypeInfer:
 
         if isinstance(ast, Ast.IdentifierAst):
             ty = TypeInfer.infer_identifier(ast, s)
+        elif isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.lhs, Ast.TypeSingleAst):
+            sym = s.current_scope.get_symbol(ast.lhs.parts[-1], SymbolTypes.TypeSymbol)
+            generic_parameters = sym.type.generic_parameters
+            generic_arguments  = ast.lhs.parts[-1].generic_arguments
+            for g, a in zip(generic_parameters, generic_arguments):
+                ast.op.generic_map[g.identifier.identifier] = a.value
+
         ty = TypeInfer.infer_type(ty, s)
         cls = s.global_scope.get_child_scope(ty)
 
@@ -102,9 +109,10 @@ class TypeInfer:
             sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False)
             if isinstance(sym, SymbolTypes.VariableSymbol):
                 return sym.type
-            return sym#, [s.type for s in sym]
+            return sym
         else:
             ty = TypeInfer.infer_expression(ast.lhs, s)
+            sym = s.current_scope.get_symbol(ast.lhs.parts[-1], SymbolTypes.TypeSymbol)
             return ty.parts[-1].generic_arguments[int(ast.op.identifier.integer)]
 
     @staticmethod
@@ -188,6 +196,14 @@ class TypeInfer:
             # for t in TypeInfer.traverse_type(return_type, scope):
             #     sym = s.get_symbol(Ast.IdentifierAst(t, -1), SymbolTypes.TypeSymbol)
             #     print(sym)
+
+            # Add the generic map from any previous member accesses into this one too.
+            l = ast.lhs
+            while type(l) == Ast.PostfixExpressionAst and type(l.op) == Ast.PostfixMemberAccessAst:
+                for g, h in l.op.generic_map.items():
+                    if h:
+                        ast.op.generic_map[g] = h
+                l = l.lhs
 
             return_type = copy.deepcopy(fn_type.return_type)
             for g, h in ast.op.generic_map.items():
