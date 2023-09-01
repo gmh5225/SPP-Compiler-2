@@ -10,14 +10,12 @@
 cls Alloc[T] {
     use Item = T
 
-    @static @virtual
-    fn alloc(size: Num) -> Ret[Arr[T], AllocErr] { ... }
+    @static fn alloc(size: Num) -> Ret[Arr[T], AllocErr] { ... }
+    @static fn realloc(arr: Arr[T], size: Num) -> Ret[Arr[T], AllocErr] { ... }
+    @static fn dealloc(arr: Arr[T]) -> Ret[Void, AllocErr] { ... }
     
-    @static @virtual
-    fn realloc(arr: Arr[T], size: Num) -> Ret[Arr[T], AllocErr] { ... }
-    
-    @static @virtual
-    fn dealloc(arr: Arr[T]) -> Ret[Void, AllocErr] { ... }
+    @static fn alloc_zero(size: Num) -> Ret[Arr[T], AllocErr] { ... }
+    ...
 }
 ```
 - Allocators aren't initialized for use, rather their methods are called statically.

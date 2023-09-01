@@ -5,3 +5,7 @@
 
 ## Static type system
 - All types must be known at compile time.
+
+## Case
+- All types must begin with an upper-case character.
+- This allows the parser to easily tell the difference between a type and a variable.
