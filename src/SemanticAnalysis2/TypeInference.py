@@ -143,10 +143,31 @@ class TypeInfer:
         if not s: # todo -> this error should be picked up in SemanticAnalysis?
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Unknown method '{ast.lhs}(...)'.")
 
+        l = ast.lhs
+        default_generic_map = {}
+        while type(l) == Ast.PostfixExpressionAst and type(l.op) == Ast.PostfixMemberAccessAst:
+            for g, h in l.op.generic_map.items():
+                if h:
+                    default_generic_map[g] = h
+            l = l.lhs
+        if type(l) == Ast.IdentifierAst:
+            ty = TypeInfer.infer_identifier(l, scope)
+            sym = s.get_symbol(ty.parts[-1], SymbolTypes.TypeSymbol)
+            if isinstance(sym.type, Ast.ClassPrototypeAst):
+                generic_parameters = sym.type.generic_parameters
+                generic_arguments  = ty.parts[-1].generic_arguments
+                default_generic_map = {gp.identifier.identifier: ga.value for gp, ga in zip(generic_parameters, generic_arguments)}
+            else:
+                default_generic_map = {}  # todo: ?
+
         # Analyse each overload for a potential match
         overloads = [x for x in s.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
         for i, fn_type in enumerate([f.meta_data["fn_proto"] for f in overloads]):
-            ast.op.generic_map = {}
+            # Load the generic map
+            ast.op.generic_map = default_generic_map
+            gs = fn_type.generic_parameters
+            for g in gs:
+                ast.op.generic_map[g.identifier.identifier] = None
 
             param_names = [param.identifier.identifier for param in fn_type.parameters]
             param_tys = [param.type_annotation for param in fn_type.parameters]
@@ -155,7 +176,6 @@ class TypeInfer:
             str_fn_type = str(fn_type)
             str_fn_type = str_fn_type[str_fn_type.index("("):].strip()
             sigs.append(str_fn_type)
-
 
             # Skip first argument type for non-static functions
             if overloads[i].meta_data.get("is_method", False) and not overloads[i].meta_data.get("is_static", False):
@@ -167,17 +187,19 @@ class TypeInfer:
                 errs.append(f"Expected {len(param_tys)} arguments, but got {len(arg_tys)}.")
                 continue
 
-            # Load the generic map
-            gs = fn_type.generic_parameters
-            for g in gs:
-                ast.op.generic_map[g.identifier.identifier] = None
-
             # Check if the function is callable with the given argument types.
-            if (check := enumerable_any([not TypeInfer.types_equal_account_for_generic(
-                    ast.op.arguments[arg_tys.index(arg_ty)],
-                    fn_type.parameters[param_tys.index(param_ty)],
-                    arg_ty, param_ty, ast.op.generic_map, scope) for arg_ty, param_ty in zip(arg_tys, param_tys)])) and check[1]:
 
+            # substituted_param_tys = [copy.deepcopy(param_ty) for param_ty in param_tys]
+            # for g, h in ast.op.generic_map.items():
+            #     for param_ty in substituted_param_tys:
+            #         TypeInfer.substitute_generic_type(param_ty, g, h.parts[-1].identifier)
+            # param_tys = substituted_param_tys
+            check = enumerable_any([not TypeInfer.types_equal_account_for_generic(
+                ast.op.arguments[arg_tys.index(arg_ty)],
+                fn_type.parameters[param_tys.index(param_ty)],
+                arg_ty, param_ty, ast.op.generic_map, scope) for arg_ty, param_ty in zip(arg_tys, param_tys)])
+
+            if check[1]:
                 mismatch_index = check[0]
                 errs.append(f"Expected argument {mismatch_index + 1} to be of type '{param_tys[mismatch_index]}', but got '{arg_tys[mismatch_index]}'.")
                 continue
@@ -198,13 +220,6 @@ class TypeInfer:
             #     print(sym)
 
             # Add the generic map from any previous member accesses into this one too.
-            l = ast.lhs
-            while type(l) == Ast.PostfixExpressionAst and type(l.op) == Ast.PostfixMemberAccessAst:
-                for g, h in l.op.generic_map.items():
-                    if h:
-                        ast.op.generic_map[g] = h
-                l = l.lhs
-
             return_type = copy.deepcopy(fn_type.return_type)
             for g, h in ast.op.generic_map.items():
                 TypeInfer.substitute_generic_type(return_type, g, h.parts[-1].identifier)
@@ -416,15 +431,18 @@ class TypeInfer:
                     # known that 'T' is 'Str', but 'T' is being bound to 'Int'), then instead of returning False, throw
                     # an error, because this is a more specific error / specialised case.
                     # TODO : the ast being errored on isn't quite correct: highlight the correct generic argument
-                    if q1 in generic_map and generic_map[q1] and q2 != generic_map[q1].parts[-1].identifier and q2 not in generic_map:
-                        ty = a1.value.lhs.parts[-1]
-                        sym = s.current_scope.get_symbol(ty, SymbolTypes.TypeSymbol)
+                    elif q1 in generic_map and generic_map[q1] and q2 != generic_map[q1].parts[-1].identifier and q2 not in generic_map:
+                        ty = TypeInfer.infer_expression(a1.value, s)  #a1.value.lhs.parts[-1]
+                        sym = s.current_scope.get_symbol(ty.parts[-1], SymbolTypes.TypeSymbol)
                         gs = sym.type.generic_parameters
-                        gi = gs.index(Ast.TypeGenericParameterAst(Ast.IdentifierAst(q1, -1), [], None, False, -1))
-                        ge = a1.value.lhs.parts[-1].generic_arguments[gi]
-                        raise SystemExit(ErrFmt.err(ge._tok) + f"Generic type '{q1}' is already bound to '{generic_map[q1]}', but is being re-bound to '{q2}'.")
+                        if gs:
+                            gi = gs.index(Ast.TypeGenericParameterAst(Ast.IdentifierAst(q1, -1), [], None, False, -1))
+                            ge = a1.value.lhs.parts[-1].generic_arguments[gi]
+                            raise SystemExit(ErrFmt.err(ge._tok) + f"Generic type '{q1}' is already bound to '{generic_map[q1]}', but is being re-bound to '{q2}'.")
+                        else:
+                            raise SystemExit(ErrFmt.err(a1._tok) + f"Generic type '{q1}' is already bound to '{generic_map[q1]}', but is being re-bound to '{q2}'.")
 
-                    if q1 in generic_map and generic_map[q1] and q2 != generic_map[q1].parts[-1].identifier and q2 in generic_map:
+                    elif q1 in generic_map and generic_map[q1] and q2 != generic_map[q1].parts[-1].identifier and q2 in generic_map:
                         TypeInfer.substitute_generic_type(t2, q1, q2)
 
                     # Unbound Generic
