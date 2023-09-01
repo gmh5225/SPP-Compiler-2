@@ -54,7 +54,6 @@ cls Add[Rhs, Output=Self] {
     use Rhs as Rhs
     use Output as Output
 
-    @abstract
     fn add(self: &Self, other: T) -> Output { ... }
 }
 

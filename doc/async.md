@@ -24,3 +24,17 @@
 - This means that yielding references out of a function is safe, and doesn't violate second-class reference rules.
 - The return type will remain just be the type the reference corresponds to, so `yield &5` would `yield` a `Num` object.
 - All yield statements must use the same convention (`&`, `&mut`, or no convention ie move).
+
+## `Async`
+- The `Async` type is a special type that is super-imposed onto `Gen[T]` and `Fut[T]`.
+- It has a `yield` function that can be used to yield values.
+
+```s++
+cls Async[Yield, Return, Send] {}
+
+sup[Yield, Return, Send] Async[Yield, Return, Send] {
+    fn yield(value: Yield) -> Void {}
+    fn return(value: Return) -> Void {}
+    fn send(value: Send) -> Void {}
+}
+```
