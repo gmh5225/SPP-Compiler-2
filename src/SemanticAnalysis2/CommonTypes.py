@@ -1,3 +1,10 @@
+"""
+Common types are used by the compiler for either literals getting their correct type, or for checking an expression
+evaluates to a certain type. For example, the "Void" type is used for checking that a function doesn't return a value,
+and while/if-pattern condition expressions must evaluate to a boolean.
+"""
+
+
 from src.SyntacticAnalysis import Ast
 
 

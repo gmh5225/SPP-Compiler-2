@@ -14,10 +14,15 @@ class Compiler:
     _ast: ProgramAst
 
     def __init__(self, code: str):
+        # Load the code into the Compiler class.
         self._code = code
+
+        # Lex the code into a stream of tokens.
         self._tokens = Lexer(code).lex()
-        self._parser = Parser(self._tokens)
-        self._ast = self._parser.parse()
+
+        # Parse the tokens into an AST.
+        self._ast = Parser(self._tokens).parse()
+
         d = dataclasses.asdict(self._ast)
         save_json(d, "_out/ast.json")
 

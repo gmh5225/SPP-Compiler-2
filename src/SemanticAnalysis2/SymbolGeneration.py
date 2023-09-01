@@ -52,14 +52,6 @@ class SymbolGeneration:
 
     @staticmethod
     def generate_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler):
-        # if s.current_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
-        #     sym = s.current_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol)
-        # else:
-        #     sym = SymbolTypes.VariableSymbol(ast.identifier, Ast.TypeSingleAst([Ast.GenericIdentifierAst("FnRef", [ast.return_type] + [p.type_annotation for p in ast.parameters], ast.identifier._tok)], ast._tok))
-        #     sym.meta_data["fn_proto"] = ast
-        #     sym.meta_data["is_method"] = is_method
-        #     s.current_scope.add_symbol(sym)
-
         sym = SymbolTypes.VariableSymbol(ast.identifier, Ast.TypeSingleAst([Ast.GenericIdentifierAst("FnRef", [ast.return_type] + [p.type_annotation for p in ast.parameters], ast.identifier._tok)], ast._tok))
         sym.meta_data["fn_proto"] = ast
         sym.meta_data["is_method"] = getattr(ast, "is_method", False)

@@ -1924,7 +1924,7 @@ class Parser:
                 exp_token = token.value if not token.name.startswith("Lx") else token.name[2:]
 
                 error = ParseSyntaxError(
-                    f"{self._current} Expected one of ¬, got: '{got_token}'")
+                    f"{self._current} Expected one of ¬, got: '{got_token}'.")
 
                 global CUR_ERR_IND
                 if CUR_ERR_IND == self._current:

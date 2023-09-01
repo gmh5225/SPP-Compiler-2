@@ -1,14 +1,15 @@
 from dataclasses import dataclass
 from enum import Enum
 
+
 class TokenType(Enum):
-    # Used for logical operations (AND, OR, NOT)
+    # Logical operations (AND, OR, NOT)
     TkDoubleAmpersand = "&&"
     TkDoubleAmpersandEquals = "&&="
     TkDoublePipe = "||"
     TkDoublePipeEquals = "||="
 
-    # Used for bitwise operations (AND, OR, XOR, NOT, SHL, SHR, ROL, ROR)
+    # Bitwise operations (AND, OR, XOR, NOT, SHL, SHR, ROL, ROR)
     TkAmpersand = "&"# Also used for references
     TkAmpersandEquals = "&="
     TkPipe = "|"
@@ -16,6 +17,7 @@ class TokenType(Enum):
     TkCaret = "^"
     TkCaretEquals = "^="
 
+    # Comparison operations (EQ, NE, LE, GE, LT, GT, CMP)
     TkEq = "=="
     TkNe = "!="
     TkLe = "<="
@@ -24,6 +26,7 @@ class TokenType(Enum):
     TkGt = ">"
     TkSs = "<=>"
 
+    # Arithmetic operations (ADD, SUB, MUL, DIV, REM)
     TkAdd = "+"
     TkSub = "-"
     TkMul = "*"
@@ -35,6 +38,7 @@ class TokenType(Enum):
     TkDivEq = "/="
     TkRemEq = "%="
 
+    # Brackets (PAREN, BRACK, BRACE)
     TkParenL = "("
     TkParenR = ")"
     TkBrackL = "["
@@ -42,6 +46,7 @@ class TokenType(Enum):
     TkBraceL = "{"
     TkBraceR = "}"
 
+    # Other symbols
     TkQst = "?"
     TkTripleDot = "..."
     TkColon = ":"
@@ -57,6 +62,7 @@ class TokenType(Enum):
     TkWhitespace = " "
     TkNewLine = "\n"
 
+    # Keywords
     KwMod = "mod"
     KwUse = "use"
     KwEnum = "enum"

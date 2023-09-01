@@ -1,3 +1,35 @@
+"""
+The AstReduction module is responsible to manipulating the AST before Syntactic Analysis is performed. There are a few
+key operations that take place in this module:
+
+1. Function overload merging:
+Generate a class per unique function name, and then super-impose Fn[...] per overload of that function. A single
+immutable variable is then generated from this class. For example:
+
+    fn a(x: Num) -> Num { ... }
+    fn a(x: Str) -> Str { ... }
+
+becomes:
+    cls __MOCK_a {}
+    sup Fn[Num, Num] for __MOCK_a {
+      fn call_ref(x: Num) -> Num { ... }
+    }
+    sup Fn[Str, Str] for __MOCK_a {
+      fn call_ref(x: Str) -> Str { ... }
+    }
+    let a = __MOCK_a {}
+
+Because `a` is immutable, the function can't be re-assigned to at runtime, so the compiler can safely assume that the
+function will always be the same, and therefore the same class can be used for all instances of `a`. Also, `__MOCK_a` is
+prefixed by a double underscore, meaning that as a type, it is inaccessible to the user, and therefore can't be used
+directly. It can be overriden by an identifier, but again this doesn't matter, as `a` is already instantiated and
+`__MOCK_a` will never have to be instantiated again.
+
+This decision was made, because a class can be made callable with multiple overloads anyway. If the decision of treating
+"fn" functions differently was made, then there would be 2 ways to do the same thing, so the Fn[...] super-imposition
+decision was made to force only 1 way of functions being callable.
+"""
+
 from src.SyntacticAnalysis import Ast
 from functools import cmp_to_key
 
@@ -36,28 +68,6 @@ class AstReduction:
 
     @staticmethod
     def reduce_function_prototype(owner: Ast.ModulePrototypeAst | Ast.SupPrototypeAst, ast: Ast.FunctionPrototypeAst):
-        """
-        Typical reduction looks like:
-
-        fn a(x: Num) -> Num { ... }
-        fn a(x: Str) -> Str { ... }
-
-        =>
-
-        cls FnRef[R, ...Ts] {
-          fn call_ref(...xs: Ts) { ... }
-        }
-
-        cls __MOCK_a {}
-        sup FnRef[Num, Num] for __MOCK_a {
-          fn call_ref(x: Num) -> Num { ... }
-        }
-        sup FnRef[Str, Str] for __MOCK_a {
-          fn call_ref(x: Str) -> Str { ... }
-        }
-        let a = __MOCK_a {}
-        """
-
         i = owner.body.members.index(ast)
 
         # Recursion break case
@@ -92,6 +102,5 @@ class AstReduction:
     @staticmethod
     def reduce_sup_prototype(owner: Ast.ModulePrototypeAst, ast: Ast.SupPrototypeAst):
         for member in [m for m in ast.body.members if isinstance(m, Ast.FunctionPrototypeAst)]:
-            # print(f"reducing sup-method {ast.identifier}::{member.identifier}")
             AstReduction.reduce_function_prototype(ast, member)
         ast.body.members.sort(key=cmp_to_key(AstReduction.sort_members))
