@@ -54,7 +54,7 @@ class TypeInfer:
     def infer_statement(ast: Ast.StatementAst, s: ScopeHandler) -> Ast.TypeAst:
         match ast:
             case Ast.TypedefStatementAst(): return CommonTypes.void()
-            case Ast.ReturnStatementAst(): return TypeInfer.infer_expression(ast.value, s)
+            case Ast.ReturnStatementAst(): return TypeInfer.infer_expression(ast.value, s) if ast.value else CommonTypes.void()
             case Ast.LetStatementAst(): return CommonTypes.void()
             case Ast.FunctionPrototypeAst(): return CommonTypes.void()
 

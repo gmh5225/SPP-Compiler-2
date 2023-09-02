@@ -142,7 +142,7 @@ class SemanticAnalysis:
             raise SystemExit(
                 "Mismatch between function return type and function's final statement:" +
                 ErrFmt.err(ast.return_type._tok) + f"Function return type is '{ast.return_type}'.\n..." +
-                ErrFmt.err(err_ast.value._tok) + f"Final statement returns type '{t}'.")
+                ErrFmt.err(err_ast._tok) + f"Final statement returns type '{t}'.")
 
         s.prev_scope()
 
