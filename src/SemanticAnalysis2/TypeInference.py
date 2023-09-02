@@ -264,6 +264,8 @@ class TypeInfer:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Too many generic arguments given to type '{sym.type}'.")
         # if len(given_generic_arguments) < len(missing_generics := TypeInfer.required_generic_parameters_for_cls(sym.type, s)):
         #     raise SystemExit(ErrFmt.err(ast._tok) + f"Not enough generic arguments given to type '{sym.type}'. Missing {missing_generics}.")
+        for g in given_generic_arguments:
+            TypeInfer.check_type(g, s)
 
         return TypeInfer.likely_symbols(ast, SymbolTypes.TypeSymbol, "type", s)
 

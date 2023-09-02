@@ -17,6 +17,11 @@ class ProgramAst:
     eof: TokenAst
     _tok: int
 
+    def __str__(self):
+        s = str(self.module)
+        s += "### END OF FILE ###"
+        return s
+
 @dataclass
 class TokenAst:
     tok: Token
@@ -148,12 +153,23 @@ class ModuleImplementationAst:
     members: list[ModuleMemberAst]
     _tok: int
 
+    def __str__(self):
+        s = str(self.import_block) + "\n" if self.import_block else ""
+        s += "\n".join([str(member) for member in self.members])
+        return s
+
 @dataclass
 class ModulePrototypeAst:
     decorators: list[DecoratorAst]
     identifier: ModuleIdentifierAst
     body: ModuleImplementationAst
     _tok: int
+
+    def __str__(self):
+        s = "\n".join([str(dec) for dec in self.decorators]) + "\n" if self.decorators else ""
+        s += "mod " + str(self.identifier) + "\n"
+        s += str(self.body)
+        return s
 
 @dataclass
 class ClassAttributeAst:
@@ -162,10 +178,19 @@ class ClassAttributeAst:
     type_annotation: TypeAst
     _tok: int
 
+    def __str__(self):
+        s = "\n".join([str(dec) for dec in self.decorators]) + "\n" if self.decorators else ""
+        s += str(self.identifier) + ": "
+        s += str(self.type_annotation)
+        return s
+
 @dataclass
 class ClassImplementationAst:
     members: list[ClassAttributeAst]
     _tok: int
+
+    def __str__(self):
+        return "\n".join([str(member) for member in self.members])
 
 @dataclass
 class ClassPrototypeAst:
@@ -180,7 +205,13 @@ class ClassPrototypeAst:
         return hash(self.identifier)
 
     def __str__(self):
-        return self.identifier.identifier + ("[" + ", ".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "")
+        s = "\n".join([str(dec) for dec in self.decorators]) + "\n" if self.decorators else ""
+        s += "cls " + self.identifier.identifier
+        s += ("[" + ", ".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "")
+        s += str(self.where_block) + "\n" if self.where_block else ""
+        s += "{" + str(self.body) + "}\n"
+
+        return s
 
     def to_type(self) -> TypeAst:
         return TypeSingleAst([GenericIdentifierAst(self.identifier.identifier, [], self.identifier._tok)], self._tok)
@@ -233,8 +264,12 @@ class FunctionParameterAst:
     _tok: int
 
     def __str__(self):
-        return ("mut" if self.is_mutable else "")\
-            + str(self.identifier) + ": " + (str(self.calling_convention) if self.calling_convention else "") + str(self.type_annotation)
+        s = "mut " if self.is_mutable else ""
+        s += str(self.identifier) + ": "
+        s += str(self.calling_convention) if self.calling_convention else ""
+        s += str(self.type_annotation)
+        s += (" = " + str(self.default_value)) if self.default_value else ""
+        return s
 
 def FunctionParameterRequiredAst(is_mutable: bool, identifier: IdentifierAst, calling_convention: Optional[TokenAst], type_annotation: TypeAst, _tok: int):
     return FunctionParameterAst(is_mutable, identifier, calling_convention, type_annotation, None, False, _tok)
@@ -591,6 +626,9 @@ class SupImplementationAst:
     members: list[SupMemberAst]
     _tok: int
 
+    def __str__(self):
+        return "\n".join([str(member) for member in self.members])
+
 @dataclass
 class SupPrototypeNormalAst:
     generic_parameters: list[TypeGenericParameterAst]
@@ -600,12 +638,26 @@ class SupPrototypeNormalAst:
     _tok: int
 
     def __str__(self):
-        return str(self.identifier)
+        s = "sup "
+        s += ("[" + ", ".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "")
+        s += str(self.identifier)
+        s += str(self.where_block) + "\n" if self.where_block else ""
+        s += "{" + str(self.body) + "}\n"
+        return s
 
 @dataclass
 class SupPrototypeInheritanceAst(SupPrototypeNormalAst):
     super_class: TypeAst
     _tok: int
+
+    def __str__(self):
+        s = "sup "
+        s += ("[" + ", ".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "")
+        s += str(self.super_class) + " for "
+        s += str(self.identifier)
+        s += str(self.where_block) + "\n" if self.where_block else ""
+        s += "{\n" + str(self.body) + "\n}\n"
+        return s
 
 @dataclass
 class SupMethodPrototypeAst(FunctionPrototypeAst):

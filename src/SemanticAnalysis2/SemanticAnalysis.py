@@ -104,14 +104,14 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler):
-        special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
-        function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.VariableSymbol) if not special else None
+        # special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
+        function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.VariableSymbol)  # if not special else None
 
         s.next_scope()
 
         # Mark global methods as "static" ie don't have a "self" parameter
-        if not special and s.current_scope == s.global_scope:
-            function_symbol.static = True
+        # if not special and s.current_scope == s.global_scope:
+        #     function_symbol.static = True
 
 
         # Analyse all the decorators and parameters, and the return type
@@ -148,12 +148,12 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_parameter(ast: Ast.FunctionParameterAst, s: ScopeHandler):
+        TypeInfer.check_type(ast.type_annotation, s)
+
         # Analyse the parameter type, and Add the parameter to the current scope.
         ast.type_annotation = TypeInfer.infer_type(ast.type_annotation, s)
         ty = ast.type_annotation if not isinstance(ast.type_annotation.parts[0], Ast.SelfTypeAst) else Ast.IdentifierAst("Self", ast.type_annotation._tok)
         s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.identifier, ty, is_mutable=ast.is_mutable, is_initialized=True))
-
-        TypeInfer.check_type(ast.type_annotation, s)
 
         # Analyse the default value
         if ast.default_value:

@@ -14,6 +14,9 @@ class SymbolGeneration:
     def generate(ast: Ast.ProgramAst) -> ScopeHandler:
         s = ScopeHandler()
         AstReduction.reduce(ast)
+
+        # print(ast)
+
         from src.Compiler.Printer import save_json
         save_json(dataclasses.asdict(ast), "_out/reduced-ast.json")
 

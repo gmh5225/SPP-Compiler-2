@@ -82,7 +82,7 @@ class AstReduction:
         if AstReduction.merge_names(owner.identifier, ast.identifier.identifier) not in AstReduction.REDUCED_FUNCTIONS.keys():
             cls_ast = Ast.ClassPrototypeAst(ast.decorators, "__MOCK_" + ast.identifier, [], None, Ast.ClassImplementationAst([], -1), -1)
             AstReduction.REDUCED_FUNCTIONS[AstReduction.merge_names(owner.identifier, ast.identifier.identifier)] = cls_ast
-            owner.body.members.insert(0, cls_ast)
+            owner.body.members.insert(i, cls_ast)
             f = True
 
         ty = AstReduction.REDUCED_FUNCTIONS[AstReduction.merge_names(owner.identifier, ast.identifier.identifier)]
@@ -90,7 +90,7 @@ class AstReduction:
 
         new_fun = Ast.SupMethodPrototypeAst([], ast.is_coro, Ast.IdentifierAst("call_ref", -1), ast.generic_parameters, ast.parameters, ast.return_type, None, ast.body, ast._tok)
         setattr(new_fun, "is_method", isinstance(owner, Ast.SupPrototypeAst))
-        owner.body.members.insert(i + 0, Ast.SupPrototypeInheritanceAst(ast.generic_parameters, Ast.TypeSingleAst([ast.identifier.to_generic_identifier()], ast.identifier._tok), None, Ast.SupImplementationAst([new_fun], -1), -1, Ast.TypeSingleAst([Ast.GenericIdentifierAst("FnRef", [ast.return_type] + [p.type_annotation for p in ast.parameters], ast.identifier._tok)], ast._tok)))
+        owner.body.members.insert(i, Ast.SupPrototypeInheritanceAst(ast.generic_parameters, Ast.TypeSingleAst([ast.identifier.to_generic_identifier()], ast.identifier._tok), None, Ast.SupImplementationAst([new_fun], -1), -1, Ast.TypeSingleAst([Ast.GenericIdentifierAst("FnRef", [ast.return_type] + [p.type_annotation for p in ast.parameters], ast.identifier._tok)], ast._tok)))
         if f:
             owner.body.members.insert(i + 1, Ast.LetStatementAst([Ast.LocalVariableAst(False, ast.identifier, -1)], Ast.PostfixExpressionAst(Ast.TypeSingleAst([("__MOCK_" + ast.identifier).to_generic_identifier()], ast.identifier._tok), Ast.PostfixStructInitializerAst([], -1), -1), ty, None, -1))
         owner.body.members.remove(ast)
