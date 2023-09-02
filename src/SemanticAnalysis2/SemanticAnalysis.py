@@ -431,9 +431,6 @@ class SemanticAnalysis:
         # TODO : partial moves not working at the moment
         # TODO : moving attributes from a borrowed context don't seem to work right now either
         # TODO : if a variable is already a borrow treat it as so
-        # TODO : slight issue with mutable borrows:
-        #  func(&mut x, &mut x.a) fails as it should
-        #  func(&mut x.a, &mut x) doesn't fail, but it should
 
         if isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.op, Ast.PostfixFunctionCallAst):
             # Save assignments for error messages later on.
