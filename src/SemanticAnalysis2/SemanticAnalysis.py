@@ -542,7 +542,7 @@ class SemanticAnalysis:
                     mut_args |= {arg.value}
 
                     # Check the outermost identifier is mutable. The mutability of a value dictates the mutability of
-                    # its fields, so only the outermost value needs to be checked. TODO : is this required?
+                    # its fields, so only the outermost value needs to be checked.
                     if isinstance(value, Ast.IdentifierAst):
                         sym = s.current_scope.get_symbol(value, SymbolTypes.VariableSymbol)
 
@@ -565,7 +565,7 @@ class SemanticAnalysis:
                                 ErrFmt.err(active_mut_borrow.calling_convention._tok) + f"Mutable borrow occurs here (borrow 1).\n..." +
                                 ErrFmt.err(arg.calling_convention._tok) + f"Immutable borrow occurs here (borrow 2).")
 
-                        ref_args |= {value}
+                        ref_args |= {arg.value}
 
                         if isinstance(value, Ast.PostfixExpressionAst):
                             value = value.lhs
