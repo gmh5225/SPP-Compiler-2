@@ -718,6 +718,9 @@ class PostfixStructInitializerFieldAst:
         s += ("=" + str(self.value)) if self.value else ""
         return s
 
+    def __hash__(self):
+        return hash(self.identifier)
+
 @dataclass
 class NumberLiteralBase10Ast:
     sign: Optional[TokenAst]

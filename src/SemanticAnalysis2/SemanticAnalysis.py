@@ -18,6 +18,8 @@ def any_elem(iterable: Iterable[T]) -> Optional[T]:
 
 
 class SemanticAnalysis:
+    ASSIGNMENTS = {}
+
     @staticmethod
     def analyse(ast: Ast.ProgramAst, s: ScopeHandler):
         SemanticAnalysis.analyse_program(ast, s)
@@ -429,82 +431,144 @@ class SemanticAnalysis:
         # TODO : partial moves not working at the moment
         # TODO : moving attributes from a borrowed context don't seem to work right now either
 
+        if isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.op, Ast.PostfixFunctionCallAst):
+            # Save assignments for error messages later on.
+            v = ast.op.arguments[1].value
+            if v in SemanticAnalysis.ASSIGNMENTS.keys():
+                SemanticAnalysis.ASSIGNMENTS[v].append(ast)
+            else:
+                SemanticAnalysis.ASSIGNMENTS[ast.op.arguments[0].value] = [ast]
+
         for i, arg in enumerate(ast.op.arguments):
+
             # Check the argument is valid.
             SemanticAnalysis.analyse_expression(arg.value, s)
 
-            # No calling convention means that a move is taking place.
-            if not arg.calling_convention:
-                # This can only happen from a non-borrowed context, so check that the argument is an attribute of a borrowed variable.
-                value = arg.value
-                if isinstance(arg.value, Ast.PostfixExpressionAst) and isinstance(arg.value.op, Ast.PostfixMemberAccessAst):
+            if isinstance(value := arg.value, Ast.IdentifierAst):
+                sym = s.current_scope.get_symbol(value, SymbolTypes.VariableSymbol)
 
-                    # For a move to be valid, no part of the attribute chain can be borrowed.
-                    while isinstance(value, Ast.PostfixExpressionAst) and isinstance(value.op, Ast.PostfixMemberAccessAst):
-                        if value in ref_args: raise SystemExit(ErrFmt.err(value._tok) + f"Cannot move value '{value}' that is already borrowed.")
-                        if value in mut_args: raise SystemExit(ErrFmt.err(value._tok) + f"Cannot move value '{value}' that is already mutably borrowed.")
-                        value = value.lhs
+                # Cannot move a value if the value isn't initialized.
+                if (ast.lhs.identifier != "__set__" or (ast.lhs.identifier == "__set__" and i > 0)) and not sym.mem_info.is_initialized:
+                    a = SemanticAnalysis.ASSIGNMENTS.get(value)
+                    moved_away = a[1] if len(a) > 1 else a[0]
+                    moved_arg = [a for a in moved_away.op.arguments if a.value == value][0]
+                    raise SystemExit(
+                        "Cannot use a value that is not initialized:\n" +
+                        ErrFmt.err(moved_arg._tok) + f"Value '{value}' moved here.\n..." +
+                        ErrFmt.err(arg.value._tok) + f"Value '{value}' is not initialized here.")
 
-                if isinstance(value, Ast.IdentifierAst):
-                    if value in ref_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move value '{value}' that is already borrowed.")
-                    if value in mut_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move value '{value}' that is already mutably borrowed.")
-
-                    sym = s.current_scope.get_symbol(value, SymbolTypes.VariableSymbol)
-
-                    if not sym.mem_info.is_initialized: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot move value '{value}' that is not initialized.")
+                if not arg.calling_convention:
                     sym.mem_info.is_initialized = False
+
+
+            # print(ast, isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.op, Ast.PostfixFunctionCallAst), ast.lhs.identifier != "__set__")
+            if not arg.calling_convention and isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.op, Ast.PostfixFunctionCallAst):
+                if ast.lhs.identifier != "__set__" or (ast.lhs.identifier == "__set__" and i > 0):
+
+            # No calling convention means that a move is taking place.
+            # if not arg.calling_convention:
+                # This can only happen from a non-borrowed context, so check that the argument is an attribute of a
+                # borrowed variable.
+                    value = arg.value
+                # if isinstance(arg.value, Ast.PostfixExpressionAst) and isinstance(arg.value.op, Ast.PostfixMemberAccessAst):
+                #
+                #     # For a move to be valid, no part of the attribute chain can be borrowed.
+                #     while isinstance(value, Ast.PostfixExpressionAst) and isinstance(value.op, Ast.PostfixMemberAccessAst):
+                #         if value in ref_args: raise SystemExit(ErrFmt.err(value._tok) + f"Cannot move value '{value}' that is already borrowed.")
+                #         if value in mut_args: raise SystemExit(ErrFmt.err(value._tok) + f"Cannot move value '{value}' that is already mutably borrowed.")
+                #         value = value.lhs
+
+                    if isinstance(value, Ast.IdentifierAst):
+                        # Cannot move a value if the value is already immutably borrowed.
+                        if value in ref_args:
+                            a = SemanticAnalysis.ASSIGNMENTS.get(value)
+                            moved_away = a[1] if len(a) > 1 else a[0]
+                            moved_arg = [a for a in moved_away.op.arguments if a.value == value][0]
+                            raise SystemExit("Cannot move a value that is already immutably borrowed:\n" +
+                                ErrFmt.err(moved_arg._tok) + f"Value '{value}' immutably borrowed here.\n..." +
+                                ErrFmt.err(arg.value._tok) + f"Value '{value}' is already immutably borrowed.")
+
+                        # Cannot move a value if the value is already mutably borrowed.
+                        if value in mut_args:
+                            a = SemanticAnalysis.ASSIGNMENTS.get(value)
+                            moved_away = a[1] if len(a) > 1 else a[0]
+                            moved_arg = [a for a in moved_away.op.arguments if a.value == value][0]
+                            raise SystemExit("Cannot move a value that is already mutably borrowed:\n" +
+                                ErrFmt.err(moved_arg._tok) + f"Value '{value}' mutably borrowed here.\n..." +
+                                ErrFmt.err(arg.value._tok) + f"Value '{value}' is already mutably borrowed.")
 
             # Handle mutable borrows
             if arg.calling_convention and arg.calling_convention.is_mutable:
                 # Because field mutability is determined by the mutability of the actual object itself, only the
                 # outermost value on the member access, up-to a function call, has to be mutable. However, each
-                # attribute in the chain has to be checked for borrowed. "a.b" cannot be mutably borrowed if "a" is
+                # attribute in the chain has to be checked for borrowing. "a.b" cannot be mutably borrowed if "a" is
                 # borrowed. However, "a.b" and "a.c" can be borrowed mutably at the same time, as there is no overlap.
-                if isinstance(arg.value, Ast.PostfixExpressionAst) and isinstance(arg.value.op, Ast.PostfixMemberAccessAst) and (value := arg.value):
-                    while isinstance(value, Ast.PostfixExpressionAst) and isinstance(value.op, Ast.PostfixMemberAccessAst):
-                        if value in mut_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow a value that is already mutably borrowed.")
-                        if value in ref_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow a value that is already immutably borrowed.")
-                        value = value.lhs
+                if (isinstance(arg.value, Ast.PostfixExpressionAst) and isinstance(arg.value.op, Ast.PostfixMemberAccessAst) or isinstance(arg.value, Ast.IdentifierAst)) and (value := arg.value):
+                    # Check every subset of the member access working back to the most lhs-identifier on its own: for
+                    # example, if the expression is "a.b.c.d", then the following are checked for borrowing: ["a.b.c.d",
+                    # "a.b.c", "a.b", "a"]. If any of these are borrowed, then the borrow is invalid, because there is
+                    # an overlap in the borrowing for a mutable borrow (the current one being taken).
+                    while (isinstance(value, Ast.PostfixExpressionAst) and isinstance(value.op, Ast.PostfixMemberAccessAst)) or isinstance(value, Ast.IdentifierAst):
+
+                        # If the value being checked is already mutably borrowed, this is an error, because more than 1
+                        # mutable borrows cannot occur at one time (law of exclusivity).
+                        if value in mut_args:
+                            active_immutable_borrow = next((a for a in ast.op.arguments[:i] if a.calling_convention and a.calling_convention.is_mutable and a.identifier == arg.identifier), None)
+                            raise SystemExit("The Law of Exclusivity prohibits a value being borrowed mutably\nif there is an active mutable borrow to the same value:\n" +
+                                ErrFmt.err(active_immutable_borrow.calling_convention._tok) + f"Mutable borrow occurs here (borrow 1).\n..." +
+                                ErrFmt.err(arg.calling_convention._tok) + f"Mutable borrow occurs here (borrow 2).")
+
+                        # If the value being checked is already immutably borrowed, this is an error, because a mutable
+                        # borrow cannot occur if there is an active immutable borrow (law of exclusivity).
+                        if value in ref_args:
+                            active_immutable_borrow = next((a for a in ast.op.arguments[:i] if a.calling_convention and not a.calling_convention.is_mutable and a.identifier == arg.identifier), None)
+                            raise SystemExit("The Law of Exclusivity prohibits a value being borrowed mutably\nif there is an active immutable borrow to the same value:\n" +
+                                ErrFmt.err(active_immutable_borrow.calling_convention._tok) + f"Immutable borrow occurs here (borrow 1).\n..." +
+                                ErrFmt.err(arg.calling_convention._tok) + f"Mutable borrow occurs here (borrow 2).")
+
+                        # Move the next left part of the AST - so after checking "a.b.c.d", "a.b.c" is checked, until
+                        # just "a" has been checked. If an identifier has just been analysed, then there is no need to
+                        # continue looping, as the final part of the "a.b.c.d" ("a") has been reached.
+                        if isinstance(value, Ast.PostfixExpressionAst):
+                            value = value.lhs
+                        else:
+                            break
+
+                    # At this point, the mutable borrow check has passed, so the value can be added to the mutable
+                    # borrows, to check any other arguments following the current one.
                     mut_args |= {value}
 
                     # Check the outermost identifier is mutable. The mutability of a value dictates the mutability of
-                    # its fields, so only the outermost value needs to be checked.
+                    # its fields, so only the outermost value needs to be checked. TODO : is this required?
                     if isinstance(value, Ast.IdentifierAst):
                         sym = s.current_scope.get_symbol(value, SymbolTypes.VariableSymbol)
                         if not sym.mem_info.is_initialized: raise SystemExit(ErrFmt.err(arg.value._tok) + f"[0] Cannot move a value that is not initialized.")
-                        if not sym.is_mutable: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow from an immutable value.")
+
+                        if not sym.is_mutable:
+                            raise SystemExit("Cannot take a mutable borrow from an immutable object:\n" +
+                                ErrFmt.err(arg.value._tok) + f"Mutable borrow taken here.")
 
                     # If the outermost value is the result of a function call, then the value being returned cannot have
                     # any active borrows, and mutability is determined by values, not types, so the borrow will always
                     # be valid. No checks are needed.
 
-                # For a single identifier, just check that it isn't borrowed, and that it is mutable.
-                elif isinstance(arg.value, Ast.IdentifierAst) and (value := arg.value):
-                    sym = s.current_scope.get_symbol(arg.value, SymbolTypes.VariableSymbol)
-                    if value in mut_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow a value that is already mutably borrowed.")
-                    if value in ref_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow a value that is already immutably borrowed.")
-                    if not sym.is_mutable: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot mutably borrow from an immutable value.")
-                    if not sym.mem_info.is_initialized: raise SystemExit(ErrFmt.err(arg.value._tok) + f"[1] Cannot move a value that is not initialized.")
-                    mut_args |= {value}
-
             # Handle immutable borrows -- they are slightly more relaxed than mutable borrows, as they can overlap, and
             # n immutable borrows can occur at the same time (but not with a mutable borrow).
             if arg.calling_convention and not arg.calling_convention.is_mutable:
-                # The mutability of the outermost value doesn't matter for an immutable borrow. The only check required
-                # is that not part of the value is not mutably borrowed.
-                if isinstance(arg.value, Ast.PostfixExpressionAst) and isinstance(arg.value.op, Ast.PostfixMemberAccessAst) and (value := arg.value):
-                    while isinstance(value, Ast.PostfixExpressionAst) and isinstance(value.op, Ast.PostfixMemberAccessAst):
-                        if value in ref_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot immutably borrow a value that is already immutably borrowed.")
-                        value = value.lhs
-                    ref_args |= {value}
+                if (isinstance(arg.value, Ast.PostfixExpressionAst) and isinstance(arg.value.op, Ast.PostfixMemberAccessAst) or isinstance(arg.value, Ast.IdentifierAst)) and (value := arg.value):
+                    while (isinstance(value, Ast.PostfixExpressionAst) and isinstance(value.op, Ast.PostfixMemberAccessAst)) or isinstance(value, Ast.IdentifierAst):
+                        if value in mut_args:
+                            active_mut_borrow = next((a for a in ast.op.arguments[:i] if a.calling_convention and a.calling_convention.is_mutable and a.identifier == arg.identifier), None)
+                            raise SystemExit("The Law of Exclusivity prohibits a value being borrowed immutably\nif there is an active mutable borrow to the same value:\n" +
+                                ErrFmt.err(active_mut_borrow.calling_convention._tok) + f"Mutable borrow occurs here (borrow 1).\n..." +
+                                ErrFmt.err(arg.calling_convention._tok) + f"Immutable borrow occurs here (borrow 2).")
 
-                # For a single identifier, just check that it isn't borrowed mutably.
-                elif isinstance(arg.value, Ast.IdentifierAst) and (value := arg.value):
-                    if value in mut_args: raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot immutably borrow a value that is already mutably borrowed.")
+                        ref_args |= {value}
 
-                    sym = s.current_scope.get_symbol(arg.value, SymbolTypes.VariableSymbol)
-                    if not sym.mem_info.is_initialized and not kwargs.get("let", False): raise SystemExit(ErrFmt.err(arg.value._tok) + f"[2] Cannot move a value that is not initialized.")
-                    ref_args |= {value}
+                        if isinstance(value, Ast.PostfixExpressionAst):
+                            value = value.lhs
+                        else:
+                            break
 
 
     @staticmethod

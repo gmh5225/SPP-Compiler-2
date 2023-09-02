@@ -232,9 +232,12 @@ class TypeInfer:
         for i in range(len(sigs)):
             output.append(f"{sigs[i]}: {errs[i]}")
 
+        # TODO : improve the "attempted signature" line of the error message to include the parameter named with their
+        #  incorrect types
         raise SystemExit(
-            ErrFmt.err(ast.lhs._tok) +
-            f"Could not find function '{ast.lhs}' with the given arguments.\nAvailable signatures{NL.join(output)}")
+            ErrFmt.err(ast.lhs._tok) + f"Could not find function '{ast.lhs}' with the given arguments.\n\n" +
+            f"Attempted signature:{NL}({', '.join([str(arg_cc or '') + str(arg_ty) for arg_cc, arg_ty in zip(arg_ccs, arg_tys)])}) -> ?\n\n" +
+            f"Available signatures{NL.join(output)}")
 
     @staticmethod
     def infer_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
