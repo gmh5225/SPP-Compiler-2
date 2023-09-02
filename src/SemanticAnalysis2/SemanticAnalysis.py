@@ -430,6 +430,10 @@ class SemanticAnalysis:
 
         # TODO : partial moves not working at the moment
         # TODO : moving attributes from a borrowed context don't seem to work right now either
+        # TODO : if a variable is already a borrow treat it as so
+        # TODO : slight issue with mutable borrows:
+        #  func(&mut x, &mut x.a) fails as it should
+        #  func(&mut x.a, &mut x) doesn't fail, but it should
 
         if isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.op, Ast.PostfixFunctionCallAst):
             # Save assignments for error messages later on.
@@ -509,7 +513,6 @@ class SemanticAnalysis:
                     # "a.b.c", "a.b", "a"]. If any of these are borrowed, then the borrow is invalid, because there is
                     # an overlap in the borrowing for a mutable borrow (the current one being taken).
                     while (isinstance(value, Ast.PostfixExpressionAst) and isinstance(value.op, Ast.PostfixMemberAccessAst)) or isinstance(value, Ast.IdentifierAst):
-
                         # If the value being checked is already mutably borrowed, this is an error, because more than 1
                         # mutable borrows cannot occur at one time (law of exclusivity).
                         if value in mut_args:
@@ -526,7 +529,7 @@ class SemanticAnalysis:
                                 ErrFmt.err(active_immutable_borrow.calling_convention._tok) + f"Immutable borrow occurs here (borrow 1).\n..." +
                                 ErrFmt.err(arg.calling_convention._tok) + f"Mutable borrow occurs here (borrow 2).")
 
-                        # Move the next left part of the AST - so after checking "a.b.c.d", "a.b.c" is checked, until
+                        # Move the next left part of the AST -- so after checking "a.b.c.d", "a.b.c" is checked, until
                         # just "a" has been checked. If an identifier has just been analysed, then there is no need to
                         # continue looping, as the final part of the "a.b.c.d" ("a") has been reached.
                         if isinstance(value, Ast.PostfixExpressionAst):
@@ -536,13 +539,12 @@ class SemanticAnalysis:
 
                     # At this point, the mutable borrow check has passed, so the value can be added to the mutable
                     # borrows, to check any other arguments following the current one.
-                    mut_args |= {value}
+                    mut_args |= {arg.value}
 
                     # Check the outermost identifier is mutable. The mutability of a value dictates the mutability of
                     # its fields, so only the outermost value needs to be checked. TODO : is this required?
                     if isinstance(value, Ast.IdentifierAst):
                         sym = s.current_scope.get_symbol(value, SymbolTypes.VariableSymbol)
-                        if not sym.mem_info.is_initialized: raise SystemExit(ErrFmt.err(arg.value._tok) + f"[0] Cannot move a value that is not initialized.")
 
                         if not sym.is_mutable:
                             raise SystemExit("Cannot take a mutable borrow from an immutable object:\n" +
