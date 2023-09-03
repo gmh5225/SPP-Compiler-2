@@ -155,7 +155,20 @@ class SemanticAnalysis:
         # Analyse the parameter type, and Add the parameter to the current scope.
         ast.type_annotation = TypeInfer.infer_type(ast.type_annotation, s)
         ty = ast.type_annotation if not isinstance(ast.type_annotation.parts[0], Ast.SelfTypeAst) else Ast.IdentifierAst("Self", ast.type_annotation._tok)
-        s.current_scope.add_symbol(SymbolTypes.VariableSymbol(ast.identifier, ty, is_mutable=ast.is_mutable, is_initialized=True))
+        sym = SymbolTypes.VariableSymbol(ast.identifier, ty, is_mutable=ast.is_mutable, is_initialized=True)
+
+        # Set the symbol borrow information based on the parameter passing convention.
+        match ast.calling_convention:
+            case Ast.ParameterPassingConventionReferenceAst() if ast.calling_convention.is_mutable:
+                sym.mem_info.is_borrowed_mut = True
+                sym.mem_info.borrow_ast = ast
+            case Ast.ParameterPassingConventionReferenceAst() if not ast.calling_convention.is_mutable:
+                sym.mem_info.is_borrowed_ref = True
+                sym.mem_info.borrow_ast = ast
+            case None: pass
+
+        # Add the symbol to the scope.
+        s.current_scope.add_symbol(sym)
 
         # Analyse the default value
         if ast.default_value:
@@ -420,154 +433,83 @@ class SemanticAnalysis:
         
     @staticmethod
     def analyse_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):
-        # Verify the LHS is valid.
-        SemanticAnalysis.analyse_expression(ast.lhs, s, call=True)
+        # Check the LHS is a function, and that the arguments match the function's parameters.
+        SemanticAnalysis.analyse_expression(ast.lhs, s)
         TypeInfer.infer_expression(ast, s)
+        SemanticAnalysis.analyse_function_arguments(ast, ast.op.arguments, s, **kwargs)
 
-        ref_args = set()
-        mut_args = set()
-        arg_ts   = []
+    @staticmethod
+    def analyse_function_arguments(func: Ast.PostfixExpressionAst, asts: list[Ast.FunctionArgumentAst], s: ScopeHandler, **kwargs):
+        # Number of memory checks need to occur here. This function handles all function calls, assignment and variable
+        # declaration (through the __set__) function.
+        ref_borrows = set()
+        mut_borrows = set()
 
-        # TODO : partial moves not working at the moment
-        # TODO : moving attributes from a borrowed context don't seem to work right now either
-        # TODO : if a variable is already a borrow treat it as so
+        def collapse_ast_to_list_of_identifiers(ast: Ast.PostfixExpressionAst | Ast.IdentifierAst):
+            match ast:
+                case Ast.IdentifierAst(): return [ast]
+                case Ast.PostfixExpressionAst(): return collapse_ast_to_list_of_identifiers(ast.lhs) + [ast.op.identifier]
 
-        if isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.op, Ast.PostfixFunctionCallAst):
-            # Save assignments for error messages later on.
-            v = ast.op.arguments[1].value
-            if v in SemanticAnalysis.ASSIGNMENTS.keys():
-                SemanticAnalysis.ASSIGNMENTS[v].append(ast)
-            else:
-                SemanticAnalysis.ASSIGNMENTS[ast.op.arguments[0].value] = [ast]
+        for i, arg in enumerate(asts):
+            check_for_move = func.lhs.identifier != "__set__" or (func.lhs.identifier == "__set__" and i > 0)
 
-        for i, arg in enumerate(ast.op.arguments):
+            # Check if the argument being borrowed is valid to borrow from, ie it hasn't already been moved
+            # elsewhere. The convention of the argument doesn't matter at this sateg, because moving or borrowing an
+            # uninitialized value is illegal.
+            sym = s.current_scope.get_symbol(arg.value, SymbolTypes.VariableSymbol, error=False)
+            if sym and check_for_move and not sym.mem_info.is_initialized:
+                raise SystemExit(
+                    "Cannot borrow from a value that is not initialized:\n" +
+                    ErrFmt.err(sym.mem_info.consume_ast._tok) + f"Value '{arg.value}' moved here.\n..." +
+                    ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' not initialized.")
 
-            # Check the argument is valid.
-            SemanticAnalysis.analyse_expression(arg.value, s)
+            match arg.calling_convention:
+                # Check for law of exclusivity violations if the argument is a borrow of any kind. This enforces that
+                # there can only be 1 mutable or n immutable borrows of an object at 1 time. It also allows multiple
+                # borrows of non-overlapping parts of an object to occur at the same time, however, such as
+                # &mut x.a, &mut x.b, as there is no overlap and is therefore safe.
+                case Ast.ParameterPassingConventionReferenceAst():
+                    # todo : mut reference requires the attribute to be mutable on declaration (check symbol)
+                    if arg.calling_convention.is_mutable and not sym.is_mutable:
+                        raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot borrow immutable value '{arg.value}' as mutable.")
 
-            if isinstance(value := arg.value, Ast.IdentifierAst):
-                sym = s.current_scope.get_symbol(value, SymbolTypes.VariableSymbol)
+                    # A mutable borrow of the argument is occurring. Ensure that no part of the argument is already
+                    # mutably or immutably borrowed.
+                    for currently_borrowed_ast in (ref_borrows | mut_borrows) if arg.calling_convention.is_mutable else mut_borrows:
+                        currently_borrowed = collapse_ast_to_list_of_identifiers(currently_borrowed_ast)
 
-                # Cannot move a value if the value isn't initialized.
-                if (ast.lhs.identifier != "__set__" or (ast.lhs.identifier == "__set__" and i > 0)) and not sym.mem_info.is_initialized:
-                    a = SemanticAnalysis.ASSIGNMENTS.get(value)
-                    moved_away = a[1] if len(a) > 1 else a[0]
-                    moved_arg = [a for a in moved_away.op.arguments if a.value == value][0]
-                    raise SystemExit(
-                        "Cannot use a value that is not initialized:\n" +
-                        ErrFmt.err(moved_arg._tok) + f"Value '{value}' moved here.\n..." +
-                        ErrFmt.err(arg.value._tok) + f"Value '{value}' is not initialized here.")
+                        # &mut a.b.c is illegal if any of [&mut a, &mut a.b, &mut a.b.c] are being borrowed. However, if
+                        # only &mut a.d is being borrowed, then &mut a.b.c is legal, as there is no overlap.
+                        identifiers = collapse_ast_to_list_of_identifiers(arg.value)
+                        check = identifiers[:len(currently_borrowed)] == currently_borrowed or currently_borrowed[:len(identifiers)] == identifiers
+                        if check:
+                            raise SystemExit(
+                                "The Law of Exclusivity requires that either 1 mutable or n\nimmutable borrows can be active at one time, but not\nconcurrently.\n" +
+                                ErrFmt.err(currently_borrowed_ast._tok) + f"1st borrow of (part of) '{arg.value}'\n..." +
+                                ErrFmt.err(arg.value._tok) + f"2nd borrow of '{arg.value}'.")
+                    mut_borrows.add(arg.value) if arg.calling_convention.is_mutable else ref_borrows.add(arg.value)
 
-                if not arg.calling_convention:
-                    sym.mem_info.is_initialized = False
+                case None:
+                    # If there is no borrow occurring, then a move is taking place. However, the move may be complete or
+                    # partial. Complete moves are when the entire object is moved, and partial moves are when only part
+                    # of the object is moved. For example, "let y = a" is a complete move, but "let z = b.c" is a
+                    # partial move; that is, "b" is partially moved. Partially moved objects cannot be borrowed from or
+                    # moved, until they are complete again.
+                    sym = s.current_scope.get_symbol(arg.value, SymbolTypes.VariableSymbol, error=False)
+                    if sym:
+                        sym.mem_info.is_initialized = False
+                        sym.mem_info.consume_ast = arg.value
 
+                    elif isinstance(arg.value, Ast.PostfixExpressionAst) and isinstance(arg.value.op, Ast.PostfixMemberAccessAst):
+                        identifier_chain = collapse_ast_to_list_of_identifiers(arg.value)
+                        # todo [1] : handle partial moves here
 
-            # print(ast, isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.op, Ast.PostfixFunctionCallAst), ast.lhs.identifier != "__set__")
-            if not arg.calling_convention and isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.op, Ast.PostfixFunctionCallAst):
-                if ast.lhs.identifier != "__set__" or (ast.lhs.identifier == "__set__" and i > 0):
-
-            # No calling convention means that a move is taking place.
-            # if not arg.calling_convention:
-                # This can only happen from a non-borrowed context, so check that the argument is an attribute of a
-                # borrowed variable.
-                    value = arg.value
-                # if isinstance(arg.value, Ast.PostfixExpressionAst) and isinstance(arg.value.op, Ast.PostfixMemberAccessAst):
-                #
-                #     # For a move to be valid, no part of the attribute chain can be borrowed.
-                #     while isinstance(value, Ast.PostfixExpressionAst) and isinstance(value.op, Ast.PostfixMemberAccessAst):
-                #         if value in ref_args: raise SystemExit(ErrFmt.err(value._tok) + f"Cannot move value '{value}' that is already borrowed.")
-                #         if value in mut_args: raise SystemExit(ErrFmt.err(value._tok) + f"Cannot move value '{value}' that is already mutably borrowed.")
-                #         value = value.lhs
-
-                    if isinstance(value, Ast.IdentifierAst):
-                        # Cannot move a value if the value is already immutably borrowed.
-                        if value in ref_args:
-                            a = SemanticAnalysis.ASSIGNMENTS.get(value)
-                            moved_away = a[1] if len(a) > 1 else a[0]
-                            moved_arg = [a for a in moved_away.op.arguments if a.value == value][0]
-                            raise SystemExit("Cannot move a value that is already immutably borrowed:\n" +
-                                ErrFmt.err(moved_arg._tok) + f"Value '{value}' immutably borrowed here.\n..." +
-                                ErrFmt.err(arg.value._tok) + f"Value '{value}' is already immutably borrowed.")
-
-                        # Cannot move a value if the value is already mutably borrowed.
-                        if value in mut_args:
-                            a = SemanticAnalysis.ASSIGNMENTS.get(value)
-                            moved_away = a[1] if len(a) > 1 else a[0]
-                            moved_arg = [a for a in moved_away.op.arguments if a.value == value][0]
-                            raise SystemExit("Cannot move a value that is already mutably borrowed:\n" +
-                                ErrFmt.err(moved_arg._tok) + f"Value '{value}' mutably borrowed here.\n..." +
-                                ErrFmt.err(arg.value._tok) + f"Value '{value}' is already mutably borrowed.")
-
-            # Handle mutable borrows
-            if arg.calling_convention and arg.calling_convention.is_mutable:
-                # Because field mutability is determined by the mutability of the actual object itself, only the
-                # outermost value on the member access, up-to a function call, has to be mutable. However, each
-                # attribute in the chain has to be checked for borrowing. "a.b" cannot be mutably borrowed if "a" is
-                # borrowed. However, "a.b" and "a.c" can be borrowed mutably at the same time, as there is no overlap.
-                if (isinstance(arg.value, Ast.PostfixExpressionAst) and isinstance(arg.value.op, Ast.PostfixMemberAccessAst) or isinstance(arg.value, Ast.IdentifierAst)) and (value := arg.value):
-                    # Check every subset of the member access working back to the most lhs-identifier on its own: for
-                    # example, if the expression is "a.b.c.d", then the following are checked for borrowing: ["a.b.c.d",
-                    # "a.b.c", "a.b", "a"]. If any of these are borrowed, then the borrow is invalid, because there is
-                    # an overlap in the borrowing for a mutable borrow (the current one being taken).
-                    while (isinstance(value, Ast.PostfixExpressionAst) and isinstance(value.op, Ast.PostfixMemberAccessAst)) or isinstance(value, Ast.IdentifierAst):
-                        # If the value being checked is already mutably borrowed, this is an error, because more than 1
-                        # mutable borrows cannot occur at one time (law of exclusivity).
-                        if value in mut_args:
-                            active_immutable_borrow = next((a for a in ast.op.arguments[:i] if a.calling_convention and a.calling_convention.is_mutable and a.identifier == arg.identifier), None)
-                            raise SystemExit("The Law of Exclusivity prohibits a value being borrowed mutably\nif there is an active mutable borrow to the same value:\n" +
-                                ErrFmt.err(active_immutable_borrow.calling_convention._tok) + f"Mutable borrow occurs here (borrow 1).\n..." +
-                                ErrFmt.err(arg.calling_convention._tok) + f"Mutable borrow occurs here (borrow 2).")
-
-                        # If the value being checked is already immutably borrowed, this is an error, because a mutable
-                        # borrow cannot occur if there is an active immutable borrow (law of exclusivity).
-                        if value in ref_args:
-                            active_immutable_borrow = next((a for a in ast.op.arguments[:i] if a.calling_convention and not a.calling_convention.is_mutable and a.identifier == arg.identifier), None)
-                            raise SystemExit("The Law of Exclusivity prohibits a value being borrowed mutably\nif there is an active immutable borrow to the same value:\n" +
-                                ErrFmt.err(active_immutable_borrow.calling_convention._tok) + f"Immutable borrow occurs here (borrow 1).\n..." +
-                                ErrFmt.err(arg.calling_convention._tok) + f"Mutable borrow occurs here (borrow 2).")
-
-                        # Move the next left part of the AST -- so after checking "a.b.c.d", "a.b.c" is checked, until
-                        # just "a" has been checked. If an identifier has just been analysed, then there is no need to
-                        # continue looping, as the final part of the "a.b.c.d" ("a") has been reached.
-                        if isinstance(value, Ast.PostfixExpressionAst):
-                            value = value.lhs
-                        else:
-                            break
-
-                    # At this point, the mutable borrow check has passed, so the value can be added to the mutable
-                    # borrows, to check any other arguments following the current one.
-                    mut_args |= {arg.value}
-
-                    # Check the outermost identifier is mutable. The mutability of a value dictates the mutability of
-                    # its fields, so only the outermost value needs to be checked.
-                    if isinstance(value, Ast.IdentifierAst):
-                        sym = s.current_scope.get_symbol(value, SymbolTypes.VariableSymbol)
-
-                        if not sym.is_mutable:
-                            raise SystemExit("Cannot take a mutable borrow from an immutable object:\n" +
-                                ErrFmt.err(arg.value._tok) + f"Mutable borrow taken here.")
-
-                    # If the outermost value is the result of a function call, then the value being returned cannot have
-                    # any active borrows, and mutability is determined by values, not types, so the borrow will always
-                    # be valid. No checks are needed.
-
-            # Handle immutable borrows -- they are slightly more relaxed than mutable borrows, as they can overlap, and
-            # n immutable borrows can occur at the same time (but not with a mutable borrow).
-            if arg.calling_convention and not arg.calling_convention.is_mutable:
-                if (isinstance(arg.value, Ast.PostfixExpressionAst) and isinstance(arg.value.op, Ast.PostfixMemberAccessAst) or isinstance(arg.value, Ast.IdentifierAst)) and (value := arg.value):
-                    while (isinstance(value, Ast.PostfixExpressionAst) and isinstance(value.op, Ast.PostfixMemberAccessAst)) or isinstance(value, Ast.IdentifierAst):
-                        if value in mut_args:
-                            active_mut_borrow = next((a for a in ast.op.arguments[:i] if a.calling_convention and a.calling_convention.is_mutable and a.identifier == arg.identifier), None)
-                            raise SystemExit("The Law of Exclusivity prohibits a value being borrowed immutably\nif there is an active mutable borrow to the same value:\n" +
-                                ErrFmt.err(active_mut_borrow.calling_convention._tok) + f"Mutable borrow occurs here (borrow 1).\n..." +
-                                ErrFmt.err(arg.calling_convention._tok) + f"Immutable borrow occurs here (borrow 2).")
-
-                        ref_args |= {arg.value}
-
-                        if isinstance(value, Ast.PostfixExpressionAst):
-                            value = value.lhs
-                        else:
-                            break
+                        outermost_symbol = s.current_scope.get_symbol(identifier_chain[0], SymbolTypes.VariableSymbol, error=False)
+                        if outermost_symbol.mem_info.is_borrowed():
+                            raise SystemExit(
+                                "Cannot move from a borrowed context:\n" +
+                                ErrFmt.err(outermost_symbol.mem_info.borrow_ast._tok) + f"Value '{arg.value}' borrowed here.\n..." +
+                                ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' moved here.")
 
 
     @staticmethod
@@ -752,9 +694,17 @@ class SemanticAnalysis:
         # function call will analyse the RHS value(s) as arguments, and double-analysis will lead to double-moves etc.
         rhs_ty = TypeInfer.infer_expression(ast.rhs, s)
         if len(ast.lhs) == 1:
+            lhs_sym = s.current_scope.get_symbol(ast.lhs[0], SymbolTypes.VariableSymbol)
+
+            convention = None
+            if lhs_sym.mem_info.is_borrowed_mut:
+                convention = Ast.ParameterPassingConventionReferenceAst(True, -1)
+            elif lhs_sym.mem_info.is_borrowed_ref:
+                convention = Ast.ParameterPassingConventionReferenceAst(False, -1)
+
             fn_call = Ast.PostfixFunctionCallAst(
                 [], [
-                    Ast.FunctionArgumentAst(None, ast.lhs[0], Ast.ParameterPassingConventionReferenceAst(False, -1), False, ast.lhs[0]._tok),
+                    Ast.FunctionArgumentAst(None, ast.lhs[0], convention, False, ast.lhs[0]._tok),
                     Ast.FunctionArgumentAst(None, ast.rhs, None, False, ast.rhs._tok)
                 ], ast.op._tok)
             fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst("__set__", ast.op._tok), fn_call, ast.op._tok)

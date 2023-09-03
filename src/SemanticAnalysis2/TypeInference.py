@@ -6,7 +6,7 @@ import inspect
 from src.SyntacticAnalysis import Ast
 from src.SyntacticAnalysis.Parser import ErrFmt
 
-from src.SemanticAnalysis2.SymbolTable import ScopeHandler, SymbolTypes
+from src.SemanticAnalysis2.SymbolTable import ScopeHandler, SymbolTypes, VariableSymbolMemoryStatus
 from src.SemanticAnalysis2.CommonTypes import CommonTypes
 
 
@@ -92,8 +92,7 @@ class TypeInfer:
                 case Ast.PostfixExpressionAst(): ty = TypeInfer.infer_postfix_member_access(ast.lhs, s)
                 case Ast.IdentifierAst(): ty = TypeInfer.infer_identifier(ast.lhs, s)
                 case _: ty = TypeInfer.infer_type(ast.lhs, s)
-
-        if isinstance(ast, Ast.IdentifierAst):
+        elif isinstance(ast, Ast.IdentifierAst):
             ty = TypeInfer.infer_identifier(ast, s)
         elif isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.lhs, Ast.TypeSingleAst):
             sym = s.current_scope.get_symbol(ast.lhs.parts[-1], SymbolTypes.TypeSymbol)
@@ -106,10 +105,12 @@ class TypeInfer:
         cls = s.global_scope.get_child_scope(ty)
 
         if isinstance(ast.op.identifier, Ast.IdentifierAst):
-            sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False)
-            if isinstance(sym, SymbolTypes.VariableSymbol):
-                return sym.type
-            return sym
+            return ty
+            # print("?")
+            # sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False)
+            # if isinstance(sym, SymbolTypes.VariableSymbol):
+            #     return sym.type
+            # return sym
         else:
             ty = TypeInfer.infer_expression(ast.lhs, s)
             sym = s.current_scope.get_symbol(ast.lhs.parts[-1], SymbolTypes.TypeSymbol)
@@ -126,9 +127,21 @@ class TypeInfer:
 
         # To infer something like x.y.z(a, b), we need to infer x.y.z, then infer a and b, then infer the function call.
 
-
+        arg_syms = [s.current_scope.get_symbol(arg.value, SymbolTypes.VariableSymbol) if isinstance(arg.value, Ast.IdentifierAst) else None for arg in ast.op.arguments]
         arg_tys = [TypeInfer.infer_expression(arg.value, s) for arg in ast.op.arguments]
         arg_ccs = [arg.calling_convention for arg in ast.op.arguments]
+
+        # for i, arg_sym in enumerate(arg_syms):
+        #     if not isinstance(ast.op.arguments[i].value, Ast.IdentifierAst): continue
+        #     match arg_sym.mem_info:
+        #         case VariableSymbolMemoryStatus() if arg_sym.mem_info.is_borrowed_mut:
+        #             print(f"changed {arg_ccs[i]} to {Ast.ParameterPassingConventionReferenceAst(True, -1)}")
+        #             arg_ccs[i] = Ast.ParameterPassingConventionReferenceAst(True, -1)
+        #         case VariableSymbolMemoryStatus() if arg_sym.mem_info.is_borrowed_ref:
+        #             print(f"changed {arg_ccs[i]} to {Ast.ParameterPassingConventionReferenceAst(False, -1)}")
+        #             arg_ccs[i] = Ast.ParameterPassingConventionReferenceAst(False, -1)
+        #         case _:
+        #             print("???")
 
         # The next step is because overloads of functions can return different types ie: 'f(Str) -> Num' and
         # 'f(Int) -> Str' can be overloads of 'f'. We need to find the function that matches the arguments, and return
@@ -140,8 +153,8 @@ class TypeInfer:
 
         ty = TypeInfer.infer_expression(ast.lhs, s, all=True)
         s = s.global_scope.get_child_scope(ty)
-        if not s: # todo -> this error should be picked up in SemanticAnalysis?
-            raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Unknown method '{ast.lhs}(...)'.")
+        # if not s: # todo -> this error should be picked up in SemanticAnalysis?
+        #     raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Unknown method '{ast.lhs}(...)'.")
 
         l = ast.lhs
         default_generic_map = {}

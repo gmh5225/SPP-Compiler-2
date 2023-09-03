@@ -364,6 +364,9 @@ class PostfixExpressionAst:
 
     def __hash__(self):
         return hash(self.lhs) + hash(self.op)
+    
+    def __eq__(self, other):
+        return isinstance(other, PostfixExpressionAst) and self.lhs == other.lhs and self.op == other.op
 
 @dataclass
 class PlaceholderAst:
@@ -682,6 +685,9 @@ class PostfixFunctionCallAst:
     def __hash__(self):
         return hash(tuple(self.type_arguments)) + hash(tuple(self.arguments))
 
+    def __eq__(self, other):
+        return isinstance(other, PostfixFunctionCallAst) and self.type_arguments == other.type_arguments and self.arguments == other.arguments
+
 @dataclass
 class PostfixMemberAccessAst:
     identifier: IdentifierAst | int
@@ -693,6 +699,9 @@ class PostfixMemberAccessAst:
 
     def __hash__(self):
         return hash(self.identifier)
+    
+    def __eq__(self, other):
+        return isinstance(other, PostfixMemberAccessAst) and self.identifier == other.identifier
 
 @dataclass
 class PostfixStructInitializerAst:
@@ -707,6 +716,9 @@ class PostfixStructInitializerAst:
     def __hash__(self):
         return hash(tuple(self.fields))
 
+    def __eq__(self, other):
+        return isinstance(other, PostfixStructInitializerAst) and self.fields == other.fields
+
 @dataclass
 class PostfixStructInitializerFieldAst:
     identifier: IdentifierAst | TokenAst
@@ -720,6 +732,9 @@ class PostfixStructInitializerFieldAst:
 
     def __hash__(self):
         return hash(self.identifier)
+
+    def __eq__(self, other):
+        return isinstance(other, PostfixStructInitializerFieldAst) and self.identifier == other.identifier and self.value == other.value
 
 @dataclass
 class NumberLiteralBase10Ast:

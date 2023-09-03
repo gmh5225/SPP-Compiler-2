@@ -16,10 +16,17 @@ class VariableSymbolMemoryStatus:
     is_borrowed_mut: bool
     is_initialized: bool
 
+    consume_ast: Any
+    borrow_ast: Any
+
+
     def __init__(self):
         self.is_borrowed_ref = False
         self.is_borrowed_mut = False
         self.is_initialized = False
+
+        self.consume_ast = None
+        self.borrow_ast = None
 
     def is_borrowed(self):
         return self.is_borrowed_ref or self.is_borrowed_mut
