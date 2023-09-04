@@ -130,16 +130,21 @@ class SemanticAnalysis:
 
         # Make sure the return type of the last statement matches the return type of the function, unless the method is
         # abstract, in which case it is allowed to not have a return statement.
-        t = TypeInfer.infer_statement(ast.body.statements[-1], s) if ast.body.statements else CommonTypes.void()
+        final_statement = ast.body.statements[-1] if ast.body.statements else None
+        if not isinstance(final_statement, Ast.ReturnStatementAst):
+            t = CommonTypes.void()
+        else:
+            t = TypeInfer.infer_statement(final_statement, s) if ast.body.statements else CommonTypes.void()
 
-        if str(ast.return_type) != "Void" and ast.body.statements and not isinstance(ast.body.statements[-1], Ast.ReturnStatementAst):
+        if ast.return_type != CommonTypes.void() and ast.body.statements and not isinstance(final_statement, Ast.ReturnStatementAst):
             err_ast = ast.body.statements[-1]
             raise SystemExit(
                 f"Function returning '{ast.return_type}' must end with a return statement:" +
                 ErrFmt.err(ast.return_type._tok) + f"Function return type is '{ast.return_type}'.\n..." +
-                ErrFmt.err(err_ast._tok) + f"Final statement is a '{type(err_ast).__name__}'.")
+                ErrFmt.err(err_ast._tok) + f"Final statement is not a return statement.")
 
-        if t != ast.return_type and ast.body.statements: # and not function_symbol.meta_data.get("abstract", False):
+        # todo - if the return type is Void, then don't check the final statement, unless it is an explicit "return"
+        if t != ast.return_type and ast.body.statements and isinstance(final_statement, Ast.ReturnStatementAst):
             err_ast = ast.body.statements[-1]
             raise SystemExit(
                 "Mismatch between function return type and function's final statement:" +
