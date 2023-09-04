@@ -484,16 +484,26 @@ class SemanticAnalysis:
                 # borrows of non-overlapping parts of an object to occur at the same time, however, such as
                 # &mut x.a, &mut x.b, as there is no overlap and is therefore safe.
                 case Ast.ParameterPassingConventionReferenceAst():
-                    if arg.calling_convention.is_mutable and not sym.is_mutable and not func.lhs.identifier == "__set__":
-                        if func.lhs.identifier == "__reset__":
-                            final_error_message = ErrFmt.err(arg.value._tok) + f"Assignment to '{arg.value}' attempted here."
-                        else:
-                            final_error_message = ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' borrowed mutably here."
+                    if arg.calling_convention.is_mutable and not func.lhs.identifier == "__set__":
+                        identifiers = collapse_ast_to_list_of_identifiers(arg.value)
+                        if identifiers is None:
+                            raise SystemExit(
+                                "Cannot borrow from a value that is not a variable:\n" if func.lhs.identifier != "__reset__" else "Cannot assign to a value that's not a variable:\n" +
+                                ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' is not a variable.")
 
-                        raise SystemExit(
-                            "Cannot take a mutable borrow from an immutable value:\n" +
-                            ErrFmt.err(sym.mem_info.initialization_ast._tok) + f"Value '{arg.value}' declared immutably here.\n..." +
-                            final_error_message)
+                        outermost_identifier = collapse_ast_to_list_of_identifiers(arg.value)[0]
+                        outermost_symbol = s.current_scope.get_symbol(outermost_identifier, SymbolTypes.VariableSymbol)
+
+                        if not outermost_symbol.is_mutable:
+                            if func.lhs.identifier == "__reset__":
+                                final_error_message = ErrFmt.err(arg.value._tok) + f"Assignment to '{arg.value}' attempted here."
+                            else:
+                                final_error_message = ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' borrowed mutably here."
+
+                            raise SystemExit(
+                                "Cannot take a mutable borrow from an immutable value:\n" +
+                                ErrFmt.err(outermost_symbol.mem_info.initialization_ast._tok) + f"Value '{outermost_identifier}' declared immutably here.\n..." +
+                                final_error_message)
 
                     # A mutable borrow of the argument is occurring. Ensure that no part of the argument is already
                     # mutably or immutably borrowed.
@@ -721,8 +731,7 @@ class SemanticAnalysis:
         # function call will analyse the RHS value(s) as arguments, and double-analysis will lead to double-moves etc.
         rhs_ty = TypeInfer.infer_expression(ast.rhs, s)
         if len(ast.lhs) == 1:
-            lhs_sym = s.current_scope.get_symbol(ast.lhs[0], SymbolTypes.VariableSymbol)
-
+            # lhs_sym = s.current_scope.get_symbol(ast.lhs[0], SymbolTypes.VariableSymbol)
             # convention = None
             # if lhs_sym.mem_info.is_borrowed_mut:
             #     convention = Ast.ParameterPassingConventionReferenceAst(True, -1)
