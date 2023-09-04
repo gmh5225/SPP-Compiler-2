@@ -29,9 +29,11 @@ This decision was made, because a class can be made callable with multiple overl
 "fn" functions differently was made, then there would be 2 ways to do the same thing, so the Fn[...] super-imposition
 decision was made to force only 1 way of functions being callable.
 """
-
+from src.SemanticAnalysis2.TypeInference import TypeInfer
 from src.SyntacticAnalysis import Ast
 from functools import cmp_to_key
+
+from src.SyntacticAnalysis.Parser import ErrFmt
 
 
 class AstReduction:
@@ -65,10 +67,31 @@ class AstReduction:
             case Ast.FunctionPrototypeAst(): AstReduction.reduce_function_prototype(mod, ast)
             case Ast.SupPrototypeNormalAst(): AstReduction.reduce_sup_prototype(mod, ast)
             case Ast.SupPrototypeInheritanceAst(): AstReduction.reduce_sup_prototype(mod, ast)
+            case Ast.ClassPrototypeAst(): AstReduction.reduce_class_prototype(ast)
+
+    @staticmethod
+    def reduce_class_prototype(ast: Ast.ClassPrototypeAst):
+        # Convert "Self" in class members to the class type
+        for member in ast.body.members:
+            if member.type_annotation.parts[-1].identifier == "Self":
+                member.type_annotation = ast.to_type()
+            TypeInfer.substitute_generic_type(member.type_annotation, "Self", ast.to_type())
 
     @staticmethod
     def reduce_function_prototype(owner: Ast.ModulePrototypeAst | Ast.SupPrototypeAst, ast: Ast.FunctionPrototypeAst):
         i = owner.body.members.index(ast)
+
+        if not isinstance(owner, Ast.ModulePrototypeAst):
+            for param in ast.parameters:
+                if param.type_annotation.parts[-1].identifier == "Self":
+                    param.type_annotation = owner.to_type()
+                TypeInfer.substitute_generic_type(param.type_annotation, "Self", owner.to_type())
+            for statement in ast.body.statements:
+                match statement:
+                    case Ast.LetStatementAst() if statement.type_annotation is not None:
+                        if statement.type_annotation.parts[-1].identifier == "Self":
+                            statement.type_annotation = owner.to_type()
+                        TypeInfer.substitute_generic_type(statement.type_annotation, "Self", owner.to_type())
 
         # Recursion break case
         if ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]:
@@ -90,7 +113,14 @@ class AstReduction:
 
         new_fun = Ast.SupMethodPrototypeAst([], ast.is_coro, Ast.IdentifierAst("call_ref", -1), ast.generic_parameters, ast.parameters, ast.return_type, None, ast.body, ast._tok)
         setattr(new_fun, "is_method", isinstance(owner, Ast.SupPrototypeAst))
-        owner.body.members.insert(i, Ast.SupPrototypeInheritanceAst(ast.generic_parameters, Ast.TypeSingleAst([ast.identifier.to_generic_identifier()], ast.identifier._tok), None, Ast.SupImplementationAst([new_fun], -1), -1, Ast.TypeSingleAst([Ast.GenericIdentifierAst("FnRef", [ast.return_type] + [p.type_annotation for p in ast.parameters], ast.identifier._tok)], ast._tok)))
+        owner.body.members.insert(i, Ast.SupPrototypeInheritanceAst(
+            ast.generic_parameters,
+            Ast.TypeSingleAst([ast.identifier.to_generic_identifier()], ast.identifier._tok),
+            None,
+            Ast.SupImplementationAst([new_fun], -1),
+            -1,
+            Ast.TypeSingleAst([Ast.GenericIdentifierAst("FnRef", [ast.return_type] + [p.type_annotation for p in ast.parameters], ast.identifier._tok)], ast._tok)))
+
         if f:
             owner.body.members.insert(i + 1, Ast.LetStatementAst([Ast.LocalVariableAst(False, ast.identifier, -1)], Ast.PostfixExpressionAst(Ast.TypeSingleAst([("__MOCK_" + ast.identifier).to_generic_identifier()], ast.identifier._tok), Ast.PostfixStructInitializerAst([], -1), -1), ty, None, -1))
         owner.body.members.remove(ast)

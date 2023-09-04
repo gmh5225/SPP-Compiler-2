@@ -82,8 +82,9 @@ class TokenType(Enum):
     KwAs = "as"
     KwSup = "sup"
     KwWith = "with"
-    KwSelf = "Self"
     KwFor = "for"
+    KwSelf = "self"
+    KwSelfType = "Self"
 
     # Don't change order of these (regex are matched in this order)
     # 0x12 must be HexDigits not DecDigits(0) then Identifier(x12)

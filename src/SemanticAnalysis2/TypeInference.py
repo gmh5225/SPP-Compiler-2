@@ -105,12 +105,10 @@ class TypeInfer:
         cls = s.global_scope.get_child_scope(ty)
 
         if isinstance(ast.op.identifier, Ast.IdentifierAst):
-            return ty
-            # print("?")
-            # sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False)
-            # if isinstance(sym, SymbolTypes.VariableSymbol):
-            #     return sym.type
-            # return sym
+            sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False)
+            if isinstance(sym, SymbolTypes.VariableSymbol):
+                return sym.type
+            return sym
         else:
             ty = TypeInfer.infer_expression(ast.lhs, s)
             sym = s.current_scope.get_symbol(ast.lhs.parts[-1], SymbolTypes.TypeSymbol)
@@ -118,11 +116,9 @@ class TypeInfer:
 
     @staticmethod
     def infer_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        # print("\n" + "#" * 20 + f" {ast} " + "#" * 20)
-
         scope = s
         if isinstance(ast.lhs, Ast.IdentifierAst) and ast.lhs.is_special():
-            return CommonTypes.void()
+            return None, CommonTypes.void()
 
         # Generics
         # print(ast.op.type_arguments)
@@ -155,8 +151,6 @@ class TypeInfer:
 
         ty = TypeInfer.infer_expression(ast.lhs, s, all=True)
         s = s.global_scope.get_child_scope(ty)
-        # if not s: # todo -> this error should be picked up in SemanticAnalysis?
-        #     raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Unknown method '{ast.lhs}(...)'.")
 
         l = ast.lhs
         default_generic_map = {}
@@ -165,6 +159,7 @@ class TypeInfer:
                 if h:
                     default_generic_map[g] = h
             l = l.lhs
+
         if type(l) == Ast.IdentifierAst:
             ty = TypeInfer.infer_identifier(l, scope)
             sym = s.get_symbol(ty.parts[-1], SymbolTypes.TypeSymbol)
@@ -177,9 +172,18 @@ class TypeInfer:
 
         # Analyse each overload for a potential match
         overloads = [x for x in s.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
+        original_call_arguments = ast.op.arguments.copy()
+        original_args_tys = arg_tys.copy()
+        original_args_ccs = arg_ccs.copy()
+
         for i, fn_type in enumerate([f.meta_data["fn_proto"] for f in overloads]):
             # Load the generic map
-            ast.op.generic_map = default_generic_map
+
+            ast.op.generic_map = default_generic_map.copy()
+            ast.op.arguments = original_call_arguments.copy()
+            arg_tys = original_args_tys.copy()
+            arg_ccs = original_args_ccs.copy()
+
             gs = fn_type.generic_parameters
             for g in gs:
                 ast.op.generic_map[g.identifier.identifier] = None
@@ -192,10 +196,11 @@ class TypeInfer:
             str_fn_type = str_fn_type[str_fn_type.index("("):].strip()
             sigs.append(str_fn_type)
 
-            # Skip first argument type for non-static functions
-            if overloads[i].meta_data.get("is_method", False) and not overloads[i].meta_data.get("is_static", False):
-                param_tys = param_tys[1:]
-                param_ccs = param_ccs[1:]
+            # Skip first argument type for non-static functions - todo?
+            if overloads[i].meta_data.get("is_method", False) and overloads[i].meta_data.get("fn_proto").parameters[0].is_self:
+                arg_tys.insert(0, TypeInfer.infer_expression(ast.lhs.lhs, scope))
+                arg_ccs.insert(0, copy.deepcopy(param_ccs[0]))
+                ast.op.arguments.insert(0, Ast.FunctionArgumentAst(None, Ast.IdentifierAst(ast.lhs.lhs.identifier, -1), copy.deepcopy(param_ccs[0]), False, -1))
 
             # Check if the function is callable with the number of given arguments.
             if len(param_tys) != len(arg_tys):
@@ -210,9 +215,9 @@ class TypeInfer:
             #         TypeInfer.substitute_generic_type(param_ty, g, h.parts[-1].identifier)
             # param_tys = substituted_param_tys
             check = enumerable_any([not TypeInfer.types_equal_account_for_generic(
-                ast.op.arguments[arg_tys.index(arg_ty)],
-                fn_type.parameters[param_tys.index(param_ty)],
-                arg_ty, param_ty, ast.op.generic_map, scope) for arg_ty, param_ty in zip(arg_tys, param_tys)])
+                ast.op.arguments[i],
+                fn_type.parameters[i],
+                arg_ty, param_ty, ast.op.generic_map, scope) for i, (arg_ty, param_ty) in enumerate(zip(arg_tys, param_tys))])
 
             if check[1]:
                 mismatch_index = check[0]
@@ -238,7 +243,10 @@ class TypeInfer:
             return_type = copy.deepcopy(fn_type.return_type)
             for g, h in ast.op.generic_map.items():
                 TypeInfer.substitute_generic_type(return_type, g, h.parts[-1].identifier)
-            return return_type
+            ast.op.arguments = original_call_arguments
+            return overloads[i], return_type
+
+        ast.op.arguments = original_call_arguments
 
         NL = "\n\t- "
         sigs.insert(0, "")
@@ -250,7 +258,7 @@ class TypeInfer:
         # TODO : improve the "attempted signature" line of the error message to include the parameter named with their
         #  incorrect types
         raise SystemExit(
-            ErrFmt.err(ast.lhs._tok) + f"Could not find function '{ast.lhs}' with the given arguments.\n\n" +
+            ErrFmt.err(ast.lhs._tok) + f"Could not call function '{ast.lhs}' with the given arguments.\n\n" +
             f"Attempted signature:{NL}({', '.join([str(arg_cc or '') + str(arg_ty) for arg_cc, arg_ty in zip(arg_ccs, arg_tys)])}) -> ?\n\n" +
             f"Available signatures{NL.join(output)}")
 
@@ -266,6 +274,8 @@ class TypeInfer:
     def check_type(ast: Ast.TypeAst, s: ScopeHandler) -> Ast.TypeAst:
         if isinstance(ast, Ast.TypeGenericArgumentAst):
             ast = ast.value
+        # if isinstance(ast, Ast.SelfTypeAst):
+        #     ast = Ast.TypeSingleAst([Ast.GenericIdentifierAst("Self", [], ast._tok)], ast._tok)
 
         # Check generic arguments given to the type
         try:
@@ -297,11 +307,6 @@ class TypeInfer:
             sym = s.current_scope.get_symbol(ast.parts[-1], SymbolTypes.TypeSymbol)
             ast = sym.type
             if sym is None: return []
-
-        # print(ast.identifier)
-        # print(hash(ast))
-        # print([c.id for c in s.global_scope.children])
-        # print("-" * 50)
 
         generics = ast.generic_parameters # todo : other parts of the type ie Vec[T].Value[X]. T would be missing here (just flatten all parts' generics)
         generics_names = [g.identifier.identifier for g in generics]
@@ -354,9 +359,9 @@ class TypeInfer:
                 case Ast.TypeTupleAst():
                     for t in ast.types:
                         yield from inner(t, s, level + 1)
-                case Ast.SelfTypeAst():
-                    sym = s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol)
-                    yield sym.type.parts[-1].identifier, level
+                # case Ast.SelfTypeAst():
+                #     sym = s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol)
+                #     yield sym.type.parts[-1].identifier, level
                 case _:
                     print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
                     raise SystemExit(ErrFmt.err(ast._tok) + f"Type '{type(ast).__name__}' not yet supported for traversal. Report as bug.")
@@ -365,8 +370,8 @@ class TypeInfer:
 
     @staticmethod
     def infer_type(ast: Ast.TypeAst, s: ScopeHandler) -> Ast.TypeAst:
-        if isinstance(ast.parts[-1], Ast.SelfTypeAst):
-            return s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol).type
+        # if isinstance(ast.parts[-1], Ast.SelfTypeAst):
+        #     return s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol).type
         return ast
 
     @staticmethod

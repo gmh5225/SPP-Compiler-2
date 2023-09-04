@@ -42,14 +42,27 @@ class SemanticAnalysis:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown module member {ast} being analysed. Report as bug.")
 
     @staticmethod
-    def analyse_function_parameters(asts: list[Ast.FunctionParameterAst], s: ScopeHandler):
+    def analyse_function_parameters(asts: list[Ast.FunctionParameterAst], s: ScopeHandler, **kwargs):
         # check no duplicate parameter names
         for i, p in enumerate(asts):
             if p.identifier in [q.identifier for q in asts[i + 1:]]:
                 raise SystemExit(ErrFmt.err(p._tok) + f"Duplicate parameter name '{p.identifier}'.")
 
         current_param_type = "required"
-        for p in asts:
+        for i, p in enumerate(asts):
+            if p.is_self:
+                if i > 0:
+                    raise SystemExit(
+                        "The 'self' parameter must be the first parameter:\n" +
+                        ErrFmt.err(asts[0]._tok) + "First parameter\n..." +
+                        ErrFmt.err(p._tok) + "Current parameter.")
+                elif not kwargs.get("in_class", False):
+                    raise SystemExit(
+                        "The 'self' parameter cannot be used in a function\nprototype outside of a class:\n" +
+                        ErrFmt.err(p._tok) + "Current parameter.")
+                else:
+                    continue
+
             if current_param_type == "optional" and not (p.default_value or p.is_variadic):
                 first_optional_parameter = next((p for p in asts if p.default_value), None)
                 final_token_1 = asts[asts.index(first_optional_parameter) + 1]._tok if first_optional_parameter != asts[-1] else p.type_annotation._tok
@@ -71,8 +84,9 @@ class SemanticAnalysis:
             if p.default_value: current_param_type = "optional"
             if p.is_variadic  : current_param_type = "variadic"
 
+        # to_analyse = asts[1:] if asts and asts[0].is_self else asts
         for p in asts:
-            SemanticAnalysis.analyse_parameter(p, s)
+            SemanticAnalysis.analyse_function_parameter(p, s)
 
     @staticmethod
     def analyse_type_generic_parameters(asts: list[Ast.TypeGenericParameterAst], s: ScopeHandler):
@@ -105,7 +119,7 @@ class SemanticAnalysis:
             if g.is_variadic: current_generic_param_type = "variadic"
 
     @staticmethod
-    def analyse_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler):
+    def analyse_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler, **kwargs):
         # special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
         function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.VariableSymbol)  # if not special else None
 
@@ -118,7 +132,7 @@ class SemanticAnalysis:
 
         # Analyse all the decorators and parameters, and the return type
         [SemanticAnalysis.analyse_decorator(ast, d, s) for d in ast.decorators]
-        SemanticAnalysis.analyse_function_parameters(ast.parameters, s)
+        SemanticAnalysis.analyse_function_parameters(ast.parameters, s, **kwargs)
         SemanticAnalysis.analyse_type_generic_parameters(ast.generic_parameters, s)
         TypeInfer.check_type(ast.return_type, s)
         ast.return_type = TypeInfer.infer_type(ast.return_type, s)
@@ -153,12 +167,12 @@ class SemanticAnalysis:
         s.prev_scope()
 
     @staticmethod
-    def analyse_parameter(ast: Ast.FunctionParameterAst, s: ScopeHandler):
+    def analyse_function_parameter(ast: Ast.FunctionParameterAst, s: ScopeHandler):
         TypeInfer.check_type(ast.type_annotation, s)
 
         # Analyse the parameter type, and Add the parameter to the current scope.
         ast.type_annotation = TypeInfer.infer_type(ast.type_annotation, s)
-        ty = ast.type_annotation if not isinstance(ast.type_annotation.parts[0], Ast.SelfTypeAst) else Ast.IdentifierAst("Self", ast.type_annotation._tok)
+        ty = ast.type_annotation   # if not isinstance(ast.type_annotation.parts[0], Ast.SelfTypeAst) else Ast.IdentifierAst("Self", ast.type_annotation._tok)
         sym = SymbolTypes.VariableSymbol(ast.identifier, ty, is_mutable=ast.is_mutable, is_initialized=True)
 
         # Set the symbol borrow information based on the parameter passing convention.
@@ -196,12 +210,14 @@ class SemanticAnalysis:
         s.next_scope()
         SemanticAnalysis.analyse_type_generic_parameters(ast.generic_parameters, s)
 
+        for type_part in ast.identifier.parts:
+            [TypeInfer.check_type(g, s) for g in type_part.generic_arguments]
+
         if type(ast) == Ast.SupPrototypeInheritanceAst:
             TypeInfer.check_type(ast.super_class, s)
             for type_part in ast.super_class.parts if ast.super_class else []:
                 [TypeInfer.check_type(g, s) for g in type_part.generic_arguments]
-        for type_part in ast.identifier.parts:
-            [TypeInfer.check_type(g, s) for g in type_part.generic_arguments]
+
         [SemanticAnalysis.analyse_sup_member(ast, m, s) for m in ast.body.members]
         s.prev_scope()
 
@@ -237,7 +253,7 @@ class SemanticAnalysis:
             # if not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
             #     raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' not found in super class '{owner.super_class}'.")
 
-        SemanticAnalysis.analyse_function_prototype(ast, s)
+        SemanticAnalysis.analyse_function_prototype(ast, s, in_class=True)
 
     @staticmethod
     def analyse_sup_typedef(ast: Ast.SupTypedefAst, s: ScopeHandler):
@@ -439,15 +455,18 @@ class SemanticAnalysis:
     def analyse_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):
         # Check the LHS is a function, and that the arguments match the function's parameters.
         SemanticAnalysis.analyse_expression(ast.lhs, s)
-        TypeInfer.infer_expression(ast, s)
-        SemanticAnalysis.analyse_function_arguments(ast, ast.op.arguments, s, **kwargs)
+        fn_target, _ = TypeInfer.infer_expression(ast, s)
+        SemanticAnalysis.analyse_function_arguments(ast, fn_target, ast.op.arguments, s, **kwargs)
 
     @staticmethod
-    def analyse_function_arguments(func: Ast.PostfixExpressionAst, asts: list[Ast.FunctionArgumentAst], s: ScopeHandler, **kwargs):
+    def analyse_function_arguments(func: Ast.PostfixExpressionAst, fn_target: SymbolTypes.VariableSymbol, asts: list[Ast.FunctionArgumentAst], s: ScopeHandler, **kwargs):
         # Number of memory checks need to occur here. This function handles all function calls, assignment and variable
         # declaration (through the __set__) function.
         ref_borrows = set()
         mut_borrows = set()
+
+        if fn_target and fn_target.meta_data.get("is_method", False) and fn_target.meta_data.get("fn_proto").parameters[0].is_self:
+            asts.insert(0, Ast.FunctionArgumentAst(None, func.lhs.lhs, fn_target.meta_data.get("fn_proto").parameters[0].calling_convention, False, func._tok))
 
         def collapse_ast_to_list_of_identifiers(ast: Ast.PostfixExpressionAst | Ast.IdentifierAst):
             match ast:
@@ -457,12 +476,12 @@ class SemanticAnalysis:
         for i, arg in enumerate(asts):
             SemanticAnalysis.analyse_expression(arg.value, s)
 
-            check_for_move = not func.lhs.is_special() or (func.lhs.is_special() and i > 0)
+            check_for_move = isinstance(func.lhs, Ast.IdentifierAst) and (not func.lhs.is_special() or (func.lhs.is_special() and i > 0))
             sym = s.current_scope.get_symbol(arg.value, SymbolTypes.VariableSymbol, error=False)
 
             # Record the initialization of single identifier let statements, so if their mutability checks fail later,
             # this AST can be pointed back to to show a immutable variable declaration.
-            if func.lhs.is_special() and isinstance(arg.value, Ast.IdentifierAst) and not sym.mem_info.is_initialized:
+            if isinstance(func.lhs, Ast.IdentifierAst) and func.lhs.is_special() and isinstance(arg.value, Ast.IdentifierAst) and not sym.mem_info.is_initialized:
                 sym.mem_info.initialization_ast = arg.value
 
             # Check if the argument being borrowed is valid to borrow from, ie it hasn't yet been moved elsewhere. The
@@ -470,7 +489,7 @@ class SemanticAnalysis:
             # value is illegal.
             if sym and check_for_move and not sym.mem_info.is_initialized:
                 raise SystemExit(
-                    "Cannot borrow from a value that is not initialized:\n" +
+                    "Cannot use a value that is not initialized:\n" +
                     ErrFmt.err(sym.mem_info.consume_ast._tok) + f"Value '{arg.value}' moved here.\n..." +
                     ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' not initialized.")
 
@@ -480,7 +499,7 @@ class SemanticAnalysis:
             # back, the object is completely initialized, and can be moved or borrowed from.
             if sym and sym.mem_info.is_partially_moved:
                 raise SystemExit(
-                    "Cannot borrow from a value that is partially moved:\n" +
+                    "Cannot use a value that is partially moved:\n" +
                     "\n".join([ErrFmt.err(a._tok) + f"Value '{arg.value}' partially moved here - {a} has been moved." for a in sym.mem_info.partially_moved_asts]) + "\n" +
                     ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' is not completely initialized.")
 
@@ -490,7 +509,7 @@ class SemanticAnalysis:
                 # borrows of non-overlapping parts of an object to occur at the same time, however, such as
                 # &mut x.a, &mut x.b, as there is no overlap and is therefore safe.
                 case Ast.ParameterPassingConventionReferenceAst():
-                    if arg.calling_convention.is_mutable and not func.lhs.identifier == "__set__":
+                    if arg.calling_convention.is_mutable and collapse_ast_to_list_of_identifiers(func.lhs)[-1].identifier != "__set__":  # and ((isinstance(func.lhs, Ast.IdentifierAst) and not func.lhs.identifier == "__set__") or not isinstance(func.lhs, Ast.IdentifierAst)):
                         identifiers = collapse_ast_to_list_of_identifiers(arg.value)
                         if identifiers is None:
                             raise SystemExit(
@@ -501,7 +520,7 @@ class SemanticAnalysis:
                         outermost_symbol = s.current_scope.get_symbol(outermost_identifier, SymbolTypes.VariableSymbol)
 
                         if not outermost_symbol.is_mutable:
-                            if func.lhs.identifier == "__reset__":
+                            if collapse_ast_to_list_of_identifiers(func.lhs)[-1].identifier == "__reset__":
                                 final_error_message = ErrFmt.err(arg.value._tok) + f"Assignment to '{arg.value}' attempted here."
                             else:
                                 final_error_message = ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' borrowed mutably here."

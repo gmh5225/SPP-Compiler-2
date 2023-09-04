@@ -44,11 +44,14 @@ class ParameterPassingConventionReferenceAst:
     def __hash__(self):
         return hash(BoolLiteralAst(self.is_mutable, self._tok))
 
-
 @dataclass
 class IdentifierAst:
     identifier: str
     _tok: int
+
+    def __init__(self, identifier, tok):
+        self.identifier = identifier
+        self._tok = tok
 
     def __hash__(self):
         h = hashlib.md5(self.identifier.encode()).digest()
@@ -99,22 +102,22 @@ class GenericIdentifierAst:
         return IdentifierAst(self.identifier, self._tok)
 
 # @dataclass
-class SelfTypeAst:
-    _tok: int
-    identifier: str
-
-    def __init__(self, _tok: int):
-        self._tok = _tok
-        self.identifier = "Self"
-
-    def __eq__(self, other):
-        return isinstance(other, SelfTypeAst)
-
-    def __str__(self):
-        return "Self"
-
-    def __hash__(self):
-        return hash(IdentifierAst("Self", self._tok))
+# class SelfTypeAst:
+#     _tok: int
+#     identifier: str
+#
+#     def __init__(self, _tok: int):
+#         self._tok = _tok
+#         self.identifier = "Self"
+#
+#     def __eq__(self, other):
+#         return isinstance(other, SelfTypeAst)
+#
+#     def __str__(self):
+#         return "Self"
+#
+#     def __hash__(self):
+#         return hash(IdentifierAst("Self", self._tok))
 
 @dataclass
 class ImportTypeAst:
@@ -264,6 +267,7 @@ def FunctionArgumentNormalAst(convention: Optional[TokenAst], value: ExpressionA
 
 @dataclass
 class FunctionParameterAst:
+    is_self: bool
     is_mutable: bool
     identifier: IdentifierAst
     calling_convention: Optional[ParameterPassingConventionReferenceAst]
@@ -280,8 +284,17 @@ class FunctionParameterAst:
         s += (" = " + str(self.default_value)) if self.default_value else ""
         return s
 
+def FunctionParameterSelfAst(calling_convention: Optional[ParameterPassingConventionReferenceAst] | TokenAst, _tok: int):
+    self_type = TypeSingleAst([GenericIdentifierAst("Self", [], _tok)], _tok)
+    param = None
+    match calling_convention:
+        case TokenAst(): param =  FunctionParameterAst(True, True, IdentifierAst("self", _tok), None, self_type, None, False, _tok)
+        case _: param = FunctionParameterAst(True, False, IdentifierAst("self", _tok), calling_convention, self_type, None, False, _tok)
+    return param
+
+
 def FunctionParameterRequiredAst(is_mutable: bool, identifier: IdentifierAst, calling_convention: Optional[TokenAst], type_annotation: TypeAst, _tok: int):
-    return FunctionParameterAst(is_mutable, identifier, calling_convention, type_annotation, None, False, _tok)
+    return FunctionParameterAst(False, is_mutable, identifier, calling_convention, type_annotation, None, False, _tok)
 
 def FunctionParameterOptionalAst(parameter: FunctionParameterAst, default_value: ExpressionAst):
     parameter.default_value = default_value
@@ -475,7 +488,7 @@ def TypeGenericArgumentNormalAst(value: TypeAst, _tok: int):
 
 @dataclass
 class TypeSingleAst:
-    parts: list[SelfTypeAst | GenericIdentifierAst | int]
+    parts: list[GenericIdentifierAst | int]
     _tok: int
 
     def __eq__(self, other):
@@ -665,6 +678,9 @@ class SupPrototypeNormalAst:
         s += str(self.where_block) + "\n" if self.where_block else ""
         s += "{" + str(self.body) + "}\n"
         return s
+
+    def to_type(self):
+        return self.identifier
 
 @dataclass
 class SupPrototypeInheritanceAst(SupPrototypeNormalAst):

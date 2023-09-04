@@ -780,11 +780,12 @@ class Parser:
 
     def _parse_function_parameter_internal(self) -> BoundParser:
         def inner():
-            p1 = self._parse_function_parameter_required().delay_parse()
-            p2 = self._parse_function_parameter_optional().delay_parse()
-            p3 = self._parse_function_parameter_variadic().delay_parse()
-            p4 = (p3 | p2 | p1).parse_once()
-            return p4
+            p1 = self._parse_function_parameter_self().delay_parse()
+            p2 = self._parse_function_parameter_required().delay_parse()
+            p3 = self._parse_function_parameter_optional().delay_parse()
+            p4 = self._parse_function_parameter_variadic().delay_parse()
+            p5 = (p1 | p4 | p3 | p2).parse_once()
+            return p5
         return BoundParser(self, inner)
 
     def _parse_function_parameters_internal_next(self) -> BoundParser:
@@ -799,6 +800,22 @@ class Parser:
             p1 = self._parse_function_parameter_internal().parse_once()
             p2 = self._parse_function_parameters_internal_next().parse_zero_or_more()
             return [p1, *p2]
+        return BoundParser(self, inner)
+
+    def _parse_function_parameter_self(self) -> BoundParser:
+        def inner():
+            c1 = self._current
+            p1 = self._parse_function_parameter_self_calling_convention().parse_optional()
+            p2 = self._parse_token(TokenType.KwSelf).parse_once()
+            return Ast.FunctionParameterSelfAst(p1, c1)
+        return BoundParser(self, inner)
+
+    def _parse_function_parameter_self_calling_convention(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_parameter_passing_convention().delay_parse()
+            p2 = self._parse_token(TokenType.KwMut).delay_parse()
+            p3 = (p1 | p2).parse_once()
+            return p3
         return BoundParser(self, inner)
 
     def _parse_function_parameter_required(self) -> BoundParser:
@@ -1170,9 +1187,9 @@ class Parser:
         # Self::Output::A
         def inner():
             c1 = self._current
-            p1 = self._parse_token(TokenType.KwSelf).parse_once()
+            p1 = self._parse_token(TokenType.KwSelfType).parse_once()
             p2 = self._parse_type_identifier_upper_types_following_self().parse_optional() or []
-            return Ast.TypeSingleAst([Ast.SelfTypeAst(c1), *p2], c1) # c1?
+            return Ast.TypeSingleAst([Ast.TypeSingleAst([Ast.GenericIdentifierAst("Self", [], c1)], c1), *p2], c1) # c1?
         return BoundParser(self, inner)
 
     def _parse_type_identifier_upper_types_following_self(self) -> BoundParser:
