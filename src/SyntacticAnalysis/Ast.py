@@ -791,6 +791,9 @@ class StringLiteralAst:
     def __str__(self):
         return self.value
 
+    def __hash__(self):
+        return hash(IdentifierAst(self.value, self._tok))
+
 @dataclass
 class ArrayLiteralAst:
     values: list[ExpressionAst]

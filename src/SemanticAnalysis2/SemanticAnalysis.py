@@ -463,6 +463,12 @@ class SemanticAnalysis:
                     ErrFmt.err(sym.mem_info.consume_ast._tok) + f"Value '{arg.value}' moved here.\n..." +
                     ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' not initialized.")
 
+            if sym and sym.mem_info.is_partially_moved:
+                raise SystemExit(
+                    "Cannot borrow from a value that is partially moved:\n" +
+                    "\n".join([ErrFmt.err(a._tok) + f"Value '{arg.value}' partially moved here - {a} has been moved." for a in sym.mem_info.partially_moved_asts]) + "\n" +
+                    ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' is not completely initialized.")
+
             match arg.calling_convention:
                 # Check for law of exclusivity violations if the argument is a borrow of any kind. This enforces that
                 # there can only be 1 mutable or n immutable borrows of an object at 1 time. It also allows multiple
@@ -510,6 +516,9 @@ class SemanticAnalysis:
                                 "Cannot move from a borrowed context:\n" +
                                 ErrFmt.err(outermost_symbol.mem_info.borrow_ast._tok) + f"Value '{arg.value}' borrowed here.\n..." +
                                 ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' moved here.")
+                        else:
+                            outermost_symbol.mem_info.is_partially_moved = True
+                            outermost_symbol.mem_info.partially_moved_asts.append(arg.value)
 
 
     @staticmethod
