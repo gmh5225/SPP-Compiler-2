@@ -41,6 +41,9 @@ class ParameterPassingConventionReferenceAst:
     def __str__(self):
         return "&" + ("mut " if self.is_mutable else "")
 
+    def __hash__(self):
+        return hash(BoolLiteralAst(self.is_mutable, self._tok))
+
 
 @dataclass
 class IdentifierAst:
@@ -249,6 +252,9 @@ class FunctionArgumentAst:
         s = str(self.calling_convention) if self.calling_convention else ""
         s += str(self.value)
         return s
+
+    def __hash__(self):
+        return hash((self.identifier, self.calling_convention, self.value, self.unpack))
 
 def FunctionArgumentNamedAst(identifier: IdentifierAst, convention: Optional[TokenAst], value: ExpressionAst, _tok: int):
     return FunctionArgumentAst(identifier, value, convention, False, _tok)
@@ -506,6 +512,9 @@ class IfStatementAst:
         s += "\n".join([str(branch) for branch in self.branches]) + "}\n"
         return s
 
+    def __hash__(self):
+        return hash((self.condition, *self.branches))
+
 @dataclass
 class PatternStatementAst:
     comparison_op: Optional[TokenAst]
@@ -521,6 +530,9 @@ class PatternStatementAst:
         s += " { " + "\n".join([str(statement) for statement in self.body]) + " }"
         return s
 
+    def __hash__(self):
+        return hash((*self.patterns, self.guard))
+
 @dataclass
 class PatternAst:
     value: ExpressionAst
@@ -528,6 +540,9 @@ class PatternAst:
 
     def __str__(self):
         return str(self.value)
+
+    def __hash__(self):
+        return hash(self.value)
 
 @dataclass
 class WhileStatementAst:
@@ -805,6 +820,9 @@ class ArrayLiteralAst:
     def __str__(self):
         return "[" + ", ".join([str(value) for value in self.values]) + "]"
 
+    def __hash__(self):
+        return hash(tuple(self.values))
+
 @dataclass
 class BoolLiteralAst:
     value: bool
@@ -812,6 +830,9 @@ class BoolLiteralAst:
 
     def __str__(self):
         return "true" if self.value else "false"
+
+    def __hash__(self):
+        return hash(IdentifierAst(str(self), self._tok))
 
 @dataclass
 class RegexLiteralAst:
@@ -821,6 +842,9 @@ class RegexLiteralAst:
     def __str__(self):
         return self.value
 
+    def __hash__(self):
+        return hash(IdentifierAst(self.value, self._tok))
+
 @dataclass
 class TupleLiteralAst:
     values: list[ExpressionAst]
@@ -828,6 +852,9 @@ class TupleLiteralAst:
 
     def __str__(self):
         return "(" + ", ".join([str(value) for value in self.values]) + ")"
+
+    def __hash__(self):
+        return hash(tuple(self.values))
 
 
 PostfixOperationAst = PostfixFunctionCallAst | PostfixMemberAccessAst | PostfixStructInitializerAst | TokenAst

@@ -118,6 +118,8 @@ class TypeInfer:
 
     @staticmethod
     def infer_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+        # print("\n" + "#" * 20 + f" {ast} " + "#" * 20)
+
         scope = s
         if isinstance(ast.lhs, Ast.IdentifierAst) and ast.lhs.is_special():
             return CommonTypes.void()

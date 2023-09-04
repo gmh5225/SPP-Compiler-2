@@ -143,7 +143,6 @@ class SemanticAnalysis:
                 ErrFmt.err(ast.return_type._tok) + f"Function return type is '{ast.return_type}'.\n..." +
                 ErrFmt.err(err_ast._tok) + f"Final statement is not a return statement.")
 
-        # todo - if the return type is Void, then don't check the final statement, unless it is an explicit "return"
         if t != ast.return_type and ast.body.statements and isinstance(final_statement, Ast.ReturnStatementAst):
             err_ast = ast.body.statements[-1]
             raise SystemExit(
@@ -358,7 +357,7 @@ class SemanticAnalysis:
         # Check there isn't a comparison operator in the if-statement and the pattern statement.
         if owner.comparison_op and ast.comparison_op:
             raise SystemExit(
-                "Cannot have a comparison operator in both the if-statement and the pattern-statement." +
+                "Cannot have a comparison operator in both the if-statement\nand the pattern-statement:\n" +
                 ErrFmt.err(owner.comparison_op._tok) + "Comparison operator in if-statement.\n..." +
                 ErrFmt.err(ast._tok) + "Comparison operator in pattern statement.")
 
@@ -402,7 +401,7 @@ class SemanticAnalysis:
 
         # Next, convert the right-hand side into a function argument, and construct the function call. The function call
         # creates the "(y)" that is the postfix expression for "x.add", creating "x.add(y)". This is then analysed.
-        rhs = Ast.FunctionArgumentAst(None, ast.rhs, Ast.ParameterPassingConventionReferenceAst(False, pos), False, pos)
+        rhs = Ast.FunctionArgumentAst(None, ast.rhs, None, False, pos)
         fn_call = Ast.PostfixFunctionCallAst([TypeInfer.infer_expression(ast.rhs, s)], [rhs], pos)
         fn_call = Ast.PostfixExpressionAst(fn, fn_call, pos)
         SemanticAnalysis.analyse_expression(fn_call, s)
@@ -456,6 +455,8 @@ class SemanticAnalysis:
                 case Ast.PostfixExpressionAst(): return collapse_ast_to_list_of_identifiers(ast.lhs) + [ast.op.identifier]
 
         for i, arg in enumerate(asts):
+            SemanticAnalysis.analyse_expression(arg.value, s)
+
             check_for_move = not func.lhs.is_special() or (func.lhs.is_special() and i > 0)
             sym = s.current_scope.get_symbol(arg.value, SymbolTypes.VariableSymbol, error=False)
 

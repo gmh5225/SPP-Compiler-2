@@ -230,6 +230,7 @@ class Scope:
         combined_symbol_tables = [a for a in self.symbol_table.symbols.values() if isinstance(a, expected_sym_type)]
         for sup_scope in self.sup_scopes:
             combined_symbol_tables += [a for a in sup_scope.symbol_table.symbols.values() if isinstance(a, expected_sym_type)]
+        print("SYMS", [str(sym.name) for sym in combined_symbol_tables])
         return combined_symbol_tables
 
     def all_symbols_exclusive_no_fn(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
