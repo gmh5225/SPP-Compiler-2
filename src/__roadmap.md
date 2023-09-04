@@ -4,7 +4,6 @@
 - [ ] Overload selection with optional & variadic parameters.
 - [ ] Named (type) parameters and arguments binding to the correct ones.
 - [ ] Generic type substitution when checking return type is matched by final statement.
-- [ ] Final statement shouldn't be compared against return-type if the return type should be `Void`.
 
 #### Lambdas/closures related
 - [ ] Lambdas & capturing variables (apply the same borrow/move rules as parameters).
@@ -18,5 +17,7 @@
 - [ ] Currently, types ignore their namespace -- fix this + nested types
 
 #### Other
+- [ ] Calling functions in `sup` scopes isn't working yet.
+- [ ] Fix the `Self` type for analysis (throws errors at the moment).
 - [ ] Statements that require a `\n` at the end shouldn't if it's a one-line statement.
 - [ ] Assigning to attributes doesn't work yet because type-inference of the attribute doesn't work.
