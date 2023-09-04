@@ -66,6 +66,9 @@ class IdentifierAst:
     def to_generic_identifier(self) -> GenericIdentifierAst:
         return GenericIdentifierAst(self.identifier, [], self._tok)
 
+    def is_special(self):
+        return self.identifier.startswith("__") and self.identifier.endswith("__")
+
 @dataclass
 class ModuleIdentifierAst:
     parts: list[IdentifierAst]

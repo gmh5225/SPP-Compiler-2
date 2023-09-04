@@ -119,7 +119,7 @@ class TypeInfer:
     @staticmethod
     def infer_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
         scope = s
-        if isinstance(ast.lhs, Ast.IdentifierAst) and ast.lhs.identifier == "__set__":
+        if isinstance(ast.lhs, Ast.IdentifierAst) and ast.lhs.is_special():
             return CommonTypes.void()
 
         # Generics

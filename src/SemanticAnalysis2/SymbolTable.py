@@ -19,6 +19,7 @@ class VariableSymbolMemoryStatus:
 
     consume_ast: Any
     borrow_ast: Any
+    initialization_ast: Any
     partially_moved_asts: list
 
 
@@ -30,6 +31,7 @@ class VariableSymbolMemoryStatus:
 
         self.consume_ast = None
         self.borrow_ast = None
+        self.initialization_ast = None
         self.partially_moved_asts = []
 
     def is_borrowed(self):

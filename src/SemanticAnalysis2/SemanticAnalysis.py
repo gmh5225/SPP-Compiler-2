@@ -316,8 +316,8 @@ class SemanticAnalysis:
     @staticmethod
     def analyse_identifier(ast: Ast.IdentifierAst, s: ScopeHandler, **kwargs):
         # Special assignment dummy method to check the statement and avoid code duplication.
-        if ast.identifier == "__set__":
-            return
+        if ast.is_special():
+            return # TODO : true or false?
         if not s.current_scope.has_symbol(ast, SymbolTypes.VariableSymbol):
             # if not s.current_scope.has_symbol("__MOCK_" + ast, SymbolTypes.TypeSymbol):
                 if not kwargs.get("no_throw", False):
@@ -451,18 +451,27 @@ class SemanticAnalysis:
                 case Ast.PostfixExpressionAst(): return collapse_ast_to_list_of_identifiers(ast.lhs) + [ast.op.identifier]
 
         for i, arg in enumerate(asts):
-            check_for_move = func.lhs.identifier != "__set__" or (func.lhs.identifier == "__set__" and i > 0)
-
-            # Check if the argument being borrowed is valid to borrow from, ie it hasn't already been moved
-            # elsewhere. The convention of the argument doesn't matter at this sateg, because moving or borrowing an
-            # uninitialized value is illegal.
+            check_for_move = not func.lhs.is_special() or (func.lhs.is_special() and i > 0)
             sym = s.current_scope.get_symbol(arg.value, SymbolTypes.VariableSymbol, error=False)
+
+            # Record the initialization of single identifier let statements, so if their mutability checks fail later,
+            # this AST can be pointed back to to show a immutable variable declaration.
+            if func.lhs.is_special() and isinstance(arg.value, Ast.IdentifierAst) and not sym.mem_info.is_initialized:
+                sym.mem_info.initialization_ast = arg.value
+
+            # Check if the argument being borrowed is valid to borrow from, ie it hasn't yet been moved elsewhere. The
+            # convention of the argument doesn't matter at this stage, because moving or borrowing an uninitialized
+            # value is illegal.
             if sym and check_for_move and not sym.mem_info.is_initialized:
                 raise SystemExit(
                     "Cannot borrow from a value that is not initialized:\n" +
                     ErrFmt.err(sym.mem_info.consume_ast._tok) + f"Value '{arg.value}' moved here.\n..." +
                     ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' not initialized.")
 
+            # No operations can be done on a value at all if any part of it has been moved -- this is because the only
+            # way to ensure the object is completely initialized before an operation is to keep it in the same scope,
+            # until it can be confirmed that it is completely initialized. Once the missing attributes have been added
+            # back, the object is completely initialized, and can be moved or borrowed from.
             if sym and sym.mem_info.is_partially_moved:
                 raise SystemExit(
                     "Cannot borrow from a value that is partially moved:\n" +
@@ -475,9 +484,16 @@ class SemanticAnalysis:
                 # borrows of non-overlapping parts of an object to occur at the same time, however, such as
                 # &mut x.a, &mut x.b, as there is no overlap and is therefore safe.
                 case Ast.ParameterPassingConventionReferenceAst():
-                    # todo : mut reference requires the attribute to be mutable on declaration (check symbol)
-                    if arg.calling_convention.is_mutable and not sym.is_mutable:
-                        raise SystemExit(ErrFmt.err(arg.value._tok) + f"Cannot borrow immutable value '{arg.value}' as mutable.")
+                    if arg.calling_convention.is_mutable and not sym.is_mutable and not func.lhs.identifier == "__set__":
+                        if func.lhs.identifier == "__reset__":
+                            final_error_message = ErrFmt.err(arg.value._tok) + f"Assignment to '{arg.value}' attempted here."
+                        else:
+                            final_error_message = ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' borrowed mutably here."
+
+                        raise SystemExit(
+                            "Cannot take a mutable borrow from an immutable value:\n" +
+                            ErrFmt.err(sym.mem_info.initialization_ast._tok) + f"Value '{arg.value}' declared immutably here.\n..." +
+                            final_error_message)
 
                     # A mutable borrow of the argument is occurring. Ensure that no part of the argument is already
                     # mutably or immutably borrowed.
@@ -679,6 +695,8 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_assignment_expression(ast: Ast.AssignmentExpressionAst, s: ScopeHandler, **kwargs):
+        special_function_name = "__set__" if kwargs.get("let", False) else "__reset__"
+
         # A manual mutability check is performed here, because whilst the function call handles all the memory and
         # mutability checks, the "set" function doesn't exist, so the mutability check has to be done manually.
         for lhs in ast.lhs:
@@ -693,10 +711,10 @@ class SemanticAnalysis:
             # the outermost identifier in a postfix member access operation. If the outermost of a member access is a
             # function call ie "a.b.c().d.e" will be "c()", then the mutability is irrelevant, as mutability is tied to
             # values not types.
-            if isinstance(lhs, Ast.IdentifierAst):
-                sym = s.current_scope.get_symbol(lhs, SymbolTypes.VariableSymbol)
-                if not sym.is_mutable and sym.mem_info.is_initialized and not sym.is_comptime:
-                    raise SystemExit(ErrFmt.err(lhs._tok) + f"Cannot assign to an immutable variable.")
+            # if isinstance(lhs, Ast.IdentifierAst):
+            #     sym = s.current_scope.get_symbol(lhs, SymbolTypes.VariableSymbol)
+            #     if not sym.is_mutable and sym.mem_info.is_initialized and not sym.is_comptime:
+            #         raise SystemExit(ErrFmt.err(lhs._tok) + f"Cannot assign to an immutable variable.")
 
         # Create a mock function call for the assignment, and analyse it. Do 1 per variable, so that the function call
         # analysis can handle the multiple function calls for tuples etc. Don't analyse the RHS, because the mock
@@ -705,18 +723,18 @@ class SemanticAnalysis:
         if len(ast.lhs) == 1:
             lhs_sym = s.current_scope.get_symbol(ast.lhs[0], SymbolTypes.VariableSymbol)
 
-            convention = None
-            if lhs_sym.mem_info.is_borrowed_mut:
-                convention = Ast.ParameterPassingConventionReferenceAst(True, -1)
-            elif lhs_sym.mem_info.is_borrowed_ref:
-                convention = Ast.ParameterPassingConventionReferenceAst(False, -1)
+            # convention = None
+            # if lhs_sym.mem_info.is_borrowed_mut:
+            #     convention = Ast.ParameterPassingConventionReferenceAst(True, -1)
+            # elif lhs_sym.mem_info.is_borrowed_ref:
+            #     convention = Ast.ParameterPassingConventionReferenceAst(False, -1)
 
             fn_call = Ast.PostfixFunctionCallAst(
                 [], [
-                    Ast.FunctionArgumentAst(None, ast.lhs[0], convention, False, ast.lhs[0]._tok),
+                    Ast.FunctionArgumentAst(None, ast.lhs[0], Ast.ParameterPassingConventionReferenceAst(True, -1), False, ast.lhs[0]._tok),
                     Ast.FunctionArgumentAst(None, ast.rhs, None, False, ast.rhs._tok)
                 ], ast.op._tok)
-            fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst("__set__", ast.op._tok), fn_call, ast.op._tok)
+            fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst(special_function_name, ast.op._tok), fn_call, ast.op._tok)
             SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **kwargs)
 
             # Type check
@@ -744,7 +762,7 @@ class SemanticAnalysis:
                         Ast.FunctionArgumentAst(None, lhs, Ast.ParameterPassingConventionReferenceAst(False, -1), False, lhs._tok),
                         Ast.FunctionArgumentAst(None, ast.rhs.values[i], None, False, ast.rhs._tok),
                     ], ast.op._tok)
-                fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst("__set__", ast.op._tok), fn_call, ast.op._tok)
+                fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst(special_function_name, ast.op._tok), fn_call, ast.op._tok)
                 SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **kwargs)
 
                 # Type check
