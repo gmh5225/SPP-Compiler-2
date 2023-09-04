@@ -9,3 +9,5 @@
 - [ ] Destructuring (especially for `if-patterns` and `let` statements).
 - [ ] Heavily extend errors to include their source declaration ie `let` statement etc.
 - [ ] Check that `copy.deepcopy` is called on all types that require it (modifying local AST variable).
+- [ ] Currently, types ignore their namespace -- fix this + nested types
+- [ ] Statements that require a `\n` at the end shouldn't if it's a one-line statement.
