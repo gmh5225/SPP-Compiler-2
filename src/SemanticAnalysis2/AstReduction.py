@@ -86,6 +86,11 @@ class AstReduction:
                 if param.type_annotation.parts[-1].identifier == "Self":
                     param.type_annotation = owner.to_type()
                 TypeInfer.substitute_generic_type(param.type_annotation, "Self", owner.to_type())
+
+            if ast.return_type.parts[-1].identifier == "Self":
+                ast.return_type = owner.to_type()
+            TypeInfer.substitute_generic_type(ast.return_type, "Self", owner.to_type())
+
             for statement in ast.body.statements:
                 match statement:
                     case Ast.LetStatementAst() if statement.type_annotation is not None:

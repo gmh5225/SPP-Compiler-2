@@ -1189,7 +1189,7 @@ class Parser:
             c1 = self._current
             p1 = self._parse_token(TokenType.KwSelfType).parse_once()
             p2 = self._parse_type_identifier_upper_types_following_self().parse_optional() or []
-            return Ast.TypeSingleAst([Ast.TypeSingleAst([Ast.GenericIdentifierAst("Self", [], c1)], c1), *p2], c1) # c1?
+            return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Self", [], c1), *p2], c1)
         return BoundParser(self, inner)
 
     def _parse_type_identifier_upper_types_following_self(self) -> BoundParser:
