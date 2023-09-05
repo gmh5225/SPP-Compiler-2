@@ -586,9 +586,21 @@ class SemanticAnalysis:
         generics_difference = set(actual_generics) - set(given_generics)
 
         if len(given_generics) < len(actual_generics):
-            raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Generic parameters missing for type '{cls_ty}': '{', '.join([str(g) for g in generics_difference])}'.")
+            raise SystemExit(
+                f"Not enough generic parameters have been given to '{cls_ty}:\n" +
+                ErrFmt.err(cls_ty._tok) + "Class definition here.\n..." +
+                ErrFmt.err(ast.lhs._tok) + f"Generic parameters given: [{', '.join([str(g) for g in given_generics])}]\n..." +
+                ErrFmt.err(ast.lhs._tok) + f"Generic parameters required: [{', '.join([str(g) for g in actual_generics])}]"
+            )
+
         if len(given_generics) > len(actual_generics):
-            raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Too many generic parameters given for type '{cls_ty}': '{', '.join(str(g) for g in generics_difference)}'.")
+            # todo: include the inferrable generics in the error message?
+            raise SystemExit(
+                f"Too many generic parameters have been given to '{cls_ty}:\n" +
+                ErrFmt.err(cls_ty._tok) + "Class definition here.\n..." +
+                ErrFmt.err(ast.lhs._tok) + f"Generic parameters given: [{', '.join([str(g) for g in given_generics])}]\n..." +
+                ErrFmt.err(ast.lhs._tok) + f"Generic parameters required: [{', '.join([str(g) for g in actual_generics])}] (probably inferrable)" # todo : proof of inferability required
+            )
 
         # After verifying all the generics are given correctly, their types need to be registered in the generic map, so
         # type checking can happen correctly. todo

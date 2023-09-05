@@ -274,8 +274,6 @@ class TypeInfer:
     def check_type(ast: Ast.TypeAst, s: ScopeHandler) -> Ast.TypeAst:
         if isinstance(ast, Ast.TypeGenericArgumentAst):
             ast = ast.value
-        # if isinstance(ast, Ast.SelfTypeAst):
-        #     ast = Ast.TypeSingleAst([Ast.GenericIdentifierAst("Self", [], ast._tok)], ast._tok)
 
         # Check generic arguments given to the type
         try:
@@ -284,16 +282,25 @@ class TypeInfer:
             raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown type '{ast}'.")
 
         given_generic_arguments = ast.parts[-1].generic_arguments
-        actual_generic_parameters = sym.type.generic_parameters if isinstance(sym.type, Ast.ClassPrototypeAst) else []
-        if len(given_generic_arguments) > len(actual_generic_parameters):
-            if actual_generic_parameters and actual_generic_parameters[-1].is_variadic:
-                pass
-            else:
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Too many generic arguments given to type '{sym.type}'.")
-        # if len(given_generic_arguments) < len(missing_generics := TypeInfer.required_generic_parameters_for_cls(sym.type, s)):
-        #     raise SystemExit(ErrFmt.err(ast._tok) + f"Not enough generic arguments given to type '{sym.type}'. Missing {missing_generics}.")
+        actual_generic_parameters = sym.type.generic_parameters.copy() if isinstance(sym.type, Ast.ClassPrototypeAst) else []
+        #
+        # print("-" * 100)
+        # print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
+        # # print(f"All global type symbols: {[str(x.type.to_type()) for x in s.global_scope.all_symbols(SymbolTypes.TypeSymbol)]}")
+        # print(f"Checking generic types for {ast}")  # ({type(ast)}) (symbol: {sym.type})")
+        # print(f"Actual generic parameters: {[str(x) for x in actual_generic_parameters]}")
+        # print(f"Given generic arguments: {[str(x) for x in given_generic_arguments]}")
+
         for g in given_generic_arguments:
             TypeInfer.check_type(g, s)
+
+        # if len(given_generic_arguments) > len(actual_generic_parameters):
+        #     if actual_generic_parameters and actual_generic_parameters[-1].is_variadic:
+        #         pass
+        #     else:
+        #         raise SystemExit(ErrFmt.err(ast._tok) + f"Too many generic arguments given to type '{sym.type.to_type()}'.")
+        # if len(given_generic_arguments) < len(missing_generics := TypeInfer.required_generic_parameters_for_cls(sym.type, s)):
+        #     raise SystemExit(ErrFmt.err(ast._tok) + f"Not enough generic arguments given to type '{sym.type.to_type()}'. Missing {[str(g) for g in missing_generics]}.")
 
         return TypeInfer.likely_symbols(ast, SymbolTypes.TypeSymbol, "type", s)
 
@@ -305,16 +312,19 @@ class TypeInfer:
 
         if isinstance(ast, Ast.TypeSingleAst):
             sym = s.current_scope.get_symbol(ast.parts[-1], SymbolTypes.TypeSymbol)
+            if sym is None or isinstance(sym.type, Ast.TypeSingleAst): return []
             ast = sym.type
-            if sym is None: return []
+            generics = sym.type.generic_parameters
+        else:
+            generics = ast.generic_parameters.copy() # todo : other parts of the type ie Vec[T].Value[X]. T would be missing here (just flatten all parts' generics)
 
-        generics = ast.generic_parameters # todo : other parts of the type ie Vec[T].Value[X]. T would be missing here (just flatten all parts' generics)
         generics_names = [g.identifier.identifier for g in generics]
         sym = s.global_scope.get_child_scope(ast.to_type())
 
 
         # For each attribute of the class, if the type is the generic or composes the generic ie Vec[T], then the type
         # is inferrable, and is therefore not required. Remove it from the list of required generics.
+
         attrs = sym.all_symbols_exclusive(SymbolTypes.VariableSymbol)
         for attr_name, attr_type in [(attr.name, attr.type) for attr in attrs]:
             for t in TypeInfer.traverse_type(attr_type, s):

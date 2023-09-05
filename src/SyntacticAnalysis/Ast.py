@@ -223,7 +223,7 @@ class ClassPrototypeAst:
         return s
 
     def to_type(self) -> TypeAst:
-        return TypeSingleAst([GenericIdentifierAst(self.identifier.identifier, [], self.identifier._tok)], self._tok)
+        return TypeSingleAst([GenericIdentifierAst(self.identifier.identifier, [None for x in range(len(self.generic_parameters))], self.identifier._tok)], self._tok)
 
 @dataclass
 class FunctionPrototypeAst:
