@@ -816,6 +816,8 @@ class SemanticAnalysis:
         # todo : this doesn't work? check how the type inference works for attributes (probs needs recursion)
         # todo : issue is for postfix ie a.b.c = 1 etc because the symbol a.b.c doesn't exist
         for variable in ast.lhs:
+            while isinstance(variable, Ast.PostfixExpressionAst) and isinstance(variable.op, Ast.PostfixMemberAccessAst):
+                variable = variable.lhs
             s.current_scope.get_symbol(variable, SymbolTypes.VariableSymbol).mem_info.is_initialized = True
 
         # Extra checks for assignment: mutability and type
