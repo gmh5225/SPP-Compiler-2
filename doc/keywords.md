@@ -97,6 +97,9 @@
 - Currently used as `sup Copy for Num` etc.
 - Will change to a different more applicable name in the future.
 
+#### self
+- Refer to the current object.
+
 #### Self
 - Refer to the current type of the enclosing class.
 - Can be used in generics referring to the class itself.

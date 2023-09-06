@@ -7,7 +7,7 @@
 - [ ] All things type-constraints.
 
 #### Memory
-- [ ] Reassigning to moves _attributes_ makes the object no longer partially moved.
+- [ ] Reassigning to moved _attributes_ makes the object no longer partially moved.
 
 #### Lambdas/closures related
 - [ ] Lambdas & capturing variables (apply the same borrow/move rules as parameters).
