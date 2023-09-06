@@ -422,7 +422,6 @@ class SemanticAnalysis:
     def analyse_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):
         lhs_type = TypeInfer.infer_expression(ast.lhs, s)
         lhs_type = isinstance(lhs_type, Ast.TypeTupleAst) and CommonTypes.tup(lhs_type.types) or lhs_type
-
         sym = s.current_scope.get_symbol(lhs_type.parts[-1], SymbolTypes.TypeSymbol)
         if not sym:
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Type '{lhs_type}' not found.")
@@ -430,6 +429,7 @@ class SemanticAnalysis:
         class_scope = s.global_scope.get_child_scope(lhs_type)
         if not class_scope:
             # Its a generic type (no attributes or methods accessible until constraints are applied)
+            # todo: check against all constraints as sup-scopes (when constraints are added to checks)
             raise SystemExit(ErrFmt.err(ast.op._tok) + f"Generic member access not available unless constraints are applied.")
 
         # For numeric member access, ie "x.0", check the LHS is a tuple type, and that the number is a valid index for
@@ -454,7 +454,7 @@ class SemanticAnalysis:
         ref_borrows = set()
         mut_borrows = set()
 
-        if fn_target and fn_target.meta_data.get("is_method", False) and fn_target.meta_data.get("fn_proto").parameters[0].is_self:
+        if fn_target and fn_target.meta_data.get("is_method", False) and fn_target.meta_data.get("fn_proto").parameters and fn_target.meta_data.get("fn_proto").parameters[0].is_self:
             asts.insert(0, Ast.FunctionArgumentAst(None, func.lhs.lhs, fn_target.meta_data.get("fn_proto").parameters[0].calling_convention, False, func._tok))
 
         def collapse_ast_to_list_of_identifiers(ast: Ast.PostfixExpressionAst | Ast.IdentifierAst | Ast.TokenAst):
@@ -813,6 +813,8 @@ class SemanticAnalysis:
 
         # Set this variable as initialized. All other memory issues will be handled by the function call analysis of the
         # "set" function.
+        # todo : this doesn't work? check how the type inference works for attributes (probs needs recursion)
+        # todo : issue is for postfix ie a.b.c = 1 etc because the symbol a.b.c doesn't exist
         for variable in ast.lhs:
             s.current_scope.get_symbol(variable, SymbolTypes.VariableSymbol).mem_info.is_initialized = True
 

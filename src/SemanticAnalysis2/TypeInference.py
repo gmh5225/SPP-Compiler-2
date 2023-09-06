@@ -101,35 +101,19 @@ class TypeInfer:
     @staticmethod
     def infer_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs) -> Ast.TypeAst:
         ty = None
-        if isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.op, Ast.PostfixMemberAccessAst):
-            match ast.lhs:
-                case Ast.PostfixExpressionAst(): ty = TypeInfer.infer_postfix_member_access(ast.lhs, s)
-                case Ast.IdentifierAst(): ty = TypeInfer.infer_identifier(ast.lhs, s)
-                case Ast.TokenAst() if ast.lhs.tok.token_type == TokenType.KwSelf: ty = TypeInfer.infer_self(ast.lhs, s)
-                case _: ty = ty
-        elif isinstance(ast, Ast.IdentifierAst):
-            ty = TypeInfer.infer_identifier(ast, s)
-
-        # todo: ?
-        elif isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.lhs, Ast.TypeSingleAst):
-            sym = s.current_scope.get_symbol(ast.lhs.parts[-1], SymbolTypes.TypeSymbol)
-            generic_parameters = sym.type.generic_parameters
-            generic_arguments  = ast.lhs.parts[-1].generic_arguments
-            for g, a in zip(generic_parameters, generic_arguments):
-                ast.op.generic_map[g.identifier.identifier] = a.value
-
-        # elif isinstance(ast, Ast.TokenAst):
-        #     sym = s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol)
-        #     ty = sym.type
-        #     print(f"type of 'self': {ty}")
-        #     print(ast.tok.token_type)
+        match ast.lhs:
+            case Ast.PostfixExpressionAst(): ty = TypeInfer.infer_postfix_member_access(ast.lhs, s)
+            case Ast.IdentifierAst(): ty = TypeInfer.infer_identifier(ast.lhs, s)
+            case Ast.TokenAst() if ast.lhs.tok.token_type == TokenType.KwSelf: ty = TypeInfer.infer_self(ast.lhs, s)
+            case _ if type(ast.lhs) in Ast.TypeAst.__args__: ty = ast.lhs
+            case _:
+                raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Unknown postfix expression {ast} being inferred. Report as bug.")
 
         cls = s.global_scope.get_child_scope(ty)
 
         if isinstance(ast.op.identifier, Ast.IdentifierAst):
             sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False)
-            if isinstance(sym, SymbolTypes.VariableSymbol):
-                return sym.type
+            if isinstance(sym, SymbolTypes.VariableSymbol): return sym.type
             return sym
         else:
             ty = TypeInfer.infer_expression(ast.lhs, s)
@@ -245,7 +229,7 @@ class TypeInfer:
                 ast.op.generic_map[g.identifier.identifier] = explicit_generic_argument.value
 
             # Skip first argument type for non-static functions - todo?
-            if overloads[i].meta_data.get("is_method", False) and overloads[i].meta_data.get("fn_proto").parameters[0].is_self:
+            if overloads[i].meta_data.get("is_method", False) and overloads[i].meta_data.get("fn_proto").parameters and overloads[i].meta_data.get("fn_proto").parameters[0].is_self:
                 arg_tys.insert(0, TypeInfer.infer_expression(ast.lhs.lhs, scope))
                 arg_ccs.insert(0, copy.deepcopy(param_ccs[0]))
                 ast.op.arguments.insert(0, Ast.FunctionArgumentAst(None, Ast.IdentifierAst(ast.lhs.lhs.identifier, -1), copy.deepcopy(param_ccs[0]), False, -1))
