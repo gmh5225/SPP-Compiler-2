@@ -52,3 +52,8 @@ sup Default for Num {
 - When instantiating a type, the _parts_ of the object are stored in memory contiguously.
 - If there is already an instance of `A` in memory, then the `A` part of `B` and `C` can be shared.
 - The first occurrence of `A` in the object is the "primary" occurrence, and is the only one kept.
+
+## Layered super-imposition
+- Take the `Num` class, which super-imposes `Copy`.
+- Take the `FastNum` class, which super-imposes `Num`.
+- In order for `FastNum` to override `Copy.copy(...)`, it must super-impose `Copy` again and implement the method.

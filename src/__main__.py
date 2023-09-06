@@ -3,7 +3,7 @@ from src.Compiler.Compiler import Compiler
 
 
 if __name__ == "__main__":
-    ROOT = "./TestCode/src/test_overload.spp"
+    ROOT = "./TestCode/src/test_generics.spp"
     code = open(ROOT).read()
 
     # pr = cProfile.Profile()

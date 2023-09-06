@@ -1,28 +1,51 @@
 # Functions
 - First class `Fun[R, ...Args]` type.
 
+## Function types:
+- `FnRef`
+- `FnMut`
+- `FnOne`
+
+### Methods
+- The type of a method is determined by the `self` parameter of the method.
+
+| Declaration of `self` | Type of method |
+|-----------------------|----------------|
+| `self: &Self`         | `FnRef`        |
+| `self: &mut Self`     | `FnMut`        |
+| `self: Self`          | `FnOne`        |
+| `mut self: Self`      | `FnOne`        |
+
+### Free functions
+- Will always be `FnRef`, because there is no "environment" to capture.
+
+### Closures
+- See [**closures**](closures.md#function-type) for more information.
+
 ## Declaring functions
-- This shows how functions are registered in `S++`:
+- This shows how functions are transformed in `S++` before analysis:
 ```s++
 fn a(x: Num) -> Num { ... }
 fn a(x: Str) -> Str { ... }
 ```
 ```s++
 cls Fn[R, ...Ts] {
-  fn call(...xs: Ts) { ... }
+  fn call_ref(&self, ...xs: Ts) { ... }
 }
 
 cls __MOCK_A {}
-sup Fn[Num, Num] for A {
-  fn call(x: Num) -> Num { ... }
+sup FnRef[Num, Num] for A {
+  fn call_ref(x: Num) -> Num { ... }
 }
-sup Fn[Str, Str] for A {
-  fn call(x: Str) -> Str { ... }
+sup FnRef[Str, Str] for A {
+  fn call_ref(x: Str) -> Str { ... }
 }
 let a = __MOCK_A{}
 ```
 - This allows overloads to be defined, and for functions to be passed around as objects.
-- Note that the only way to pass `fn`/`gn` functions is to use the `&Fn` calling convention.
+- Note that the only way to pass `fn`/`gn` non-closure functions is to use the `&` calling convention.
+- Due to the `__` prefix of the mock classes, they (deliberately) cannot be used in user code.
+- The function-variables (`let a`) are declared as immutable, to prevent mutable references.
 
 ## Parameters
 - Every parameter must have a type-annotation (design decision).
@@ -60,10 +83,11 @@ fn add_all(x: Num, y: Num) -> Num { ... }
 ```s++
 fn a[T, U](x: T, y: U) -> (T, U) { ... }
 ```
+- See [**type-generics**](type-generics.md) for more information.
 
 ### Implicit type parameters
 - Type parameters don't have to be specified if they are in - `T`:
-  - Parameter type: `fn func(param: T) -> Void {}`
+  - Parameter type: `fn func[T](param: T) -> Void {}`
   - Inside the constraint of another type parameter: `fn func[T: Constraint[U]]() -> Void {}`
 - Otherwise, the type parameter must be specified.
 

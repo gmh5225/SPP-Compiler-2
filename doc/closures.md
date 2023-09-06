@@ -11,3 +11,13 @@
 ### Capturing moves
 - If a closure captures a move, the object is moved into the closure's scope.
 - If the closure consumes the object, it can only be called once.
+
+## Function type
+- Capturing variables is done explicitly using the `with` keyword.
+- The captured variables can be captured with an optional convention -- `&` or `&mut`.
+- The captured variables are passed as fixed arguments to the function.
+
+### Which function type is implemented by the closure?
+- If 1+ variables are consumed by the closure, then the function type is `FnOne`.
+- If 1+ variables are captured as a mutable borrow, then the function type is `FnMut`.
+- Otherwise, the function type is `FnRef`.
