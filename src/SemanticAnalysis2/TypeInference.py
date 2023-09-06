@@ -79,7 +79,7 @@ class TypeInfer:
     def infer_postfix_expression(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs) -> Ast.TypeAst:
         match ast.op:
             case Ast.PostfixMemberAccessAst(): return TypeInfer.infer_postfix_member_access(ast, s, **kwargs)
-            case Ast.PostfixFunctionCallAst(): return TypeInfer.infer_postfix_function_call(ast, s)
+            case Ast.PostfixFunctionCallAst(): return TypeInfer.infer_postfix_function_call(ast, s)[1]
             case Ast.PostfixStructInitializerAst(): return TypeInfer.infer_postfix_struct_initializer(ast, s)
             case _:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown postfix expression {ast} being inferred. Report as bug.")
@@ -90,7 +90,8 @@ class TypeInfer:
         if isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.op, Ast.PostfixMemberAccessAst):
             match ast.lhs:
                 case Ast.PostfixExpressionAst(): ty = TypeInfer.infer_postfix_member_access(ast.lhs, s)
-                case Ast.IdentifierAst(): ty = TypeInfer.infer_identifier(ast.lhs, s)
+                case Ast.IdentifierAst():
+                    ty = TypeInfer.infer_identifier(ast.lhs, s)
                 case _: ty = TypeInfer.infer_type(ast.lhs, s)
         elif isinstance(ast, Ast.IdentifierAst):
             ty = TypeInfer.infer_identifier(ast, s)
@@ -196,6 +197,10 @@ class TypeInfer:
             str_fn_type = str_fn_type[str_fn_type.index("("):].strip()
             sigs.append(str_fn_type)
 
+            # First thing to check are function generics
+            actual_generics = fn_type.generic_parameters
+            given_generics = ast.op.type_arguments
+
             # Skip first argument type for non-static functions - todo?
             if overloads[i].meta_data.get("is_method", False) and overloads[i].meta_data.get("fn_proto").parameters[0].is_self:
                 arg_tys.insert(0, TypeInfer.infer_expression(ast.lhs.lhs, scope))
@@ -231,6 +236,17 @@ class TypeInfer:
                 errs.append(f"Expected argument {mismatch_index + 1} to be passed by '{param_ccs[mismatch_index]}', but got '{arg_ccs[mismatch_index]}'.")
                 continue
 
+            if len(given_generics) > len(actual_generics):
+                if actual_generics and actual_generics[-1].is_variadic:
+                    pass
+                else:
+                    errs.append(f"Too many generic arguments given to function '{fn_type}'.")
+                    continue
+
+            if len(given_generics) < len(missing_generics := TypeInfer.required_generic_parameters_for_fun(fn_type, scope)):
+                errs.append(f"Not enough generic arguments given to function '{fn_type}'. Missing {[str(g) for g in missing_generics]}.")
+                continue
+
             # If we get here, we have found the function we are looking for. Walk through the type and replace generics
             # with their corresponding type arguments.
             # print("-" * 50)
@@ -258,7 +274,7 @@ class TypeInfer:
         # TODO : improve the "attempted signature" line of the error message to include the parameter named with their
         #  incorrect types
         raise SystemExit(
-            ErrFmt.err(ast.lhs._tok) + f"Could not call function '{ast.lhs}' with the given arguments.\n\n" +
+            ErrFmt.err(ast.lhs._tok) + f"Could not call function '{ast.lhs}' with the given generics and arguments.\n\n" +
             f"Attempted signature:{NL}({', '.join([str(arg_cc or '') + str(arg_ty) for arg_cc, arg_ty in zip(arg_ccs, arg_tys)])}) -> ?\n\n" +
             f"Available signatures{NL.join(output)}")
 
@@ -342,7 +358,7 @@ class TypeInfer:
         generics = ast.generic_parameters
         generics_names = [g.identifier for g in generics]
 
-        for ty in [param.type_annotation for param in ast.parameters] + [g for g in ast.generic_parameters]:
+        for ty in [param.type_annotation for param in ast.parameters]:
             for t in TypeInfer.traverse_type(ty, s):
                 t = t[0]
                 if t in generics_names:
@@ -366,6 +382,8 @@ class TypeInfer:
                         yield from inner(t, s, level + 1)
                 case Ast.TypeGenericArgumentAst():
                     yield from inner(ast.value, s, level + 1)
+                case Ast.TypeGenericParameterAst():
+                    yield ast.identifier, level
                 case Ast.TypeTupleAst():
                     for t in ast.types:
                         yield from inner(t, s, level + 1)

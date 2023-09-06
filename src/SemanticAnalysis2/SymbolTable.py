@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import builtins
+import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Hashable, Optional, TypeVar, Callable
@@ -71,6 +73,9 @@ class SymbolTypes:
                 "type": str(self.type),
                 "is_mutable": self.is_mutable
             }
+
+        def __str__(self):
+            return f"Variable Symbol({self.name}: {self.type})"
 
     @dataclass
     class TypeSymbol(Symbol):

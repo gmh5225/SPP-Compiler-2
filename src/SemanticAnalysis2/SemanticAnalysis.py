@@ -452,13 +452,6 @@ class SemanticAnalysis:
             raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"{what} '{ast.op.identifier}' not found on type '{lhs_type}'.")
         
     @staticmethod
-    def analyse_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):
-        # Check the LHS is a function, and that the arguments match the function's parameters.
-        SemanticAnalysis.analyse_expression(ast.lhs, s)
-        fn_target, _ = TypeInfer.infer_expression(ast, s)
-        SemanticAnalysis.analyse_function_arguments(ast, fn_target, ast.op.arguments, s, **kwargs)
-
-    @staticmethod
     def analyse_function_arguments(func: Ast.PostfixExpressionAst, fn_target: SymbolTypes.VariableSymbol, asts: list[Ast.FunctionArgumentAst], s: ScopeHandler, **kwargs):
         # Number of memory checks need to occur here. This function handles all function calls, assignment and variable
         # declaration (through the __set__) function.
@@ -571,6 +564,12 @@ class SemanticAnalysis:
                             outermost_symbol.mem_info.is_partially_moved = True
                             outermost_symbol.mem_info.partially_moved_asts.append(arg.value)
 
+    @staticmethod
+    def analyse_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):
+        # Check the LHS is a function, and that the arguments match the function's parameters.
+        SemanticAnalysis.analyse_expression(ast.lhs, s)
+        fn_target, _ = TypeInfer.infer_postfix_function_call(ast, s)
+        SemanticAnalysis.analyse_function_arguments(ast, fn_target, ast.op.arguments, s, **kwargs)
 
     @staticmethod
     def analyse_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
@@ -583,7 +582,6 @@ class SemanticAnalysis:
         # SemanticAnalysis.analyse_type_generic_arguments(ast.lhs.parts[-1].generic_arguments, s)
         actual_generics = TypeInfer.required_generic_parameters_for_cls(cls_ty, s)
         given_generics = ast.lhs.parts[-1].generic_arguments
-        generics_difference = set(actual_generics) - set(given_generics)
 
         if len(given_generics) < len(actual_generics):
             raise SystemExit(
