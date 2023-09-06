@@ -20,6 +20,12 @@ def enumerable_any(args: list) -> tuple[int, bool]:
 class TypeInfer:
     @staticmethod
     def infer_expression(ast: Ast.ExpressionAst, s: ScopeHandler, **kwargs) -> Ast.TypeAst:
+        """
+        - Match the actual AST type and calling the appropriate function.
+        - Example: Ast.IdentifierAst => "TypeInfer.infer_identifier(...)".
+        - Literals will always have the same type => return the literal's type.
+        """
+
         match ast:
             case Ast.IdentifierAst(): return TypeInfer.infer_identifier(ast, s)
             case Ast.LambdaAst(): raise NotImplementedError("Lambda expressions are not implemented yet.")
@@ -34,10 +40,10 @@ class TypeInfer:
             case Ast.PlaceholderAst(): raise NotImplementedError("Placeholder expressions are not implemented yet.")
             case Ast.TypeSingleAst(): return ast
             case Ast.BoolLiteralAst(): return CommonTypes.bool()
-            case Ast.StringLiteralAst(): return CommonTypes.string()
-            case Ast.ArrayLiteralAst(): return CommonTypes.array(TypeInfer.infer_expression(ast.values[0], s))
-            case Ast.RegexLiteralAst(): return CommonTypes.regex()
-            case Ast.TupleLiteralAst(): return CommonTypes.tuple([TypeInfer.infer_expression(e, s) for e in ast.values])
+            case Ast.StringLiteralAst(): return CommonTypes.str()
+            case Ast.ArrayLiteralAst(): return CommonTypes.arr(TypeInfer.infer_expression(ast.values[0], s))
+            case Ast.RegexLiteralAst(): return CommonTypes.reg()
+            case Ast.TupleLiteralAst(): return CommonTypes.tup([TypeInfer.infer_expression(e, s) for e in ast.values])
             case Ast.NumberLiteralBase02Ast(): return CommonTypes.num()
             case Ast.NumberLiteralBase10Ast(): return CommonTypes.num()
             case Ast.NumberLiteralBase16Ast(): return CommonTypes.num()
@@ -490,6 +496,7 @@ class TypeInfer:
                     # known that 'T' is 'Str', but 'T' is being bound to 'Int'), then instead of returning False, throw
                     # an error, because this is a more specific error / specialised case.
                     # TODO : the ast being errored on isn't quite correct: highlight the correct generic argument
+                    # TODO : don't throw an error here, just return it for handling by the caller?
                     elif q1 in generic_map and generic_map[q1] and q2 != generic_map[q1].parts[-1].identifier and q2 not in generic_map:
                         ty = TypeInfer.infer_expression(a1.value, s)  #a1.value.lhs.parts[-1]
                         sym = s.current_scope.get_symbol(ty.parts[-1], SymbolTypes.TypeSymbol)

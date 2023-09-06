@@ -20,17 +20,17 @@ class CommonTypes:
         return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Bool", [], -1)], -1)
 
     @staticmethod
-    def string() -> Ast.TypeAst:
+    def str() -> Ast.TypeAst:
         # String type
         return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Str", [], -1)], -1)
 
     @staticmethod
-    def array(type: Ast.TypeAst) -> Ast.TypeAst:
+    def arr(element_type: Ast.TypeAst) -> Ast.TypeAst:
         # Character type
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Arr", [type], -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Arr", [element_type], -1)], -1)
 
     @staticmethod
-    def regex() -> Ast.TypeAst:
+    def reg() -> Ast.TypeAst:
         # Regular expression type
         return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Rgx", [], -1)], -1)
 
@@ -40,6 +40,6 @@ class CommonTypes:
         return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Num", [], -1)], -1)
 
     @staticmethod
-    def tuple(types: list[Ast.TypeAst]) -> Ast.TypeAst:
+    def tup(element_types: list[Ast.TypeAst]) -> Ast.TypeAst:
         # Tuple type - add the types of the tuple as the generic arguments
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Tup", types, -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Tup", element_types, -1)], -1)
