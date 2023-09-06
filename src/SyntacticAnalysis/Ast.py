@@ -30,6 +30,9 @@ class TokenAst:
     def __str__(self):
         return self.tok.token_metadata
 
+    def __hash__(self):
+        return hash(self.tok.token_type)
+
 @dataclass
 class ParameterPassingConventionReferenceAst:
     is_mutable: bool

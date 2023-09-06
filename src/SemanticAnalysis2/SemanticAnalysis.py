@@ -135,7 +135,6 @@ class SemanticAnalysis:
         SemanticAnalysis.analyse_function_parameters(ast.parameters, s, **kwargs)
         SemanticAnalysis.analyse_type_generic_parameters(ast.generic_parameters, s)
         TypeInfer.check_type(ast.return_type, s)
-        ast.return_type = TypeInfer.infer_type(ast.return_type, s)
 
         # Analyse each statement
         # if not special and not function_symbol.meta_data.get("abstract", False) or special:
@@ -171,7 +170,6 @@ class SemanticAnalysis:
         TypeInfer.check_type(ast.type_annotation, s)
 
         # Analyse the parameter type, and Add the parameter to the current scope.
-        ast.type_annotation = TypeInfer.infer_type(ast.type_annotation, s)
         ty = ast.type_annotation   # if not isinstance(ast.type_annotation.parts[0], Ast.SelfTypeAst) else Ast.IdentifierAst("Self", ast.type_annotation._tok)
         sym = SymbolTypes.VariableSymbol(ast.identifier, ty, is_mutable=ast.is_mutable, is_initialized=True)
 
@@ -203,7 +201,6 @@ class SemanticAnalysis:
     @staticmethod
     def analyse_class_member(ast: Ast.ClassAttributeAst, s: ScopeHandler):
         [SemanticAnalysis.analyse_decorator(ast, d, s) for d in ast.decorators]
-        ast.type_annotation = TypeInfer.infer_type(ast.type_annotation, s)
 
     @staticmethod
     def analyse_sup_prototype(ast: Ast.SupPrototypeAst, s: ScopeHandler):
@@ -283,7 +280,6 @@ class SemanticAnalysis:
     @staticmethod
     def analyse_typedef(ast: Ast.TypedefStatementAst, s: ScopeHandler):
         # Analyse the old type, then add a symbol for the new type that points to the old type.
-        ast.old_type = TypeInfer.infer_type(ast.old_type, s)
         old_type_sym = s.current_scope.get_symbol(ast.old_type.parts[-1].identifier, SymbolTypes.TypeSymbol)
         s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ast.new_type.parts[-1].to_identifier(), old_type_sym.type, old_type_sym.sup_scopes))
 
@@ -418,7 +414,7 @@ class SemanticAnalysis:
         # Next, convert the right-hand side into a function argument, and construct the function call. The function call
         # creates the "(y)" that is the postfix expression for "x.add", creating "x.add(y)". This is then analysed.
         rhs = Ast.FunctionArgumentAst(None, ast.rhs, None, False, pos)
-        fn_call = Ast.PostfixFunctionCallAst([TypeInfer.infer_expression(ast.rhs, s)], [rhs], pos)
+        fn_call = Ast.PostfixFunctionCallAst([], [rhs], pos)
         fn_call = Ast.PostfixExpressionAst(fn, fn_call, pos)
         SemanticAnalysis.analyse_expression(fn_call, s)
 
@@ -461,8 +457,9 @@ class SemanticAnalysis:
         if fn_target and fn_target.meta_data.get("is_method", False) and fn_target.meta_data.get("fn_proto").parameters[0].is_self:
             asts.insert(0, Ast.FunctionArgumentAst(None, func.lhs.lhs, fn_target.meta_data.get("fn_proto").parameters[0].calling_convention, False, func._tok))
 
-        def collapse_ast_to_list_of_identifiers(ast: Ast.PostfixExpressionAst | Ast.IdentifierAst):
+        def collapse_ast_to_list_of_identifiers(ast: Ast.PostfixExpressionAst | Ast.IdentifierAst | Ast.TokenAst):
             match ast:
+                case Ast.TokenAst() if ast.tok.token_type == TokenType.KwSelf: return [Ast.IdentifierAst("self", ast.tok)]
                 case Ast.IdentifierAst(): return [ast]
                 case Ast.PostfixExpressionAst(): return collapse_ast_to_list_of_identifiers(ast.lhs) + [ast.op.identifier]
 
@@ -687,7 +684,7 @@ class SemanticAnalysis:
 
         # Check that the type of the variable is not "Void". This is because "Void" values don't exist, and therefore
         # cannot be assigned to a variable.
-        let_statement_type = TypeInfer.infer_type(ast.type_annotation, s) if ast.type_annotation else TypeInfer.infer_expression(ast.value, s)
+        let_statement_type = ast.type_annotation or TypeInfer.infer_expression(ast.value, s)
         if let_statement_type == CommonTypes.void():
             raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot define a variable with 'Void' type.")
 

@@ -1022,20 +1022,21 @@ class Parser:
 
     def _parse_primary_expression(self) -> BoundParser:
         def inner():
-            p0 = self._parse_single_type_identifier_for_initialization().delay_parse()  # let x: std.Num{};
-            p1 = self._parse_single_type_identifier().delay_parse()  # let x = std.Num.new();
-            p2 = self._parse_identifier().delay_parse()  # let x = identifier
-            p3 = self._parse_literal().delay_parse()  # let x = 123
-            p4 = self._parse_lambda().delay_parse()  # let x = (x) => {x + 1}
-            p5 = self._parse_operator_identifier_variadic().delay_parse()  # let x = 0 + ... + args
-            p6 = self._parse_expression_placeholder().delay_parse()  # let x = f(_, 1, 2);
-            p7 = self._parse_statement_if().delay_parse()
-            p8 = self._parse_statement_while().delay_parse()
-            p9 = self._parse_statement_new_scope().delay_parse()
-            p10 = self._parse_statement_yield().delay_parse()
-            p11 = self._parse_statement_with().delay_parse()
-            p12 = (p7 | p8 | p9 | p10 | p11 | p0 | p1 | p2 | p3 | p4 | p5 | p6).parse_once()
-            return p12
+            p1 = self._parse_token(TokenType.KwSelf).delay_parse()
+            p2 = self._parse_single_type_identifier_for_initialization().delay_parse()  # let x: std.Num{};
+            p3 = self._parse_single_type_identifier().delay_parse()  # let x = std.Num.new();
+            p4 = self._parse_identifier().delay_parse()  # let x = identifier
+            p5 = self._parse_literal().delay_parse()  # let x = 123
+            p6 = self._parse_lambda().delay_parse()  # let x = (x) => {x + 1}
+            p7 = self._parse_operator_identifier_variadic().delay_parse()  # let x = 0 + ... + args
+            p8 = self._parse_expression_placeholder().delay_parse()  # let x = f(_, 1, 2);
+            p9 = self._parse_statement_if().delay_parse()
+            p10 = self._parse_statement_while().delay_parse()
+            p11 = self._parse_statement_new_scope().delay_parse()
+            p12 = self._parse_statement_yield().delay_parse()
+            p13 = self._parse_statement_with().delay_parse()
+            p14 = (p9 | p10 | p11 | p12 | p13 | p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8).parse_once()
+            return p14
         return BoundParser(self, inner)
 
     def _parse_single_type_identifier_for_initialization(self) -> BoundParser:

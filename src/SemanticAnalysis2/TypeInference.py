@@ -3,6 +3,7 @@ from difflib import SequenceMatcher
 from typing import Generator
 import inspect
 
+from src.LexicalAnalysis.Tokens import TokenType
 from src.SyntacticAnalysis import Ast
 from src.SyntacticAnalysis.Parser import ErrFmt
 
@@ -47,8 +48,13 @@ class TypeInfer:
             case Ast.NumberLiteralBase02Ast(): return CommonTypes.num()
             case Ast.NumberLiteralBase10Ast(): return CommonTypes.num()
             case Ast.NumberLiteralBase16Ast(): return CommonTypes.num()
+            case Ast.TokenAst() if ast.tok.token_type == TokenType.KwSelf: return TypeInfer.infer_self(ast, s)
             case _:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown expression {ast} being inferred. Report as bug.")
+
+    @staticmethod
+    def infer_self(ast: Ast.TokenAst, s: ScopeHandler) -> Ast.TypeAst:
+        return s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol).type
 
     @staticmethod
     def infer_if_statement(ast: Ast.StatementAst, s: ScopeHandler) -> Ast.TypeAst:
@@ -96,9 +102,9 @@ class TypeInfer:
         if isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.op, Ast.PostfixMemberAccessAst):
             match ast.lhs:
                 case Ast.PostfixExpressionAst(): ty = TypeInfer.infer_postfix_member_access(ast.lhs, s)
-                case Ast.IdentifierAst():
-                    ty = TypeInfer.infer_identifier(ast.lhs, s)
-                case _: ty = TypeInfer.infer_type(ast.lhs, s)
+                case Ast.IdentifierAst(): ty = TypeInfer.infer_identifier(ast.lhs, s)
+                case Ast.TokenAst() if ast.lhs.tok.token_type == TokenType.KwSelf: ty = TypeInfer.infer_self(ast.lhs, s)
+                case _: ty = ty
         elif isinstance(ast, Ast.IdentifierAst):
             ty = TypeInfer.infer_identifier(ast, s)
 
@@ -110,7 +116,12 @@ class TypeInfer:
             for g, a in zip(generic_parameters, generic_arguments):
                 ast.op.generic_map[g.identifier.identifier] = a.value
 
-        ty = TypeInfer.infer_type(ty, s)
+        # elif isinstance(ast, Ast.TokenAst):
+        #     sym = s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol)
+        #     ty = sym.type
+        #     print(f"type of 'self': {ty}")
+        #     print(ast.tok.token_type)
+
         cls = s.global_scope.get_child_scope(ty)
 
         if isinstance(ast.op.identifier, Ast.IdentifierAst):
@@ -410,8 +421,6 @@ class TypeInfer:
 
     @staticmethod
     def infer_type(ast: Ast.TypeAst, s: ScopeHandler) -> Ast.TypeAst:
-        # if isinstance(ast.parts[-1], Ast.SelfTypeAst):
-        #     return s.current_scope.get_symbol(Ast.IdentifierAst("Self", ast._tok), SymbolTypes.TypeSymbol).type
         return ast
 
     @staticmethod
