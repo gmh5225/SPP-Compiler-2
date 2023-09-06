@@ -33,13 +33,17 @@
 - This remodels functions to be variables that are callable, by super-imposing `Fn...` types over them.
 - This shows how functions are transformed in `S++` before analysis:
 ```s++
+# User code
 fn a(x: Num) -> Num { ... }
 fn a(x: Str) -> Str { ... }
 ```
 ```s++
-cls Fn[R, ...Ts] {
+# From the STL
+cls FnRef[R, ...Ts] {
   fn call_ref(&self, ...xs: Ts) { ... }
 }
+
+# User code
 
 cls __MOCK_A {}
 sup FnRef[Num, Num] for A {
@@ -51,7 +55,7 @@ sup FnRef[Str, Str] for A {
 let a = __MOCK_A{}
 ```
 - This allows overloads to be defined, and for functions to be passed around as objects.
-- Note that the only way to pass `fn`/`gn` non-closure functions is to use the `&` calling convention.
+- Note that the only way to pass `fn`/`gn` non-closure functions as arguments is to use the `&` calling convention.
 - Due to the `__` prefix of the mock classes, they (deliberately) cannot be used in user code.
 - The function-variables (`let a`) are declared as immutable, to prevent mutable references.
 
@@ -59,21 +63,18 @@ let a = __MOCK_A{}
 - Every parameter must have a type-annotation (design decision).
 - Parameters are passed by value, unless the `&`/`&mut` calling convention is used.
 - Parameters can be made mutable by prefixing the parameter with `mut`, like in Rust.
-- Parameters must be in the order:
-  - Required parameters
-  - Optional parameters
-  - Variadic parameter
+- Parameters must be in the order: Required -> Optional -> Variadic.
 ```s++
 fn add_all(x: Num, y: Num ...xs: Num) -> Num { ... }
 fn add_all(x: Num, y: Num) -> Num { ... }
 ```
 - Arguments with no calling convention are "moved" into the function.
-- Super-impose the `Copy` class onto the type to allow the previous value to be used after the function call.
+- See the [**Copy**](move-vs-copy.md#copying) documentation for how to copy a value into a function.
 
 ### Calling conventions
 | Symbol | Convention       | Description                                         |
 |--------|------------------|-----------------------------------------------------|
-| ` `    | Move (or copy)   | The value is moved, unless `Copy` is super-imposed. |
+| none   | Move (or copy)   | The value is moved, unless `Copy` is super-imposed. |
 | `&`    | Immutable borrow | The value is borrowed, and cannot be mutated.       |
 | `&mut` | Mutable borrow   | The value is borrowed, and can be mutated.          |
 - The argument must match the calling convention exactly.
@@ -82,10 +83,7 @@ fn add_all(x: Num, y: Num) -> Num { ... }
 
 ## Generic type parameters
 - A function can have generic type parameters.
-- Generic type parameters must be in the order:
-  - Required type parameters
-  - Optional type parameters
-  - Variadic type parameters
+- Generic type parameters must be in the order: Required -> Optional -> Variadic.
 - Type parameters are passed into a function inside the `[...]` brackets.
 
 ```s++
@@ -99,12 +97,18 @@ fn a[T, U](x: T, y: U) -> (T, U) { ... }
   - Inside the constraint of another type parameter: `fn func[T: Constraint[U]]() -> Void {}`
 - Otherwise, the type parameter must be specified.
 
+### Type parameter ordering
+- As well as the order: Required -> Optional -> Variadic, there is an extra enforcement.
+- All inferrable type parameters must **come after** non-inferrable / explicit type parameters.
+- This means that inferrable type parameters cannot be filled by explicit type arguments; they must be inferred.
+
 ## Return types
-- A return type must **always** be specified.
-- A function that doesn't return a value must return `Void`.
-- Returning `()` is allowed, but creates a new tuple object.
+- A return type must **always** be specified (design decision).
+- A function that doesn't return a value must return the `Void` type.
+- Returning `()` is allowed, but creates a new (emtpy) tuple object.
 
 ## Asynchronous functions (coroutines)
+- See [**coroutines**](coroutines.md) for more information.
 - Functions defined as `gn` rather than `fn` are asynchronous.
 - This means that a value is `yielded` rather than `returned`.
 - If the return type super-imposes `Async`, then the function will return immediately, and values will be yielded asynchronously.
@@ -115,18 +119,9 @@ fn a[T, U](x: T, y: U) -> (T, U) { ... }
   - This allows the compiler to keep track of the type of yield taking place, and enforce the necessary memory safety rules.
 
 ## Recursion
-- Recursion is allowed
+- Recursion is allowed.
 - All recursive functions are tail-call optimised.
   - Recursive functions that aren't tail-call recursive are re-written to be tail-call recursive.
-- This means that the stack will not overflow.
-- The stack will only ever contain a single frame for a recursive function.
-
-## Examples:
-### Fibonacci
-```s++
-fn fib(n: Num) -> Num {
-  return if n == {
-    0 | 1 { n }
-    else { fib(n - 1) + fib(n - 2) }
-  }
-}
+  - This means that the stack will not overflow.
+  - The stack will only ever contain a single frame for a recursive function.
+  - Recursion is time-limited, not stack-limited.
