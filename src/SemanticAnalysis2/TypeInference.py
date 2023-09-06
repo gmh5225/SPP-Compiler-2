@@ -95,6 +95,8 @@ class TypeInfer:
                 case _: ty = TypeInfer.infer_type(ast.lhs, s)
         elif isinstance(ast, Ast.IdentifierAst):
             ty = TypeInfer.infer_identifier(ast, s)
+
+        # todo: ?
         elif isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.lhs, Ast.TypeSingleAst):
             sym = s.current_scope.get_symbol(ast.lhs.parts[-1], SymbolTypes.TypeSymbol)
             generic_parameters = sym.type.generic_parameters
@@ -153,6 +155,8 @@ class TypeInfer:
         ty = TypeInfer.infer_expression(ast.lhs, s, all=True)
         s = s.global_scope.get_child_scope(ty)
 
+        # Construct the default generic map. Pull in previous postfix's generic maps for fallthorugh, so that generic
+        # types on owner classes etc can be used etc. ie Vec[Str].new() can pull Str as T.
         l = ast.lhs
         default_generic_map = {}
         while type(l) == Ast.PostfixExpressionAst and type(l.op) == Ast.PostfixMemberAccessAst:
@@ -161,6 +165,7 @@ class TypeInfer:
                     default_generic_map[g] = h
             l = l.lhs
 
+        # Once reaching the identifier, get its type, and pull in the generic map from the class.
         if type(l) == Ast.IdentifierAst:
             ty = TypeInfer.infer_identifier(l, scope)
             sym = s.get_symbol(ty.parts[-1], SymbolTypes.TypeSymbol)
@@ -177,7 +182,8 @@ class TypeInfer:
         original_args_tys = arg_tys.copy()
         original_args_ccs = arg_ccs.copy()
 
-        for i, fn_type in enumerate([f.meta_data["fn_proto"] for f in overloads]):
+        fn_protos = [f.meta_data["fn_proto"] for f in overloads]
+        for i, fn_type in enumerate(fn_protos):
             # Load the generic map
 
             ast.op.generic_map = default_generic_map.copy()
@@ -185,21 +191,39 @@ class TypeInfer:
             arg_tys = original_args_tys.copy()
             arg_ccs = original_args_ccs.copy()
 
-            gs = fn_type.generic_parameters
-            for g in gs:
-                ast.op.generic_map[g.identifier.identifier] = None
-
             param_names = [param.identifier.identifier for param in fn_type.parameters]
             param_tys = [param.type_annotation for param in fn_type.parameters]
             param_ccs = [param.calling_convention for param in fn_type.parameters]
 
             str_fn_type = str(fn_type)
-            str_fn_type = str_fn_type[str_fn_type.index("("):].strip()
+            str_fn_type_substring_index = [i for i, char in enumerate(str_fn_type) if char in ["[", "("]][0]
+            str_fn_type = str_fn_type[str_fn_type_substring_index:].strip()
             sigs.append(str_fn_type)
 
-            # First thing to check are function generics
-            actual_generics = fn_type.generic_parameters
-            given_generics = ast.op.type_arguments
+            # Check function generics
+            all_generic_parameters = fn_type.generic_parameters
+            given_generic_arguments = ast.op.type_arguments
+            required_generic_parameters = TypeInfer.required_generic_parameters_for_fun(fn_type, scope)
+            missing_generic_parameters = required_generic_parameters[len(given_generic_arguments):]
+            unpack = all_generic_parameters and all_generic_parameters[-1].is_variadic
+
+            if len(given_generic_arguments) > len(all_generic_parameters) and not unpack:
+                errs.append(f"Too many generic arguments given to function '{fn_type}'.")
+                continue
+
+            if len(given_generic_arguments) < len(required_generic_parameters):
+                errs.append(f"Not enough generic arguments given to function '{fn_type}'. Missing {[str(t) for t in missing_generic_parameters]}.")
+                continue
+
+            # Add the generic parameters of the function to the generic map (as None)
+            for g in all_generic_parameters:
+                ast.op.generic_map[g.identifier.identifier] = None
+
+            # Add the explicit generic arguments to the generic map. This means that for "func[T](...)", calling
+            # "func[Str](...)" will map add {"T": "Str"} in the generic map.
+            for j, g in enumerate(all_generic_parameters[:len(given_generic_arguments)]):
+                explicit_generic_argument = given_generic_arguments[j]
+                ast.op.generic_map[g.identifier.identifier] = explicit_generic_argument.value
 
             # Skip first argument type for non-static functions - todo?
             if overloads[i].meta_data.get("is_method", False) and overloads[i].meta_data.get("fn_proto").parameters[0].is_self:
@@ -234,17 +258,6 @@ class TypeInfer:
             if any([arg_cc != param_cc for arg_cc, param_cc in zip(arg_ccs, param_ccs)]):
                 mismatch_index = [i for i, (arg_cc, param_cc) in enumerate(zip(arg_ccs, param_ccs)) if arg_cc != param_cc][0]
                 errs.append(f"Expected argument {mismatch_index + 1} to be passed by '{param_ccs[mismatch_index]}', but got '{arg_ccs[mismatch_index]}'.")
-                continue
-
-            if len(given_generics) > len(actual_generics):
-                if actual_generics and actual_generics[-1].is_variadic:
-                    pass
-                else:
-                    errs.append(f"Too many generic arguments given to function '{fn_type}'.")
-                    continue
-
-            if len(given_generics) < len(missing_generics := TypeInfer.required_generic_parameters_for_fun(fn_type, scope)):
-                errs.append(f"Not enough generic arguments given to function '{fn_type}'. Missing {[str(g) for g in missing_generics]}.")
                 continue
 
             # If we get here, we have found the function we are looking for. Walk through the type and replace generics
@@ -299,13 +312,6 @@ class TypeInfer:
 
         given_generic_arguments = ast.parts[-1].generic_arguments
         actual_generic_parameters = sym.type.generic_parameters.copy() if isinstance(sym.type, Ast.ClassPrototypeAst) else []
-        #
-        # print("-" * 100)
-        # print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
-        # # print(f"All global type symbols: {[str(x.type.to_type()) for x in s.global_scope.all_symbols(SymbolTypes.TypeSymbol)]}")
-        # print(f"Checking generic types for {ast}")  # ({type(ast)}) (symbol: {sym.type})")
-        # print(f"Actual generic parameters: {[str(x) for x in actual_generic_parameters]}")
-        # print(f"Given generic arguments: {[str(x) for x in given_generic_arguments]}")
 
         for g in given_generic_arguments:
             TypeInfer.check_type(g, s)
@@ -330,7 +336,7 @@ class TypeInfer:
             sym = s.current_scope.get_symbol(ast.parts[-1], SymbolTypes.TypeSymbol)
             if sym is None or isinstance(sym.type, Ast.TypeSingleAst): return []
             ast = sym.type
-            generics = sym.type.generic_parameters
+            generics = sym.type.generic_parameters.copy()
         else:
             generics = ast.generic_parameters.copy() # todo : other parts of the type ie Vec[T].Value[X]. T would be missing here (just flatten all parts' generics)
 
@@ -355,8 +361,8 @@ class TypeInfer:
         # Generic parameters can be inferred, for a function, if they are:
         #   - The type, or part of the type, of a parameter.
         #   - Part of another generic type.
-        generics = ast.generic_parameters
-        generics_names = [g.identifier for g in generics]
+        generics = ast.generic_parameters.copy()
+        generics_names = [g.identifier.identifier for g in generics]
 
         for ty in [param.type_annotation for param in ast.parameters]:
             for t in TypeInfer.traverse_type(ty, s):
