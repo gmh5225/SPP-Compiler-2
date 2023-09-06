@@ -1,5 +1,4 @@
 # Coroutines
-- A lot of overlap with the [**async**](./async.md) section.
 - A coroutine is a function that can be paused and resumed.
 - A coroutine is not necessarily asynchronous.
 
