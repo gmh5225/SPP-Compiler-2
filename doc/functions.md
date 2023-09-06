@@ -21,15 +21,16 @@
 | `mut self: Self`      | `FnOne`        |
 
 ### Free functions
-- Will always be `FnRef`, because there is no "environment" to capture.
+- These will always be `FnRef`, because there is no "environment" to capture.
 - Static class methods are also `FnRef`, because they don't capture the class's environment.
 
 ### Closures
 - See [**closures**](closures.md#function-type) for more information.
+- Complicated by variable capture.
 
 ## Declaring functions
 - Prior to the AST being semantically analysed, functions are transformed for "AST normalisation".
-- This allows their "1st type nature" to allow them to be treated as variables that are callable.
+- This remodels functions to be variables that are callable, by super-imposing `Fn...` types over them.
 - This shows how functions are transformed in `S++` before analysis:
 ```s++
 fn a(x: Num) -> Num { ... }
