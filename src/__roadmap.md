@@ -24,6 +24,5 @@
 
 #### Other
 - [ ] Statements that require a `\n` at the end shouldn't if it's a one-line statement.
-- [ ] Assigning to attributes doesn't work yet because type-inference of the attribute doesn't work.
-- [ ] All thing `yield`
+- [ ] All things `yield`
 - [ ] Allow subtyping in the type-comparison algorithm.
