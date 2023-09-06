@@ -1,13 +1,17 @@
 # Functions
-- First class `Fun[R, ...Args]` type.
+- Functions are a first class type in S++.
+- They are one of the [**3 function types**](#function-types) seen below.
+- All functions, methods, and [**closures**](closures.md) are of one of these types.
 
 ## Function types:
-- `FnRef`
-- `FnMut`
-- `FnOne`
+| Function type | Description                                         |
+|---------------|-----------------------------------------------------|
+| `FnRef`       | A function that borrows its environment.            |
+| `FnMut`       | A function that mutably borrows its environment.    |
+| `FnOne`       | A function that takes ownership of its environment. |
 
 ### Methods
-- The type of a method is determined by the `self` parameter of the method.
+- A method's function type is determined by the `self` parameter of the method.
 
 | Declaration of `self` | Type of method |
 |-----------------------|----------------|
@@ -18,11 +22,14 @@
 
 ### Free functions
 - Will always be `FnRef`, because there is no "environment" to capture.
+- Static class methods are also `FnRef`, because they don't capture the class's environment.
 
 ### Closures
 - See [**closures**](closures.md#function-type) for more information.
 
 ## Declaring functions
+- Prior to the AST being semantically analysed, functions are transformed for "AST normalisation".
+- This allows their "1st type nature" to allow them to be treated as variables that are callable.
 - This shows how functions are transformed in `S++` before analysis:
 ```s++
 fn a(x: Num) -> Num { ... }
@@ -96,7 +103,7 @@ fn a[T, U](x: T, y: U) -> (T, U) { ... }
 - A function that doesn't return a value must return `Void`.
 - Returning `()` is allowed, but creates a new tuple object.
 
-## Asynchronous functions
+## Asynchronous functions (coroutines)
 - Functions defined as `gn` rather than `fn` are asynchronous.
 - This means that a value is `yielded` rather than `returned`.
 - If the return type super-imposes `Async`, then the function will return immediately, and values will be yielded asynchronously.
