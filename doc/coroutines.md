@@ -41,6 +41,6 @@ sup[Yield, Return, Send] Async[Yield, Return, Send] {
 - The return type will remain just be the type the reference corresponds to, so `yield &5` would `yield` a `Num` object.
 - All yield statements must use the same convention (`&`, `&mut`, or no convention ie move).
 
-### The `gn` keyword
+## Why "`gn`"?
 - Because the `coroutines` are technically stackless, they are more like "generators".
 - Generators can be abbreviated to `gn`, anf follows from `fn` nicely.
