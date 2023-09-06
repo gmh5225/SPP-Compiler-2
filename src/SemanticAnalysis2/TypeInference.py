@@ -72,6 +72,8 @@ class TypeInfer:
 
     @staticmethod
     def infer_binary_expression(ast: Ast.BinaryExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
+        # TODO: this is currently a duplicate of SemanticAnalysis.analyse_binary_expression()
+
         # Remodel the binary expression into a function call, then analyse the function call. Start with constructing a
         # postfix call to the correct method name. For example, for "x + y", begin with constructing "x.add".
         pos = ast._tok
@@ -81,8 +83,8 @@ class TypeInfer:
 
         # Next, convert the right-hand side into a function argument, and construct the function call. The function call
         # creates the "(y)" that is the postfix expression for "x.add", creating "x.add(y)". This is then analysed.
-        rhs = Ast.FunctionArgumentAst(None, ast.rhs, Ast.ParameterPassingConventionReferenceAst(False, pos), False, pos)
-        fn_call = Ast.PostfixFunctionCallAst([TypeInfer.infer_expression(ast.rhs, s)], [rhs], pos)
+        rhs = Ast.FunctionArgumentAst(None, ast.rhs, None, False, pos)
+        fn_call = Ast.PostfixFunctionCallAst([], [rhs], pos)
         fn_call = Ast.PostfixExpressionAst(fn, fn_call, pos)
 
         return TypeInfer.infer_expression(fn_call, s)
