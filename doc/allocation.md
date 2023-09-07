@@ -37,7 +37,7 @@ cls Alloc[T] {
 - Because references are 2nd class, they will always have a lifetime smaller than the function they are created in.
 - This means that they are stored on the stack, and will be deallocated when the function returns.
 - Any local variables are also stored on the stack, and will be deallocated when the function returns.
-- No need for an expandable heap (there will be a small fixed-size heap for true/false etc -- program wide)
+- The heap is still required, however, for dynamic allocation, for example a `Vec[T]` type -- the size of the array is not known at compile time, and can change.
 
 ### Creating a new stack
 - When a function is called, a new stack is created.

@@ -8,6 +8,7 @@
 - This expression doesn't have to be a boolean expression.
 - The expression can be followed by an operator.
 - Each branch is applied against the operator if it exists.
+- Each branches' application against the condition **must** evaluate to a `Bool` type.
 
 ## Examples
 ### Simple `==` comparison
@@ -60,7 +61,7 @@ let str = if my_number == {
 ```
 - Each pattern is separated by the `|` operator.
 - Each pattern is then applied to the operator per branch.
-- For self-consuming methods, multiple patterns can't be used.
+- For self-consuming methods, multiple patterns can't be used (unless `Copy` is super-imposed).
 
 ### Pattern-branch guards
 ```s++
@@ -71,6 +72,9 @@ let str = if my_number == {
     else { "error" }
 }
 ```
+- Each pattern can be _guarded_ by a boolean expression, placed after a `&&` token.
+- The boolean expression is evaluated after the pattern is matched.
+- The boolean expression must evaluate to a `Bool` type.
 
 ## Assignment from `if` statements
 - Each branch must return a value.

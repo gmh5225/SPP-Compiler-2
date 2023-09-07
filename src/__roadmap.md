@@ -27,3 +27,7 @@
 - [ ] All things `yield`
 - [ ] Allow subtyping in the type-comparison algorithm.
 - [ ] Fold expressions
+- [ ] Disallow duplicate inheritance super-impositions onto a class.
+
+#### Ideas that probably won't happen
+- [ ] Keyword renaming: `while` -> `do`, `else` -> `or` (matches 2 letter nature of `if`).
