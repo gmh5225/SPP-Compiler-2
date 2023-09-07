@@ -232,7 +232,7 @@ class TypeInfer:
             if overloads[i].meta_data.get("is_method", False) and overloads[i].meta_data.get("fn_proto").parameters and overloads[i].meta_data.get("fn_proto").parameters[0].is_self:
                 arg_tys.insert(0, TypeInfer.infer_expression(ast.lhs.lhs, scope))
                 arg_ccs.insert(0, copy.deepcopy(param_ccs[0]))
-                ast.op.arguments.insert(0, Ast.FunctionArgumentAst(None, Ast.IdentifierAst(ast.lhs.lhs.identifier, -1), copy.deepcopy(param_ccs[0]), False, -1))
+                ast.op.arguments.insert(0, Ast.FunctionArgumentAst(None, ast.lhs.lhs, copy.deepcopy(param_ccs[0]), False, -1))
 
             # Check if the function is callable with the number of given arguments.
             if len(param_tys) != len(arg_tys):

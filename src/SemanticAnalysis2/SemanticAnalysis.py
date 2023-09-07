@@ -172,6 +172,7 @@ class SemanticAnalysis:
         # Analyse the parameter type, and Add the parameter to the current scope.
         ty = ast.type_annotation   # if not isinstance(ast.type_annotation.parts[0], Ast.SelfTypeAst) else Ast.IdentifierAst("Self", ast.type_annotation._tok)
         sym = SymbolTypes.VariableSymbol(ast.identifier, ty, is_mutable=ast.is_mutable, is_initialized=True)
+        sym.mem_info.initialization_ast = ast
 
         # Set the symbol borrow information based on the parameter passing convention.
         match ast.calling_convention:
@@ -300,6 +301,7 @@ class SemanticAnalysis:
             case Ast.TypeSingleAst(): TypeInfer.check_type(ast, s)
             case Ast.ArrayLiteralAst(): SemanticAnalysis.analyse_array_literal(ast, s)
             case Ast.TupleLiteralAst(): SemanticAnalysis.analyse_tuple_literal(ast, s)
+            case Ast.TokenAst() if ast.tok.token_type == TokenType.KwSelf: pass
             case _:
                 if type(ast) in Ast.LiteralAst.__args__ or type(ast) in Ast.NumberLiteralAst.__args__: return
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown expression {ast} being analysed. Report as bug.")
@@ -399,6 +401,7 @@ class SemanticAnalysis:
         s.enter_scope("with")
         SemanticAnalysis.analyse_expression(ast.value, s)
         s.current_scope.get_symbol(ast.alias.identifier, SymbolTypes.VariableSymbol).mem_info.is_initialized = True
+        s.current_scope.get_symbol(ast.alias.identifier, SymbolTypes.VariableSymbol).mem_info.initialization_ast = ast.alias
         [SemanticAnalysis.analyse_statement(st, s) for st in ast.body]
         s.exit_scope()
 
@@ -514,7 +517,6 @@ class SemanticAnalysis:
                                 final_error_message = ErrFmt.err(arg.value._tok) + f"Assignment to '{arg.value}' attempted here."
                             else:
                                 final_error_message = ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' borrowed mutably here."
-
                             raise SystemExit(
                                 "Cannot take a mutable borrow from an immutable value:\n" +
                                 ErrFmt.err(outermost_symbol.mem_info.initialization_ast._tok) + f"Value '{outermost_identifier}' declared immutably here.\n..." +
