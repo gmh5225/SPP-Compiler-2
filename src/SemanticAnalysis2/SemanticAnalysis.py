@@ -629,7 +629,7 @@ class SemanticAnalysis:
         if cls_definition_scope is None:
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Cannot find definition for class '{cls_ty}'.")
 
-        actual_fields = [v.name.identifier for v in cls_definition_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol) if not v.is_comptime]
+        actual_fields = [v.name.identifier for v in cls_definition_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol, sup=False) if not v.is_comptime]
         actual_fields = [a for a in actual_fields if str(a) not in ["call_ref", "call_mut", "call_one"]]
 
         # If a fields has been given twice, then raise an error

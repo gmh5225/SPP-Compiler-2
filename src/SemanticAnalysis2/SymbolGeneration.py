@@ -15,8 +15,6 @@ class SymbolGeneration:
         s = ScopeHandler()
         AstReduction.reduce(ast)
 
-        # print(ast)
-
         from src.Compiler.Printer import save_json
         save_json(dataclasses.asdict(ast), "_out/reduced-ast.json")
 
@@ -88,15 +86,17 @@ class SymbolGeneration:
         for g in ast.generic_parameters: s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier)))
         for member in ast.body.members: SymbolGeneration.generate_sup_member(member, s)
 
-        if ast.identifier.parts[-1].identifier in ["call_ref", "call_mut", "call_one"]:
-            return
-
         c = copy.deepcopy(ast)
         c.identifier.parts[-1] = ("__MOCK_" + c.identifier.parts[-1].to_identifier()).to_generic_identifier()
         cls_scope = s.global_scope.get_child_scope(ast.identifier) or s.global_scope.get_child_scope(c.identifier) or s.current_scope.parent.get_child_scope(c.identifier)
         if not cls_scope:
             raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Class '{ast.identifier}' not found.")
+
         cls_scope.sup_scopes.append(s.current_scope)
+        if isinstance(ast, Ast.SupPrototypeInheritanceAst) and ast.super_class.parts[-1].identifier not in ["FnRef", "FnMut", "FnOne"]:
+            cls_scope.sup_scopes.append(s.global_scope.get_child_scope(ast.super_class))
+            cls_scope.sup_scopes.extend(s.global_scope.get_child_scope(ast.super_class).sup_scopes)
+
         s.exit_scope()
 
     @staticmethod

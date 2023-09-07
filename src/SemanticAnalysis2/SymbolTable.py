@@ -231,10 +231,11 @@ class Scope:
         syms = self.all_symbols(expected_sym_type)
         return [str(s.name) for s in syms]
 
-    def all_symbols_exclusive(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
+    def all_symbols_exclusive(self, expected_sym_type: type, **kwargs) -> list[SymbolTypes.Symbol]:
         combined_symbol_tables = [a for a in self.symbol_table.symbols.values() if isinstance(a, expected_sym_type)]
-        for sup_scope in self.sup_scopes:
-            combined_symbol_tables += [a for a in sup_scope.symbol_table.symbols.values() if isinstance(a, expected_sym_type)]
+        if kwargs.get("sup", True):
+            for sup_scope in self.sup_scopes:
+                combined_symbol_tables += [a for a in sup_scope.symbol_table.symbols.values() if isinstance(a, expected_sym_type)]
         return combined_symbol_tables
 
     def all_symbols_exclusive_no_fn(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
@@ -317,7 +318,8 @@ class ScopeHandler:
                     "symbols": {str(v.name): v.json() for k, v in scope.symbol_table.symbols.items()}
                 },
                 "scope-id": scope.id,
-                "children": [scope_to_json(child) for child in scope.children]
+                "children": [scope_to_json(child) for child in scope.children],
+                "sup-scopes": [str(sup_scope.name) for sup_scope in scope.sup_scopes]
             }
 
         return scope_to_json(self.global_scope)
