@@ -202,6 +202,7 @@ class SemanticAnalysis:
     @staticmethod
     def analyse_class_member(ast: Ast.ClassAttributeAst, s: ScopeHandler):
         [SemanticAnalysis.analyse_decorator(ast, d, s) for d in ast.decorators]
+        TypeInfer.check_type(ast.type_annotation, s)
 
     @staticmethod
     def analyse_sup_prototype(ast: Ast.SupPrototypeAst, s: ScopeHandler):
@@ -623,6 +624,7 @@ class SemanticAnalysis:
         default_obj_given = default_objs_given[0] if default_objs_given else None
 
         # Get all the actual fields on a class, so that the given arguments can be checked against them.
+        # todo : is this check correct? should be checking the type exists?
         cls_definition_scope = s.global_scope.get_child_scope(cls_ty)
         if cls_definition_scope is None:
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Cannot find definition for class '{cls_ty}'.")
