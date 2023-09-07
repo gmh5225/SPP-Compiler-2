@@ -104,8 +104,8 @@ class AstReduction:
 
         # If no overload of a function has been seen before, then create the class for it. So for the first instance of
         # a function named "f", the class "__MOCK_f" will be created. For every function definition for "f" found,
-        # including this first one, the "FnRef" class will be super-imposed on it, with "call_ref" having the parameter
-        # and generic types from the original "f" definition.
+        # including this first one, the "Fn[Ref|Mut|One]" class will be super-imposed on it, with "call_[ref|mut|one]"
+        # having the parameter and generic types from the original "f" definition.
         f = False
         if AstReduction.merge_names(owner.identifier, ast.identifier.identifier) not in AstReduction.REDUCED_FUNCTIONS.keys():
             cls_ast = Ast.ClassPrototypeAst(ast.decorators, "__MOCK_" + ast.identifier, [], None, Ast.ClassImplementationAst([], -1), -1)
@@ -116,20 +116,37 @@ class AstReduction:
         ty = AstReduction.REDUCED_FUNCTIONS[AstReduction.merge_names(owner.identifier, ast.identifier.identifier)]
         ty = Ast.TypeSingleAst([ty.identifier.to_generic_identifier()], ty.identifier._tok)
 
-        new_fun = Ast.SupMethodPrototypeAst([], ast.is_coro, Ast.IdentifierAst("call_ref", -1), ast.generic_parameters, ast.parameters, ast.return_type, None, ast.body, ast._tok)
-        setattr(new_fun, "is_method", isinstance(owner, Ast.SupPrototypeAst))
+        function_type = AstReduction.deduce_function_type(isinstance(owner, Ast.SupPrototypeAst), ast.parameters, ast.return_type)
+        new_fun = Ast.SupMethodPrototypeAst(
+            [], ast.is_coro, AstReduction.deduce_call_method_from_function_type(function_type),
+            ast.generic_parameters, ast.parameters, ast.return_type, None, ast.body, ast._tok)
+
+        is_method = isinstance(owner, Ast.SupPrototypeAst)
+        setattr(new_fun, "is_method", is_method)
+
         owner.body.members.insert(i, Ast.SupPrototypeInheritanceAst(
             ast.generic_parameters,
             Ast.TypeSingleAst([Ast.GenericIdentifierAst("__MOCK_" + ast.identifier.identifier, [], ast.identifier._tok)], ast.identifier._tok),
-            None,
-            Ast.SupImplementationAst([new_fun], -1),
-            -1,
-            Ast.TypeSingleAst([Ast.GenericIdentifierAst("FnRef", [ast.return_type] + [p.type_annotation for p in ast.parameters], ast.identifier._tok)], ast._tok)))
+            None, Ast.SupImplementationAst([new_fun], -1), -1, function_type))
 
         if f:
             # todo : LetStatement doesn't need type if it's been given a value (check the case below)
             owner.body.members.insert(i + 1, Ast.LetStatementAst([Ast.LocalVariableAst(False, ast.identifier, -1)], Ast.PostfixExpressionAst(Ast.TypeSingleAst([("__MOCK_" + ast.identifier).to_generic_identifier()], ast.identifier._tok), Ast.PostfixStructInitializerAst([], -1), -1), ty, None, -1))
         owner.body.members.remove(ast)
+
+    @staticmethod
+    def deduce_function_type(is_method: bool, parameters: list[Ast.FunctionParameterAst], return_type: Ast.TypeAst) -> Ast.TypeAst:
+        ty = "FnRef"
+        if is_method and parameters[0].is_self:
+            match parameters[0].calling_convention:
+                case None: ty = "FnOne"
+                case _ if parameters[0].calling_convention.is_mutable: ty = "FnMut"
+                case _: ty = "FnRef"
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst(ty, [return_type] + [p.type_annotation for p in parameters], return_type._tok)], return_type._tok)
+
+    @staticmethod
+    def deduce_call_method_from_function_type(function_type: Ast.TypeSingleAst) -> Ast.IdentifierAst:
+        return Ast.IdentifierAst("call_" + function_type.parts[-1].identifier[2:].lower(), -1)
 
     @staticmethod
     def merge_names(*args) -> str:

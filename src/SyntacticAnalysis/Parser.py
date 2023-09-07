@@ -1022,7 +1022,7 @@ class Parser:
 
     def _parse_primary_expression(self) -> BoundParser:
         def inner():
-            p1 = self._parse_token(TokenType.KwSelf).delay_parse()
+            p1 = self._parse_self_keyword().delay_parse()  # self.function();
             p2 = self._parse_single_type_identifier_for_initialization().delay_parse()  # let x: std.Num{};
             p3 = self._parse_single_type_identifier().delay_parse()  # let x = std.Num.new();
             p4 = self._parse_identifier().delay_parse()  # let x = identifier
@@ -1037,6 +1037,13 @@ class Parser:
             p13 = self._parse_statement_with().delay_parse()
             p14 = (p9 | p10 | p11 | p12 | p13 | p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8).parse_once()
             return p14
+        return BoundParser(self, inner)
+
+    def _parse_self_keyword(self) -> BoundParser:
+        def inner():
+            c1 = self._current
+            p1 = self._parse_token(TokenType.KwSelf).parse_once()
+            return Ast.IdentifierAst("self", c1)
         return BoundParser(self, inner)
 
     def _parse_single_type_identifier_for_initialization(self) -> BoundParser:

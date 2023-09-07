@@ -454,6 +454,7 @@ class SemanticAnalysis:
         # Check the parts are all initialized.
         while isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.lhs, Ast.PostfixExpressionAst):
             ast = ast.lhs
+
         sym = s.current_scope.get_symbol(ast.lhs, SymbolTypes.VariableSymbol)
         if not sym.mem_info.is_initialized:
             raise SystemExit(
@@ -523,7 +524,7 @@ class SemanticAnalysis:
                         outermost_identifier = collapse_ast_to_list_of_identifiers(arg.value)[0]
                         outermost_symbol = s.current_scope.get_symbol(outermost_identifier, SymbolTypes.VariableSymbol)
 
-                        if not outermost_symbol.is_mutable:
+                        if not outermost_symbol.is_mutable and not outermost_symbol.mem_info.is_borrowed_mut:
                             if collapse_ast_to_list_of_identifiers(func.lhs)[-1].identifier == "__reset__":
                                 final_error_message = ErrFmt.err(arg.value._tok) + f"Assignment to '{arg.value}' attempted here."
                             else:

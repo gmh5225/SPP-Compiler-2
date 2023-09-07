@@ -53,9 +53,12 @@ class SymbolGeneration:
 
     @staticmethod
     def generate_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler):
-        sym = SymbolTypes.VariableSymbol(ast.identifier, Ast.TypeSingleAst([Ast.GenericIdentifierAst("FnRef", [ast.return_type] + [p.type_annotation for p in ast.parameters], ast.identifier._tok)], ast._tok))
+        is_method = getattr(ast, "is_method", False)
+        fn_type = AstReduction.deduce_function_type(is_method, ast.parameters, ast.return_type)
+
+        sym = SymbolTypes.VariableSymbol(ast.identifier, fn_type, is_comptime=True)  # todo : is_comptime needed here?
         sym.meta_data["fn_proto"] = ast
-        sym.meta_data["is_method"] = getattr(ast, "is_method", False)
+        sym.meta_data["is_method"] = is_method
         s.current_scope.add_symbol(sym)
 
         s.enter_scope(ast.identifier)

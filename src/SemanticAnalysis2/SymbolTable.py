@@ -240,7 +240,7 @@ class Scope:
 
     def all_symbols_exclusive_no_fn(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
         syms = self.all_symbols_exclusive(expected_sym_type)
-        syms = [s for s in syms if s.type.identifier.identifier != "FnRef"]
+        syms = [s for s in syms if s.type.identifier.identifier not in ["FnRef", "FnMut", "FnOne"]]
         return syms
 
     def get_child_scope(self, id: Hashable) -> Optional[Scope]:
