@@ -32,3 +32,18 @@ cls Alloc[T] {
 #### Alloc.dealloc
 - Deallocates the array `arr` and returns `Ret[Void, ...]`.
 - Has to take ownership of the memory, free it and return.
+
+## Stack vs Heap
+- Because references are 2nd class, they will always have a lifetime smaller than the function they are created in.
+- This means that they are stored on the stack, and will be deallocated when the function returns.
+- Any local variables are also stored on the stack, and will be deallocated when the function returns.
+- No need for an expandable heap (there will be a small fixed-size heap for true/false etc -- program wide)
+
+### Creating a new stack
+- When a function is called, a new stack is created.
+- This stack is used to store all local variables and references.
+- When the function returns, the stack is deallocated.
+- This means that all local variables and references are deallocated.
+
+### Shadow stacks
+- A shadow stack is a special stack 

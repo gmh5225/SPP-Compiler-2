@@ -26,3 +26,4 @@
 - [ ] Statements that require a `\n` at the end shouldn't if it's a one-line statement.
 - [ ] All things `yield`
 - [ ] Allow subtyping in the type-comparison algorithm.
+- [ ] Fold expressions
