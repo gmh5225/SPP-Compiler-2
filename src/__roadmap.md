@@ -15,6 +15,7 @@
 
 #### Variable related
 - [ ] Destructuring (especially for `if-patterns` and `let` statements).
+- [ ] Struct initialization: require stateful, non-default sub-classes in `sup=`
 
 #### Actual compiler Python code
 - [ ] Heavily extend errors to include their source declaration ie `let` statement etc.
