@@ -484,6 +484,11 @@ class TypeInfer:
                     # example, 'Str' must match 'Str'. The parameter and arguments are direct type matches.
                     # TODO : allow for subtyping here.
                     if q1 not in generic_map and q1 != q2:
+                        wrapped_q2 = Ast.TypeSingleAst([Ast.GenericIdentifierAst(q2, [], -1)], -1)
+                        q2_sym = s.global_scope.get_child_scope(wrapped_q2)
+                        if q1 in [str(x.name) for x in q2_sym.sup_scopes]:
+                            continue
+
                         return False
 
                     # Bound Generic
