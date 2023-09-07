@@ -450,6 +450,16 @@ class SemanticAnalysis:
         elif not class_scope.has_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol): #or s.current_scope.has_symbol("__MOCK_" + ast.op.identifier, SymbolTypes.TypeSymbol)):
             what = "Attribute" if not kwargs.get("call", False) else "Method"
             raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"{what} '{ast.op.identifier}' not found on type '{lhs_type}'.")
+
+        # Check the parts are all initialized.
+        while isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.lhs, Ast.PostfixExpressionAst):
+            ast = ast.lhs
+        sym = s.current_scope.get_symbol(ast.lhs, SymbolTypes.VariableSymbol)
+        if not sym.mem_info.is_initialized:
+            raise SystemExit(
+                "Cannot use a value that is not initialized:\n" +
+                ErrFmt.err(sym.mem_info.consume_ast._tok) + f"Value '{ast.lhs}' moved here.\n..." +
+                ErrFmt.err(ast.lhs._tok) + f"Value '{ast.lhs}' not initialized.")
         
     @staticmethod
     def analyse_function_arguments(func: Ast.PostfixExpressionAst, fn_target: SymbolTypes.VariableSymbol, asts: list[Ast.FunctionArgumentAst], s: ScopeHandler, **kwargs):
