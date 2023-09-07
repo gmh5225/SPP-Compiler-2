@@ -56,6 +56,7 @@ class SymbolGeneration:
     @staticmethod
     def generate_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler):
         sym = SymbolTypes.VariableSymbol(ast.identifier, Ast.TypeSingleAst([Ast.GenericIdentifierAst("FnRef", [ast.return_type] + [p.type_annotation for p in ast.parameters], ast.identifier._tok)], ast._tok))
+        print(s.current_scope.name, ast)
         sym.meta_data["fn_proto"] = ast
         sym.meta_data["is_method"] = getattr(ast, "is_method", False)
         s.current_scope.add_symbol(sym)
@@ -82,12 +83,23 @@ class SymbolGeneration:
     def generate_sup_prototype(ast: Ast.SupPrototypeAst, s: ScopeHandler, hidden: bool = False):
         s.enter_scope(Ast.IdentifierAst(ast.identifier.parts[-1].identifier + "#SUP", ast.identifier._tok), hidden=hidden)
 
+        # For classes that aren't mock function wrappers, add the Self type, so that "self" can be analysed like any
+        # other type of expression, and just return the type stored against "Self" in the symbol table.
         if not (ast.identifier.parts[-1].identifier.startswith("__") or ast.identifier.parts[-1].identifier[0].islower()):
             s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast.identifier))
 
-        for g in ast.generic_parameters: s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier)))
-        for member in ast.body.members: SymbolGeneration.generate_sup_member(member, s)
+        # Add mock generic parameter type into the symbol table, so they are accessible in any scope whose where this
+        # scope is an ancestor.
+        for g in ast.generic_parameters:
+            s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier)))
 
+        # Add all the members of the sup prototype into the symbol table. This registers the methods and typedefs into
+        # this scope.
+        for member in ast.body.members:
+            SymbolGeneration.generate_sup_member(member, s)
+
+        # At this point, if the sup prototype is a mock function wrapper, then there is nothing else that needs doing,
+        # and as the final bit of code would conflict with this, it is skipped -- return early.
         if ast.identifier.parts[-1].identifier in ["call_ref", "call_mut", "call_one"]:
             return
 
@@ -96,7 +108,13 @@ class SymbolGeneration:
         cls_scope = s.global_scope.get_child_scope(ast.identifier) or s.global_scope.get_child_scope(c.identifier) or s.current_scope.parent.get_child_scope(c.identifier)
         if not cls_scope:
             raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Class '{ast.identifier}' not found.")
-        cls_scope.sup_scopes.append(s.current_scope)
+
+        # The super-class' scope is the current scope if the super-imposition is just method implementations over the
+        # class, ie "sup A { ... }", and is the super-class if the super-imposition is imposing an entire class over
+        # this once, ie "sup B for A { ... }".
+        sup_scope = s.current_scope if not isinstance(ast, Ast.SupPrototypeInheritanceAst) else s.global_scope.get_child_scope(ast.super_class)
+        cls_scope.sup_scopes.append(sup_scope)
+
         s.exit_scope()
 
     @staticmethod

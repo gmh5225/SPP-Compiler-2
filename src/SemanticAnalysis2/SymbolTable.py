@@ -190,14 +190,31 @@ class Scope:
         #     raise Exception(f"Could not find {expected_sym_type.__name__} '{name}'.")
         # return sym
 
-    def get_symbol_exclusive(self, name: Hashable, expected_sym_type: type[T], error=True) -> T | list[T]:
-        combined_symbol_tables = SymbolTable()
-        combined_symbol_tables.symbols = {**self.symbol_table.symbols}
-        for sup_scope in self.sup_scopes:
-            combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **sup_scope.symbol_table.symbols}
+    def get_symbol_exclusive_including_sup(self, name: Hashable, expected_sym_type: type[T], error=True) -> T | list[T]:
+        # combined_symbol_tables = SymbolTable()
+        # combined_symbol_tables.symbols = {**self.symbol_table.symbols}
+        # for sup_scope in self.sup_scopes:
+        #     combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **sup_scope.symbol_table.symbols}
+        #
+        # try:
+        #     return combined_symbol_tables.get(name, expected_sym_type)
+        # except KeyError as e:
+        #     if error:
+        #         raise e
+        #     else:
+        #         return None
+        symbol = self.get_symbol_exclusive(name, expected_sym_type, error=error)
+        if not symbol and self.sup_scopes:
+            for sup_scope in self.sup_scopes:
+                symbol = sup_scope.get_symbol_exclusive_including_sup(name, expected_sym_type, error=error)
+                if symbol:
+                    break
+        return symbol
 
+
+    def get_symbol_exclusive(self, name: Hashable, expected_sym_type: type[T], error=True) -> T | list[T]:
         try:
-            return combined_symbol_tables.get(name, expected_sym_type)
+            return self.symbol_table.get(name, expected_sym_type)
         except KeyError as e:
             if error:
                 raise e
@@ -205,24 +222,32 @@ class Scope:
                 return None
 
     def has_symbol(self, name: Hashable, expected_sym_type: type) -> bool:
-        found = self.has_symbol_exclusive(name, expected_sym_type)
+        found = self.has_symbol_exclusive_including_sup(name, expected_sym_type)
         if not found and self.parent:
             found = self.parent.has_symbol(name, expected_sym_type)
         # if not found and expected_sym_type == SymbolTypes.TypeSymbol and not name.identifier.startswith("__MOCK_"):
         #     found = self.has_symbol("__MOCK_" + name, expected_sym_type)
         return found
 
-    def has_symbol_exclusive(self, name: Hashable, expected_sym_type: type) -> bool:
-        combined_symbol_tables = SymbolTable()
-        combined_symbol_tables.symbols = {**self.symbol_table.symbols}
+    def has_symbol_exclusive_including_sup(self, name: Hashable, expected_sym_type: type) -> bool:
+        # combined_symbol_tables = SymbolTable()
+        # combined_symbol_tables.symbols = {**self.symbol_table.symbols}
+        # for sup_scope in self.sup_scopes:
+        #     combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **sup_scope.symbol_table.symbols}
+        # t = combined_symbol_tables.has(name, expected_sym_type)
+        # return t
+        if self.has_symbol_exclusive(name, expected_sym_type):
+            return True
         for sup_scope in self.sup_scopes:
-            combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **sup_scope.symbol_table.symbols}
+            if sup_scope.has_symbol_exclusive_including_sup(name, expected_sym_type):
+                return True
+        return False
 
-        t = combined_symbol_tables.has(name, expected_sym_type)
-        return t
+    def has_symbol_exclusive(self, name: Hashable, expected_sym_type: type) -> bool:
+        return self.symbol_table.has(name, expected_sym_type)
 
     def all_symbols(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
-        syms = self.all_symbols_exclusive(expected_sym_type)
+        syms = self.all_symbols_exclusive_including_sup(expected_sym_type)
         if self.parent:
             syms += self.parent.all_symbols(expected_sym_type)
         return syms
@@ -231,14 +256,19 @@ class Scope:
         syms = self.all_symbols(expected_sym_type)
         return [str(s.name) for s in syms]
 
+    def all_symbols_exclusive_including_sup(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
+        combined_symbol_tables = self.all_symbols_exclusive(expected_sym_type)
+        for sup_scope in self.sup_scopes:
+            # combined_symbol_tables += [a for a in sup_scope.symbol_table.symbols.values() if isinstance(a, expected_sym_type)]
+            combined_symbol_tables += sup_scope.all_symbols_exclusive_including_sup(expected_sym_type)
+        return combined_symbol_tables
+
     def all_symbols_exclusive(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
         combined_symbol_tables = [a for a in self.symbol_table.symbols.values() if isinstance(a, expected_sym_type)]
-        for sup_scope in self.sup_scopes:
-            combined_symbol_tables += [a for a in sup_scope.symbol_table.symbols.values() if isinstance(a, expected_sym_type)]
         return combined_symbol_tables
 
     def all_symbols_exclusive_no_fn(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
-        syms = self.all_symbols_exclusive(expected_sym_type)
+        syms = self.all_symbols_exclusive_including_sup(expected_sym_type)
         syms = [s for s in syms if s.type.identifier.identifier != "FnRef"]
         return syms
 

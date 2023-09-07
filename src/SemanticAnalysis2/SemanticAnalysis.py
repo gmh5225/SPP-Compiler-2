@@ -229,7 +229,7 @@ class SemanticAnalysis:
                 if isinstance(owner, Ast.SupPrototypeInheritanceAst):
                     super_class_scope = s.global_scope.get_child_scope(owner.super_class)
                     reduced_identifier = Ast.IdentifierAst(ast.identifier.identifier.split("__MOCK_")[1], ast.identifier._tok)
-                    if not super_class_scope.has_symbol_exclusive(reduced_identifier, SymbolTypes.VariableSymbol):
+                    if not super_class_scope.has_symbol_exclusive_including_sup(reduced_identifier, SymbolTypes.VariableSymbol):
                         raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{reduced_identifier}' not found in super class '{owner.super_class}'.")
 
                 SemanticAnalysis.analyse_class_prototype(ast, s)
@@ -249,7 +249,7 @@ class SemanticAnalysis:
                 raise SystemExit(ErrFmt.err(owner.super_class._tok) + f"Super class '{owner.super_class}' not found.")
 
             # Make sure the method exists in the super class.
-            # if not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
+            # if not super_class_scope.has_symbol_exclusive_including_sup(ast.identifier, SymbolTypes.VariableSymbol):
             #     raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' not found in super class '{owner.super_class}'.")
 
         SemanticAnalysis.analyse_function_prototype(ast, s, in_class=True)
@@ -447,7 +447,7 @@ class SemanticAnalysis:
                 raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Index {ast.op.identifier.integer} out of range for type '{lhs_type}'.")
 
         # Else, check the attribute exists on the LHS.
-        elif not class_scope.has_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol): #or s.current_scope.has_symbol("__MOCK_" + ast.op.identifier, SymbolTypes.TypeSymbol)):
+        elif not class_scope.has_symbol_exclusive_including_sup(ast.op.identifier, SymbolTypes.VariableSymbol): #or s.current_scope.has_symbol("__MOCK_" + ast.op.identifier, SymbolTypes.TypeSymbol)):
             what = "Attribute" if not kwargs.get("call", False) else "Method"
             raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"{what} '{ast.op.identifier}' not found on type '{lhs_type}'.")
         

@@ -112,7 +112,7 @@ class TypeInfer:
         cls = s.global_scope.get_child_scope(ty)
 
         if isinstance(ast.op.identifier, Ast.IdentifierAst):
-            sym = cls.get_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol, error=False)
+            sym = cls.get_symbol_exclusive_including_sup(ast.op.identifier, SymbolTypes.VariableSymbol, error=False)
             if isinstance(sym, SymbolTypes.VariableSymbol): return sym.type
             return sym
         else:
@@ -171,7 +171,7 @@ class TypeInfer:
         # Once reaching the identifier, get its type, and pull in the generic map from the class.
         if type(l) == Ast.IdentifierAst:
             ty = TypeInfer.infer_identifier(l, scope)
-            sym = s.get_symbol(ty.parts[-1], SymbolTypes.TypeSymbol)
+            sym = s.get_symbol(ty.parts[-1].to_identifier(), SymbolTypes.TypeSymbol)
             if isinstance(sym.type, Ast.ClassPrototypeAst):
                 generic_parameters = sym.type.generic_parameters
                 generic_arguments  = ty.parts[-1].generic_arguments
@@ -180,7 +180,8 @@ class TypeInfer:
                 default_generic_map = {}  # todo: ?
 
         # Analyse each overload for a potential match
-        overloads = [x for x in s.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
+        overloads = [x for x in s.all_symbols_exclusive_including_sup(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
+        print([str(x.meta_data["fn_proto"]) for x in s.all_symbols_exclusive_including_sup(SymbolTypes.VariableSymbol)])
         original_call_arguments = ast.op.arguments.copy()
         original_args_tys = arg_tys.copy()
         original_args_ccs = arg_ccs.copy()
@@ -350,7 +351,7 @@ class TypeInfer:
         # For each attribute of the class, if the type is the generic or composes the generic ie Vec[T], then the type
         # is inferrable, and is therefore not required. Remove it from the list of required generics.
 
-        attrs = sym.all_symbols_exclusive(SymbolTypes.VariableSymbol)
+        attrs = sym.all_symbols_exclusive_including_sup(SymbolTypes.VariableSymbol)
         for attr_name, attr_type in [(attr.name, attr.type) for attr in attrs]:
             for t in TypeInfer.traverse_type(attr_type, s):
                 t = t[0]
@@ -484,6 +485,14 @@ class TypeInfer:
                     # example, 'Str' must match 'Str'. The parameter and arguments are direct type matches.
                     # TODO : allow for subtyping here.
                     if q1 not in generic_map and q1 != q2:
+                        q1_sym = s.current_scope.get_symbol(Ast.IdentifierAst(q1, -1), SymbolTypes.TypeSymbol)
+                        q2_sym = s.current_scope.get_symbol(Ast.IdentifierAst(q2, -1), SymbolTypes.TypeSymbol)
+
+                        q2_sup_scopes = s.global_scope.get_child_scope(q2_sym.type.to_type()).sup_scopes
+                        print(q2_sup_scopes)
+                        for s in q2_sup_scopes:
+                            print(s.all_symbols_exclusive_including_sup(SymbolTypes.VariableSymbol))
+
                         return False
 
                     # Bound Generic
