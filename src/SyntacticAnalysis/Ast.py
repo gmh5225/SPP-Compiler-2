@@ -241,10 +241,17 @@ class FunctionPrototypeAst:
     _tok: int
 
     def __str__(self):
-        return self.identifier.identifier\
-            + ("[" + ", ".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "")\
-            + "(" + ", ".join([str(param) for param in self.parameters]) + ")"\
-            + (" -> " + str(self.return_type) if self.return_type else "")
+        s = repr(self)
+        # s += str(self.body)
+        return s
+
+    def __repr__(self):
+        s = "fn " if not self.is_coro else "gn "
+        s += str(self.identifier)
+        s += ("[" + ", ".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "")
+        s += "(" + ", ".join([str(param) for param in self.parameters]) + ")"
+        s += (" -> " + str(self.return_type) if self.return_type else "")
+        return s
 
 @dataclass
 class FunctionArgumentAst:
@@ -311,6 +318,10 @@ def FunctionParameterVariadicAst(parameter: FunctionParameterAst):
 class FunctionImplementationAst:
     statements: list[StatementAst]
     _tok: int
+
+    def __str__(self):
+        s = "{\n" + "\n".join([str(statement) for statement in self.statements]) + "}\n"
+        return s
 
 @dataclass
 class EnumMemberAst:
@@ -664,7 +675,7 @@ class SupImplementationAst:
     _tok: int
 
     def __str__(self):
-        return "\n".join([str(member) for member in self.members])
+        return "{\n" + "\n".join([str(member) for member in self.members]) + "}\n"
 
 @dataclass
 class SupPrototypeNormalAst:
@@ -679,7 +690,7 @@ class SupPrototypeNormalAst:
         s += ("[" + ", ".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "")
         s += str(self.identifier)
         s += str(self.where_block) + "\n" if self.where_block else ""
-        s += "{" + str(self.body) + "}\n"
+        s += str(self.body)
         return s
 
     def to_type(self):

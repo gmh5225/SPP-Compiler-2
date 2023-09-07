@@ -209,6 +209,7 @@ class SemanticAnalysis:
         s.next_scope()
         SemanticAnalysis.analyse_type_generic_parameters(ast.generic_parameters, s)
 
+        # print("SUP", ast.identifier, ast.body)
         for type_part in ast.identifier.parts:
             [TypeInfer.check_type(g, s) for g in type_part.generic_arguments]
 
@@ -518,14 +519,14 @@ class SemanticAnalysis:
                         identifiers = collapse_ast_to_list_of_identifiers(arg.value)
                         if identifiers is None:
                             raise SystemExit(
-                                "Cannot borrow from a value that is not a variable:\n" if func.lhs.identifier != "__reset__" else "Cannot assign to a value that's not a variable:\n" +
+                                "Cannot borrow from a value that is not a variable:\n" if func.lhs.identifier != "__assign__" else "Cannot assign to a value that's not a variable:\n" +
                                 ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' is not a variable.")
 
                         outermost_identifier = collapse_ast_to_list_of_identifiers(arg.value)[0]
                         outermost_symbol = s.current_scope.get_symbol(outermost_identifier, SymbolTypes.VariableSymbol)
 
                         if not outermost_symbol.is_mutable and not outermost_symbol.mem_info.is_borrowed_mut:
-                            if collapse_ast_to_list_of_identifiers(func.lhs)[-1].identifier == "__reset__":
+                            if collapse_ast_to_list_of_identifiers(func.lhs)[-1].identifier == "__assign__":
                                 final_error_message = ErrFmt.err(arg.value._tok) + f"Assignment to '{arg.value}' attempted here."
                             else:
                                 final_error_message = ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' borrowed mutably here."
@@ -752,7 +753,7 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_assignment_expression(ast: Ast.AssignmentExpressionAst, s: ScopeHandler, **kwargs):
-        special_function_name = "__set__" if kwargs.get("let", False) else "__reset__"
+        special_function_name = "__set__" if kwargs.get("let", False) else "__assign__"
 
         # A manual mutability check is performed here, because whilst the function call handles all the memory and
         # mutability checks, the "set" function doesn't exist, so the mutability check has to be done manually.
@@ -793,11 +794,6 @@ class SemanticAnalysis:
             fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst(special_function_name, ast.op._tok), fn_call, ast.op._tok)
             SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **kwargs)
 
-            # Type check
-            lhs_ty = TypeInfer.infer_expression(ast.lhs[0], s)
-            if rhs_ty != lhs_ty:
-                raise SystemExit(ErrFmt.err(ast.rhs._tok) + f"Cannot assign type '{rhs_ty}' to type '{lhs_ty}'.")
-
         # The tuple checks have to be done again, because for normal assignment they have to exist, and for assignment
         # from a let statement, the let statement analyser needs to check the tuple types are valid before settings the
         # types of the symbols in the table prior to assignment.
@@ -820,11 +816,6 @@ class SemanticAnalysis:
                     ], ast.op._tok)
                 fn_call_expr = Ast.PostfixExpressionAst(Ast.IdentifierAst(special_function_name, ast.op._tok), fn_call, ast.op._tok)
                 SemanticAnalysis.analyse_postfix_function_call(fn_call_expr, s, **kwargs)
-
-                # Type check
-                lhs_ty = TypeInfer.infer_expression(lhs, s)
-                if rhs_ty.parts[-1].generic_arguments[i] != lhs_ty:
-                    raise SystemExit(ErrFmt.err(ast.rhs.values[i]._tok) + f"Cannot assign type '{rhs_ty.parts[-1].generic_arguments[i]}' to type '{lhs_ty}'.")
 
         # Set this variable as initialized. All other memory issues will be handled by the function call analysis of the
         # "set" function.

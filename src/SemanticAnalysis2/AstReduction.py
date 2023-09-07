@@ -29,6 +29,7 @@ This decision was made, because a class can be made callable with multiple overl
 "fn" functions differently was made, then there would be 2 ways to do the same thing, so the Fn[...] super-imposition
 decision was made to force only 1 way of functions being callable.
 """
+from src.SemanticAnalysis2.CommonTypes import CommonTypes
 from src.SemanticAnalysis2.TypeInference import TypeInfer
 from src.SyntacticAnalysis import Ast
 from functools import cmp_to_key
@@ -67,15 +68,28 @@ class AstReduction:
             case Ast.FunctionPrototypeAst(): AstReduction.reduce_function_prototype(mod, ast)
             case Ast.SupPrototypeNormalAst(): AstReduction.reduce_sup_prototype(mod, ast)
             case Ast.SupPrototypeInheritanceAst(): AstReduction.reduce_sup_prototype(mod, ast)
-            case Ast.ClassPrototypeAst(): AstReduction.reduce_class_prototype(ast)
+            case Ast.ClassPrototypeAst(): AstReduction.reduce_class_prototype(mod, ast)
 
     @staticmethod
-    def reduce_class_prototype(ast: Ast.ClassPrototypeAst):
+    def reduce_class_prototype(mod: Ast.ModulePrototypeAst, ast: Ast.ClassPrototypeAst):
         # Convert "Self" in class members to the class type
         for member in ast.body.members:
             if member.type_annotation.parts[-1].identifier == "Self":
                 member.type_annotation = ast.to_type()
             TypeInfer.substitute_generic_type(member.type_annotation, "Self", ast.to_type())
+
+        # Inject a mock method for assignment (type checking)
+        # if ast.identifier.identifier.startswith("__"):
+        #     return
+        #
+        # mock_method = Ast.FunctionPrototypeAst(
+        #     [], False, Ast.IdentifierAst("__assign__", -1), [], [
+        #         Ast.FunctionParameterSelfAst(Ast.ParameterPassingConventionReferenceAst(True, -1), -1),
+        #         Ast.FunctionParameterRequiredAst(False, Ast.IdentifierAst("value", -1), None, ast.to_type(), -1)
+        #     ], CommonTypes.void(), None, Ast.FunctionImplementationAst([], -1), -1)
+        #
+        # mock_sup = Ast.SupPrototypeNormalAst([], ast.to_type(), None, Ast.SupImplementationAst([mock_method], -1), -1)
+        # mod.body.members.append(mock_sup)
 
     @staticmethod
     def reduce_function_prototype(owner: Ast.ModulePrototypeAst | Ast.SupPrototypeAst, ast: Ast.FunctionPrototypeAst):

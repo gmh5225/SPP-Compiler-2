@@ -1,6 +1,6 @@
 import copy
 from difflib import SequenceMatcher
-from typing import Generator
+from typing import Generator, Optional
 import inspect
 
 from src.LexicalAnalysis.Tokens import TokenType
@@ -121,10 +121,45 @@ class TypeInfer:
             return ty.parts[-1].generic_arguments[int(ast.op.identifier.integer)]
 
     @staticmethod
-    def infer_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
-        scope = s
-        if isinstance(ast.lhs, Ast.IdentifierAst) and ast.lhs.is_special():
+    def infer_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> tuple[Optional[SymbolTypes.VariableSymbol], Ast.TypeAst]:
+        special_operation = isinstance(ast.lhs, Ast.IdentifierAst) and ast.lhs.identifier in ["__set__", "__assign__"]
+
+        if isinstance(ast.lhs, Ast.IdentifierAst) and ast.lhs.identifier == "__set__":
             return None, CommonTypes.void()
+
+        if isinstance(ast.lhs, Ast.IdentifierAst) and ast.lhs.identifier == "__assign__":
+            fn_proto = Ast.FunctionPrototypeAst([], False, Ast.IdentifierAst("__assign__", -1), [], [
+                Ast.FunctionParameterAst(True, False, Ast.IdentifierAst("self", -1), Ast.ParameterPassingConventionReferenceAst(True, -1), TypeInfer.infer_expression(ast.op.arguments[0].value, s), None, False, -1),
+                Ast.FunctionParameterRequiredAst(False, Ast.IdentifierAst("value", -1), None, TypeInfer.infer_expression(ast.op.arguments[0].value, s), -1)
+            ], CommonTypes.void(), None, Ast.FunctionImplementationAst([], -1), -1)
+            fn_protos = [fn_proto]
+            default_generic_map = {}
+        else:
+            ty = TypeInfer.infer_expression(ast.lhs, s, all=True)
+            scope = s.global_scope.get_child_scope(ty)
+            overloads = [x for x in scope.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
+            fn_protos = [f.meta_data["fn_proto"] for f in overloads]
+
+            # Construct the default generic map. Pull in previous postfix's generic maps for fallthorugh, so that generic
+            # types on owner classes etc can be used etc. ie Vec[Str].new() can pull Str as T.
+            l = ast.lhs
+            default_generic_map = {}
+            while type(l) == Ast.PostfixExpressionAst and type(l.op) == Ast.PostfixMemberAccessAst:
+                for g, h in l.op.generic_map.items():
+                    if h:
+                        default_generic_map[g] = h
+                l = l.lhs
+
+            # Once reaching the identifier, get its type, and pull in the generic map from the class.
+            if type(l) == Ast.IdentifierAst:
+                ty = TypeInfer.infer_identifier(l, s)
+                sym = scope.get_symbol(ty.parts[-1], SymbolTypes.TypeSymbol)
+                if isinstance(sym.type, Ast.ClassPrototypeAst):
+                    generic_parameters = sym.type.generic_parameters
+                    generic_arguments  = ty.parts[-1].generic_arguments
+                    default_generic_map = {gp.identifier.identifier: ga.value for gp, ga in zip(generic_parameters, generic_arguments)}
+                else:
+                    default_generic_map = {}  # todo: ?
 
         # Generics
         # print(ast.op.type_arguments)
@@ -135,18 +170,6 @@ class TypeInfer:
         arg_tys = [TypeInfer.infer_expression(arg.value, s) for arg in ast.op.arguments]
         arg_ccs = [arg.calling_convention for arg in ast.op.arguments]
 
-        # for i, arg_sym in enumerate(arg_syms):
-        #     if not isinstance(ast.op.arguments[i].value, Ast.IdentifierAst): continue
-        #     match arg_sym.mem_info:
-        #         case VariableSymbolMemoryStatus() if arg_sym.mem_info.is_borrowed_mut:
-        #             print(f"changed {arg_ccs[i]} to {Ast.ParameterPassingConventionReferenceAst(True, -1)}")
-        #             arg_ccs[i] = Ast.ParameterPassingConventionReferenceAst(True, -1)
-        #         case VariableSymbolMemoryStatus() if arg_sym.mem_info.is_borrowed_ref:
-        #             print(f"changed {arg_ccs[i]} to {Ast.ParameterPassingConventionReferenceAst(False, -1)}")
-        #             arg_ccs[i] = Ast.ParameterPassingConventionReferenceAst(False, -1)
-        #         case _:
-        #             print("???")
-
         # The next step is because overloads of functions can return different types ie: 'f(Str) -> Num' and
         # 'f(Int) -> Str' can be overloads of 'f'. We need to find the function that matches the arguments, and return
         # the return type of that function.
@@ -155,37 +178,11 @@ class TypeInfer:
         sigs = []
         errs = []
 
-        ty = TypeInfer.infer_expression(ast.lhs, s, all=True)
-        s = s.global_scope.get_child_scope(ty)
-
-        # Construct the default generic map. Pull in previous postfix's generic maps for fallthorugh, so that generic
-        # types on owner classes etc can be used etc. ie Vec[Str].new() can pull Str as T.
-        l = ast.lhs
-        default_generic_map = {}
-        while type(l) == Ast.PostfixExpressionAst and type(l.op) == Ast.PostfixMemberAccessAst:
-            for g, h in l.op.generic_map.items():
-                if h:
-                    default_generic_map[g] = h
-            l = l.lhs
-
-        # Once reaching the identifier, get its type, and pull in the generic map from the class.
-        if type(l) == Ast.IdentifierAst:
-            ty = TypeInfer.infer_identifier(l, scope)
-            sym = s.get_symbol(ty.parts[-1], SymbolTypes.TypeSymbol)
-            if isinstance(sym.type, Ast.ClassPrototypeAst):
-                generic_parameters = sym.type.generic_parameters
-                generic_arguments  = ty.parts[-1].generic_arguments
-                default_generic_map = {gp.identifier.identifier: ga.value for gp, ga in zip(generic_parameters, generic_arguments)}
-            else:
-                default_generic_map = {}  # todo: ?
-
         # Analyse each overload for a potential match
-        overloads = [x for x in s.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
         original_call_arguments = ast.op.arguments.copy()
         original_args_tys = arg_tys.copy()
         original_args_ccs = arg_ccs.copy()
 
-        fn_protos = [f.meta_data["fn_proto"] for f in overloads]
         for i, fn_type in enumerate(fn_protos):
             # Load the generic map
 
@@ -206,7 +203,7 @@ class TypeInfer:
             # Check function generics
             all_generic_parameters = fn_type.generic_parameters
             given_generic_arguments = ast.op.type_arguments
-            required_generic_parameters = TypeInfer.required_generic_parameters_for_fun(fn_type, scope)
+            required_generic_parameters = TypeInfer.required_generic_parameters_for_fun(fn_type, s)
             missing_generic_parameters = required_generic_parameters[len(given_generic_arguments):]
             unpack = all_generic_parameters and all_generic_parameters[-1].is_variadic
 
@@ -229,15 +226,16 @@ class TypeInfer:
                 ast.op.generic_map[g.identifier.identifier] = explicit_generic_argument.value
 
             # Skip first argument type for non-static functions - todo?
-            if overloads[i].meta_data.get("is_method", False) and overloads[i].meta_data.get("fn_proto").parameters and overloads[i].meta_data.get("fn_proto").parameters[0].is_self:
-                arg_tys.insert(0, TypeInfer.infer_expression(ast.lhs.lhs, scope))
-                arg_ccs.insert(0, copy.deepcopy(param_ccs[0]))
-                ast.op.arguments.insert(0, Ast.FunctionArgumentAst(None, ast.lhs.lhs, copy.deepcopy(param_ccs[0]), False, -1))
+            if not special_operation:
+                if overloads[i].meta_data.get("is_method", False) and overloads[i].meta_data.get("fn_proto").parameters and overloads[i].meta_data.get("fn_proto").parameters[0].is_self:
+                    arg_tys.insert(0, TypeInfer.infer_expression(ast.lhs.lhs, s))
+                    arg_ccs.insert(0, copy.deepcopy(param_ccs[0]))
+                    ast.op.arguments.insert(0, Ast.FunctionArgumentAst(None, ast.lhs.lhs, copy.deepcopy(param_ccs[0]), False, -1))
 
-            # Check if the function is callable with the number of given arguments.
-            if len(param_tys) != len(arg_tys):
-                errs.append(f"Expected {len(param_tys)} arguments, but got {len(arg_tys)}.")
-                continue
+                # Check if the function is callable with the number of given arguments.
+                if len(param_tys) != len(arg_tys):
+                    errs.append(f"Expected {len(param_tys)} arguments, but got {len(arg_tys)}.")
+                    continue
 
             # Check if the function is callable with the given argument types.
 
@@ -249,7 +247,7 @@ class TypeInfer:
             check = enumerable_any([not TypeInfer.types_equal_account_for_generic(
                 ast.op.arguments[i],
                 fn_type.parameters[i],
-                arg_ty, param_ty, ast.op.generic_map, scope) for i, (arg_ty, param_ty) in enumerate(zip(arg_tys, param_tys))])
+                arg_ty, param_ty, ast.op.generic_map, s) for i, (arg_ty, param_ty) in enumerate(zip(arg_tys, param_tys))])
 
             if check[1]:
                 mismatch_index = check[0]
@@ -267,7 +265,7 @@ class TypeInfer:
             # with their corresponding type arguments.
             # print("-" * 50)
             # return_type = copy.deepcopy(fn_type.return_type)
-            # for t in TypeInfer.traverse_type(return_type, scope):
+            # for t in TypeInfer.traverse_type(return_type, s):
             #     sym = s.get_symbol(Ast.IdentifierAst(t, -1), SymbolTypes.TypeSymbol)
             #     print(sym)
 
@@ -276,7 +274,10 @@ class TypeInfer:
             for g, h in ast.op.generic_map.items():
                 TypeInfer.substitute_generic_type(return_type, g, h.parts[-1].identifier)
             ast.op.arguments = original_call_arguments
-            return overloads[i], return_type
+            if not special_operation:
+                return overloads[i], return_type
+            else:
+                return None, return_type
 
         ast.op.arguments = original_call_arguments
 
@@ -556,6 +557,8 @@ class TypeInfer:
         elif isinstance(ty, Ast.TypeTupleAst):
             for p in ty.types:
                 TypeInfer.substitute_generic_type(p, q1, q2)
+        elif ty is None:
+            pass
         else:
             print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
             raise SystemExit(ErrFmt.err(ty._tok) + f"Unknown 'Ast.{type(ty).__name__}' being inferred. Report as bug.")
