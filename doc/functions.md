@@ -45,14 +45,14 @@ cls FnRef[R, ...Ts] {
 
 # User code
 
-cls __MOCK_A {}
-sup FnRef[Num, Num] for A {
+cls __MOCK_a {}
+sup FnRef[Num, Num] for __MOCK_a {
   fn call_ref(x: Num) -> Num { ... }
 }
-sup FnRef[Str, Str] for A {
+sup FnRef[Str, Str] for __MOCK_a {
   fn call_ref(x: Str) -> Str { ... }
 }
-let a = __MOCK_A{}
+let a = __MOCK_a{}
 ```
 - This allows overloads to be defined, and for functions to be passed around as objects.
 - Note that the only way to pass `fn`/`gn` non-closure functions as arguments is to use the `&` calling convention.

@@ -8,6 +8,7 @@
 
 #### Memory
 - [ ] Reassigning to moved _attributes_ makes the object no longer partially moved.
+- [ ] Can still assign to attributes of a moved object --  should not be allowed.
 
 #### Lambdas/closures related
 - [ ] Lambdas & capturing variables (apply the same borrow/move rules as parameters).
@@ -18,8 +19,8 @@
 #### Actual compiler Python code
 - [ ] Heavily extend errors to include their source declaration ie `let` statement etc.
 - [ ] Check that `copy.deepcopy` is called on all types that require it (modifying local AST variable).
-- [ ] Currently, types ignore their namespace -- fix this + nested types => imports
-- [ ] Redo all error types regarding `SystemExit` etc
+- [ ] Currently, types ignore their namespace -- fix this + nested types => imports.
+- [ ] Redo all error types regarding `SystemExit` etc.
 - [ ] Work out all error codes (will have to finish syntactic analysis first).
 
 #### Other
