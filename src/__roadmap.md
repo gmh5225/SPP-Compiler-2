@@ -30,7 +30,13 @@
 - [ ] Allow subtyping in the type-comparison algorithm.
 - [ ] Fold expressions
 - [ ] Disallow duplicate inheritance super-impositions onto a class.
+
+#### Imports
 - [ ] Only import what is specified in the actual import.
+- [ ] Currently `use std.num.Num` forces `std.Num` to be used
+  - [ ] Make everything imported at FQN level by default, ie `std.Num` usable with no import.
+  - [ ] Make `use std.num.Num` only import `Num` from `std.num`, so `Num` can be used as it
+    - [ ] Add links to child scopes to optionally bypass FQN
 
 #### Ideas that probably won't happen
 - [ ] Keyword renaming: `while` -> `do`, `else` -> `or` (matches 2 letter nature of `if`).
