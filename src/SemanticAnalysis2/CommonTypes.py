@@ -12,34 +12,34 @@ class CommonTypes:
     @staticmethod
     def void() -> Ast.TypeAst:
         # Void type for a "no-value" return
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Void", [], -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Void", [], -1)], -1)
 
     @staticmethod
     def bool() -> Ast.TypeAst:
         # Boolean type
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Bool", [], -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Bool", [], -1)], -1)
 
     @staticmethod
     def str() -> Ast.TypeAst:
         # String type
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Str", [], -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Str", [], -1)], -1)
 
     @staticmethod
     def arr(element_type: Ast.TypeAst) -> Ast.TypeAst:
         # Character type
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Arr", [element_type], -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Arr", [element_type], -1)], -1)
 
     @staticmethod
     def reg() -> Ast.TypeAst:
         # Regular expression type
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Rgx", [], -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Rgx", [], -1)], -1)
 
     @staticmethod
     def num() -> Ast.TypeAst:
         # Number type
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Num", [], -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Num", [], -1)], -1)
 
     @staticmethod
     def tup(element_types: list[Ast.TypeAst]) -> Ast.TypeAst:
         # Tuple type - add the types of the tuple as the generic arguments
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Tup", element_types, -1)], -1)
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Tup", element_types, -1)], -1)

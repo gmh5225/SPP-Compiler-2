@@ -120,9 +120,13 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler, **kwargs):
-        # special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
-        function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.VariableSymbol)  # if not special else None
+        # print("-" * 50)
+        # print(ast)
+        # print(s.current_scope.name, f"{[str(s.name) for s in s.current_scope.children]}")
+        # print(s.current_scope.name, f"{[s.visited for s in s.current_scope.children]}")
 
+        # special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
+        # function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.VariableSymbol)  # if not special else None
         s.next_scope()
 
         # Mark global methods as "static" ie don't have a "self" parameter
@@ -194,9 +198,11 @@ class SemanticAnalysis:
     @staticmethod
     def analyse_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeHandler):
         s.next_scope()
+
         SemanticAnalysis.analyse_type_generic_parameters(ast.generic_parameters, s)
         [SemanticAnalysis.analyse_decorator(ast, d, s) for d in ast.decorators]
         [SemanticAnalysis.analyse_class_member(m, s) for m in ast.body.members]
+
         s.prev_scope()
 
     @staticmethod
@@ -209,7 +215,6 @@ class SemanticAnalysis:
         s.next_scope()
         SemanticAnalysis.analyse_type_generic_parameters(ast.generic_parameters, s)
 
-        # print("SUP", ast.identifier, ast.body)
         for type_part in ast.identifier.parts:
             [TypeInfer.check_type(g, s) for g in type_part.generic_arguments]
 
@@ -219,6 +224,7 @@ class SemanticAnalysis:
                 [TypeInfer.check_type(g, s) for g in type_part.generic_arguments]
 
         [SemanticAnalysis.analyse_sup_member(ast, m, s) for m in ast.body.members]
+
         s.prev_scope()
 
     @staticmethod
@@ -230,7 +236,7 @@ class SemanticAnalysis:
                 if isinstance(owner, Ast.SupPrototypeInheritanceAst):
                     super_class_scope = s.global_scope.get_child_scope(owner.super_class)
                     reduced_identifier = Ast.IdentifierAst(ast.identifier.identifier.split("__MOCK_")[1], ast.identifier._tok)
-                    if not super_class_scope.has_symbol_exclusive(reduced_identifier, SymbolTypes.VariableSymbol):
+                    if not super_class_scope.has_symbol_exclusive(reduced_identifier, SymbolTypes.VariableSymbol): # todo : this check needed?
                         raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{reduced_identifier}' not found in super class '{owner.super_class}'.")
 
                 SemanticAnalysis.analyse_class_prototype(ast, s)
@@ -244,12 +250,13 @@ class SemanticAnalysis:
     def analyse_sup_method_prototype(owner: Ast.SupPrototypeAst, ast: Ast.SupMethodPrototypeAst, s: ScopeHandler):
         if isinstance(owner, Ast.SupPrototypeInheritanceAst):
             super_class_scope = s.global_scope.get_child_scope(owner.super_class)
-            special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
+            # special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
 
             if not super_class_scope:
                 raise SystemExit(ErrFmt.err(owner.super_class._tok) + f"Super class '{owner.super_class}' not found.")
 
             # Make sure the method exists in the super class.
+            # print(super_class_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol))
             # if not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
             #     raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' not found in super class '{owner.super_class}'.")
 
@@ -283,8 +290,8 @@ class SemanticAnalysis:
     @staticmethod
     def analyse_typedef(ast: Ast.TypedefStatementAst, s: ScopeHandler):
         # Analyse the old type, then add a symbol for the new type that points to the old type.
-        old_type_sym = s.current_scope.get_symbol(ast.old_type.parts[-1].identifier, SymbolTypes.TypeSymbol)
-        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ast.new_type.parts[-1].to_identifier(), old_type_sym.type, old_type_sym.sup_scopes))
+        old_type_sym = s.current_scope.get_symbol(ast.old_type.to_identifier(), SymbolTypes.TypeSymbol)
+        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ast.new_type.to_identifier(), old_type_sym.type, old_type_sym.sup_scopes))
 
     @staticmethod
     def analyse_expression(ast: Ast.ExpressionAst, s: ScopeHandler, **kwargs):
@@ -427,7 +434,7 @@ class SemanticAnalysis:
     def analyse_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):
         lhs_type = TypeInfer.infer_expression(ast.lhs, s)
         lhs_type = isinstance(lhs_type, Ast.TypeTupleAst) and CommonTypes.tup(lhs_type.types) or lhs_type
-        sym = s.current_scope.get_symbol(lhs_type.parts[-1], SymbolTypes.TypeSymbol)
+        sym = s.current_scope.get_symbol(lhs_type.to_identifier(), SymbolTypes.TypeSymbol)
         if not sym:
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Type '{lhs_type}' not found.")
 
@@ -441,7 +448,7 @@ class SemanticAnalysis:
         # the tuple.
         if isinstance(ast.op.identifier, Ast.NumberLiteralBase10Ast):
             # If the member access is a number literal, check the number literal is a valid index for the tuple.
-            if not lhs_type.parts[-1].identifier == "Tup":
+            if not lhs_type.to_identifier().identifier == "std.Tup":
                 raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"Cannot index into non-tuple type '{lhs_type}'.")
 
             if int(ast.op.identifier.integer) >= len(lhs_type.parts[-1].generic_arguments):
@@ -668,7 +675,7 @@ class SemanticAnalysis:
                 raise SystemExit(ErrFmt.err(default_obj_given._tok) + f"Default object given to struct initializer is not of type '{cls_ty}'.")
 
         # Register all the generic parameters of the class as None in the generic map.
-        sym = s.current_scope.get_symbol(cls_ty.parts[-1], SymbolTypes.TypeSymbol)
+        sym = s.current_scope.get_symbol(cls_ty.to_identifier(), SymbolTypes.TypeSymbol)
         gs = sym.type.generic_parameters
         for g in gs:
             ast.op.generic_map[g.identifier.identifier] = None
@@ -678,14 +685,14 @@ class SemanticAnalysis:
         for given, actual in zip(sorted(given_fields), sorted(actual_fields)):
             given_ty = TypeInfer.infer_expression(ast.op.fields[given_fields.index(given)].value or ast.op.fields[given_fields.index(given)].identifier, s)
             actual_ty = cls_definition_scope.get_symbol(Ast.IdentifierAst(actual, -1), SymbolTypes.VariableSymbol).type
-            acc_sym = cls_definition_scope.get_symbol(actual_ty.parts[-1], SymbolTypes.TypeSymbol)
+            acc_sym = cls_definition_scope.get_symbol(actual_ty.to_identifier(), SymbolTypes.TypeSymbol)
 
             # Fill in the inferrable generics from the attributes being given
             # -> TODO : shift this to type comparison where-ever that is?
             # -> TODO : also traverse the type tree and replace generic parameters with their actual types
 
             if type(acc_sym.type) == Ast.TypeSingleAst:
-                gi = actual_ty.parts[-1].identifier
+                gi = actual_ty.to_identifier()
                 ast.op.generic_map[gi] = given_ty
 
             if not TypeInfer.types_equal_account_for_generic(ast.op.fields[sorted(given_fields).index(given)], actual, given_ty, actual_ty, ast.op.generic_map, s):
@@ -717,8 +724,8 @@ class SemanticAnalysis:
         else:
             ty = TypeInfer.infer_expression(ast.value, s)
 
-            # Ensure that the RHS is a tuple type.
-            if not ty.parts[-1].identifier:
+            # Ensure that the RHS is a tuple type. # todo ?
+            if not ty.to_identifier().identifier != "std.Tup":
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a non-tuple type ({ty}) into to {len(ast.variables)} variables.")
 
             # Ensure that the tuple contains the correct number of elements.
@@ -800,7 +807,7 @@ class SemanticAnalysis:
         else:
             # Ensure that the RHS is a tuple type.
             # Ensure that the RHS is a tuple type.
-            if not rhs_ty.parts[-1].identifier == "Tup":
+            if not rhs_ty.to_identifier() == "std.Tup":
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a non-tuple type ({rhs_ty}) into to {len(ast.lhs)} variables.")
 
             # Ensure that the tuple contains the correct number of elements.

@@ -150,6 +150,29 @@ class Scope:
         if parent is not None:
             parent.children.append(self)
 
+    def where_to_look(self, name: Hashable, expected_sym_type: type[T], error=True) -> tuple[Optional[Scope], Optional[Hashable]]:
+        if expected_sym_type == SymbolTypes.TypeSymbol:
+            where = self
+            while where.parent:
+                where = where.parent
+
+            parts = name.identifier.split(".")
+            i = 0
+            while parts[i].islower():
+                p = parts[i]
+                where = [c for c in where.children if str(c.name).replace("/", ".") == p]
+                if len(where) == 0:
+                    if error:
+                        raise SystemExit(
+                            f"Could not find module-part/namespace '{p}'." +
+                            ErrFmt.err(name._tok) + f"Symbol '{p}' used here")
+                    else:
+                        return None, None
+                where = where[0]
+                i += 1
+            return where, Ast.IdentifierAst(".".join(parts[i:]), name._tok)
+        return self, name
+
     def add_symbol(self, symbol: SymbolTypes.Symbol):
         if self.symbol_table.has(symbol.name, SymbolTypes.TypeSymbol):
             raise SystemExit(f"Symbol '{symbol.name}' already exists." +
@@ -158,18 +181,20 @@ class Scope:
         self.symbol_table.add(symbol)
 
     def get_symbol(self, name: Hashable, expected_sym_type: type[T], error=True) -> T:
+        where, name = self.where_to_look(name, expected_sym_type, error=error)
+
         # combine this, sup-scopes and parents (recursively) into one symbol table
         combined_symbol_tables = SymbolTable()
-        combined_symbol_tables.symbols = {**self.symbol_table.symbols}
-        for sup_scope in self.sup_scopes:
+        combined_symbol_tables.symbols = {**where.symbol_table.symbols}
+        for sup_scope in where.sup_scopes:
             combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **sup_scope.symbol_table.symbols}
 
         sym = None
         try:
             sym = combined_symbol_tables.get(name, expected_sym_type)
         except KeyError:
-            if self.parent:
-                sym = self.parent.get_symbol(name, expected_sym_type, error=False)
+            if where.parent and where == self:
+                sym = where.parent.get_symbol(name, expected_sym_type, error=False)
         if not sym and error:
             raise Exception(f"Could not find {expected_sym_type.__name__} '{name}'.")
         return sym
@@ -191,9 +216,11 @@ class Scope:
         # return sym
 
     def get_symbol_exclusive(self, name: Hashable, expected_sym_type: type[T], error=True) -> T | list[T]:
+        where, name = self.where_to_look(name, expected_sym_type, error=error)
+
         combined_symbol_tables = SymbolTable()
-        combined_symbol_tables.symbols = {**self.symbol_table.symbols}
-        for sup_scope in self.sup_scopes:
+        combined_symbol_tables.symbols = {**where.symbol_table.symbols}
+        for sup_scope in where.sup_scopes:
             combined_symbol_tables.symbols = {**combined_symbol_tables.symbols, **sup_scope.symbol_table.symbols}
 
         try:
@@ -204,15 +231,17 @@ class Scope:
             else:
                 return None
 
-    def has_symbol(self, name: Hashable, expected_sym_type: type) -> bool:
-        found = self.has_symbol_exclusive(name, expected_sym_type)
-        if not found and self.parent:
-            found = self.parent.has_symbol(name, expected_sym_type)
+    def has_symbol(self, name: Hashable, expected_sym_type: type[T]) -> bool:
+        where, name = self.where_to_look(name, expected_sym_type, error=False)
+
+        found = where.has_symbol_exclusive(name, expected_sym_type)
+        if not found and where.parent and where == self:
+            found = where.parent.has_symbol(name, expected_sym_type)
         # if not found and expected_sym_type == SymbolTypes.TypeSymbol and not name.identifier.startswith("__MOCK_"):
         #     found = self.has_symbol("__MOCK_" + name, expected_sym_type)
         return found
 
-    def has_symbol_exclusive(self, name: Hashable, expected_sym_type: type) -> bool:
+    def has_symbol_exclusive(self, name: Hashable, expected_sym_type: type[T]) -> bool:#
         combined_symbol_tables = SymbolTable()
         combined_symbol_tables.symbols = {**self.symbol_table.symbols}
         for sup_scope in self.sup_scopes:
@@ -244,6 +273,7 @@ class Scope:
         return syms
 
     def get_child_scope(self, id: Hashable) -> Optional[Scope]:
+
         # sup_children = []
         # for sup_scope in self.sup_scopes:
         #     sup_children.extend(sup_scope.children)
@@ -253,14 +283,39 @@ class Scope:
         # matches = (c for c in self.children if c.id == hash(id))
         # return next(matches, None)
 
-        matches = [c for c in self.children if c.id == hash(id)]
-        if not any(matches):
-            for c in self.children:
-                match = c.get_child_scope(id)
-                if match:
-                    return match
+        def inner(part, scope):
+            # print("=>")
+            # print(hash(part), type(part))
+            # print(part, scope.name, [str(x.name) for x in scope.children])
+            # print(part, scope.name, [type(x.name) for x in scope.children])
+            # print(part, scope.name, [x.id for x in scope.children])
+            matches = [c for c in scope.children if c.id == hash(part)]
+            if not any(matches):
+                for c in scope.children:
+                    match = c.get_child_scope(part)
+                    if match:
+                        return match
+            else:
+                return matches[0]
+
+        if isinstance(id, Ast.TypeSingleAst):
+            current = self
+            # print("-" * 50)
+            # print(current.name)
+            # print(id, [str(x.name) for x in self.children])
+            # print([q for q in str(id).split(".") if q[0].islower()])
+            for p in [q for q in str(id).split(".") if q[0].islower()]:
+                current = inner(Ast.IdentifierAst(p, id._tok), current)
+                if not current:
+                    # print("!" * 50)
+                    # print(id, [str(x.name) for x in self.children])
+                    return None # todo : error?
+            if str(id).split(".")[0][0].islower():
+                return current
+            return inner(id, current)
         else:
-            return matches[0]
+            return inner(id, self)
+
 
 
 class ScopeHandler:

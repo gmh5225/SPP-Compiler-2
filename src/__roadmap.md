@@ -30,6 +30,7 @@
 - [ ] Allow subtyping in the type-comparison algorithm.
 - [ ] Fold expressions
 - [ ] Disallow duplicate inheritance super-impositions onto a class.
+- [ ] Only import what is specified in the actual import.
 
 #### Ideas that probably won't happen
 - [ ] Keyword renaming: `while` -> `do`, `else` -> `or` (matches 2 letter nature of `if`).

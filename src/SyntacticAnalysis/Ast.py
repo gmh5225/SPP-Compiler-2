@@ -19,7 +19,7 @@ class ProgramAst:
 
     def __str__(self):
         s = str(self.module)
-        s += "### END OF FILE ###"
+        s += "\n\n### END OF FILE ###\n\n"
         return s
 
 @dataclass
@@ -128,11 +128,22 @@ class ImportTypeAst:
     alias: Optional[IdentifierAst]
     _tok: int
 
+    def __str__(self):
+        s = str(self.imported_type)
+        s += " as " + str(self.alias) if self.alias else ""
+        return s
+
 @dataclass
 class ImportTypesAst:
     individual_types: list[ImportTypeAst]
     import_all: bool
     _tok: int
+
+    def __str__(self):
+        s = ""
+        s += "*" if self.import_all else ""
+        s += "{" + ", ".join([str(individual_type) for individual_type in self.individual_types]) + "}" if len(self.individual_types) > 1 else str(self.individual_types[0])
+        return s
 
 def ImportTypesAllAst(_tok: int):
     return ImportTypesAst([], True, _tok)
@@ -146,6 +157,11 @@ class ImportStatementAst:
     what_to_import: ImportTypesAst
     _tok: int
 
+    def __str__(self):
+        s = "use " + str(self.module) + "."
+        s += str(self.what_to_import)
+        return s
+
 @dataclass
 class ImportIdentifierAst:
     parts: list[IdentifierAst]
@@ -154,10 +170,23 @@ class ImportIdentifierAst:
     def __str__(self):
         return "/".join([str(part) for part in self.parts])
 
+    def __hash__(self):
+        return hash(tuple(self.parts)) if len(self.parts) else hash(self.parts[0])
+
+    def __eq__(self, other):
+        return isinstance(other, ImportIdentifierAst) and self.parts == other.parts
+
+    def remove_last(self):
+        return ImportIdentifierAst(self.parts[:-1], self._tok)
+
 @dataclass
 class ImportBlockAst:
     imports: list[ImportStatementAst]
     _tok: int
+
+    def __str__(self):
+        s = "\n".join([str(i) for i in self.imports])
+        return s
 
 @dataclass
 class ModuleImplementationAst:
@@ -242,7 +271,6 @@ class FunctionPrototypeAst:
 
     def __str__(self):
         s = repr(self)
-        # s += str(self.body)
         return s
 
     def __repr__(self):
@@ -251,6 +279,7 @@ class FunctionPrototypeAst:
         s += ("[" + ", ".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "")
         s += "(" + ", ".join([str(param) for param in self.parameters]) + ")"
         s += (" -> " + str(self.return_type) if self.return_type else "")
+        s += str(self.body)
         return s
 
 @dataclass
@@ -320,7 +349,7 @@ class FunctionImplementationAst:
     _tok: int
 
     def __str__(self):
-        s = "{\n" + "\n".join([str(statement) for statement in self.statements]) + "}\n"
+        s = "{\n" + ("\n".join(["" + str(statement) for statement in self.statements]) if self.statements else "") + "}\n"
         return s
 
 @dataclass
@@ -514,6 +543,10 @@ class TypeSingleAst:
     def __str__(self):
         return ".".join([str(part) for part in self.parts])
 
+    def to_identifier(self):
+        s = ".".join([part.to_identifier().identifier for part in self.parts])
+        return IdentifierAst(s, self._tok)
+
 @dataclass
 class TypeTupleAst:
     types: list[TypeAst]
@@ -675,7 +708,7 @@ class SupImplementationAst:
     _tok: int
 
     def __str__(self):
-        return "{\n" + "\n".join([str(member) for member in self.members]) + "}\n"
+        return " {\n" + "\n".join([str(member) for member in self.members]) + "\n}\n"
 
 @dataclass
 class SupPrototypeNormalAst:
@@ -707,12 +740,15 @@ class SupPrototypeInheritanceAst(SupPrototypeNormalAst):
         s += str(self.super_class) + " for "
         s += str(self.identifier)
         s += str(self.where_block) + "\n" if self.where_block else ""
-        s += "{\n" + str(self.body) + "\n}\n"
+        s += str(self.body)
         return s
 
 @dataclass
 class SupMethodPrototypeAst(FunctionPrototypeAst):
     _tok: int
+
+    def __str__(self):
+        return super().__repr__()
 
 @dataclass
 class SupTypedefAst(TypedefStatementAst):

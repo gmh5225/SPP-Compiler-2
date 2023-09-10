@@ -13,7 +13,7 @@ class Compiler:
     _tokens: list[Token]
     _ast: ProgramAst
 
-    def __init__(self, code: str):
+    def __init__(self, code: str, root_path: str):
         # Load the code into the Compiler class.
         self._code = code
 
@@ -21,10 +21,11 @@ class Compiler:
         self._tokens = Lexer(code).lex()
 
         # Parse the tokens into an AST.
-        self._ast = Parser(self._tokens).parse()
+        self._ast = Parser(self._tokens, root_path).parse()
 
         d = dataclasses.asdict(self._ast)
         save_json(d, "_out/ast.json")
+        open("_out/new_code.spp", "w").write(str(self._ast))
 
         Semantics(self._ast)
 

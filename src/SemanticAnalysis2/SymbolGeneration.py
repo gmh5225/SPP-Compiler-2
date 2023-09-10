@@ -24,9 +24,12 @@ class SymbolGeneration:
 
     @staticmethod
     def generate_program(ast: Ast.ProgramAst, s: ScopeHandler):
-        for member in ast.module.body.members: SymbolGeneration.generate_module_member(member, s)
+        for member in ast.module.body.members:
+            SymbolGeneration.generate_module_member(member, s)
+
         if ast.module.body.import_block:
-            for imp in ast.module.body.import_block.imports: SymbolGeneration.generate_import(imp, s)
+            for imp in ast.module.body.import_block.imports: # todo : check against already imported modules
+                SymbolGeneration.generate_import(ast, imp, s)
 
     @staticmethod
     def generate_module_member(ast: Ast.ModuleMemberAst, s: ScopeHandler):
@@ -41,15 +44,51 @@ class SymbolGeneration:
                 raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown module member {ast} being generated. Report as bug.")
 
     @staticmethod
-    def generate_import(ast: Ast.ImportStatementAst, s: ScopeHandler):
+    def generate_import(root: Ast.ProgramAst, ast: Ast.ImportStatementAst, s: ScopeHandler):
         mod_name = f"./TestCode/{ast.module}.spp"
         try:
             mod_code = open(mod_name, "r").read()
         except FileNotFoundError:
-            raise SystemExit(ErrFmt.err(ast.module._tok) + f"Module '{ast.module}' not found.")
-        ts = ErrFmt.TOKENS
-        SymbolGeneration.generate_program(Parser(Lexer(mod_code).lex()).parse(), s)
+            raise SystemExit(
+                f"The module {ast.module} was not found" +
+                ErrFmt.err(ast.module._tok) + f"The module was attempted to be imported here.")
+
+        ts = ErrFmt.TOKENS.copy()
+        fp = ErrFmt.FILE_PATH
+        open("_out/new_code.spp", "a").write(mod_code)
+
+        new_mod = Parser(Lexer(mod_code).lex(), f"{ast.module}.spp").parse()
+
+        # Separate all the scopes -- for example, if the module is `a.b.c`, then we need to separate the scopes "a",
+        # "b", and "c". Set the current scope to the global scope (where modules are all found, then layered from)
+        scopes = ast.module.remove_last().parts
+        current = s.global_scope
+        scope_restore = s.current_scope
+
+        # Iterate through the scopes.
+        for scope in scopes:
+
+            # If the scope already exists, ie a module in the same directory, then we can just set the current scope
+            # to that scope, and generate the program if it's the last scope.
+            if scope in [y.name for y in current.children]:
+                c = s.current_scope
+                s.current_scope = current.get_child_scope(scope)
+                if scope == scopes[-1]:
+                    SymbolGeneration.generate_program(new_mod, s)
+                current = s.current_scope
+
+            # Otherwise, we need to create a new scope, and generate the program if it's the last scope.
+            else:
+                s.enter_scope(scope)
+                if scope == scopes[-1]:
+                    SymbolGeneration.generate_program(new_mod, s)
+
+        s.current_scope = scope_restore
+
+        root.module.body.members.extend(new_mod.module.body.members)
+
         ErrFmt.TOKENS = ts
+        ErrFmt.FILE_PATH = fp
 
     @staticmethod
     def generate_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler):
@@ -68,7 +107,7 @@ class SymbolGeneration:
     @staticmethod
     def generate_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeHandler, hidden: bool = False):
         ty = Ast.TypeSingleAst([Ast.GenericIdentifierAst(ast.identifier.identifier, [], ast._tok)], ast._tok)
-        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ty.parts[-1].to_identifier(), ast))
+        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ty.to_identifier(), ast))
         s.enter_scope(ty, hidden=hidden)
         [s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier))) for g in ast.generic_parameters]
 
@@ -77,11 +116,12 @@ class SymbolGeneration:
 
         for attr in ast.body.members:
             s.current_scope.add_symbol(SymbolTypes.VariableSymbol(attr.identifier, attr.type_annotation))
+
         s.exit_scope()
 
     @staticmethod
     def generate_sup_prototype(ast: Ast.SupPrototypeAst, s: ScopeHandler, hidden: bool = False):
-        s.enter_scope(Ast.IdentifierAst(ast.identifier.parts[-1].identifier + "#SUP", ast.identifier._tok), hidden=hidden)
+        s.enter_scope(ast.identifier.to_identifier().identifier + "#SUP", hidden=hidden)
 
         if not (ast.identifier.parts[-1].identifier.startswith("__") or ast.identifier.parts[-1].identifier[0].islower()):
             s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast.identifier))
@@ -125,12 +165,12 @@ class SymbolGeneration:
 
     @staticmethod
     def generate_sup_typedef(ast: Ast.SupTypedefAst, s: ScopeHandler):
-        old_type_sym = s.current_scope.get_symbol(ast.old_type.parts[-1], SymbolTypes.TypeSymbol, error=False)
+        old_type_sym = s.current_scope.get_symbol(ast.old_type.to_identifier(), SymbolTypes.TypeSymbol, error=False)
         if not old_type_sym:
             raise SystemExit(ErrFmt.err(ast.old_type._tok) + f"Type '{ast.old_type}' not found.")
 
         old_type_scope = s.global_scope.get_child_scope(ast.old_type)
-        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ast.new_type.parts[-1].to_identifier(), old_type_sym.type))
+        s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ast.new_type.to_identifier(), old_type_sym.type))
         s.current_scope.sup_scopes.extend(old_type_scope.sup_scopes)
 
     @staticmethod

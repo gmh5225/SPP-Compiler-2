@@ -38,6 +38,7 @@ CUR_ERR_IND = 0
 
 class ErrFmt:
     TOKENS: list[Token] = []
+    FILE_PATH: str = ""
 
     @staticmethod
     def escape_ansi(line):
@@ -104,6 +105,13 @@ class ErrFmt:
         error_length = max(1, len(ErrFmt.TOKENS[error_position].token_metadata)) if extend_tok_len < 0 else extend_tok_len - error_position
         number_margin_len = len(ErrFmt.escape_ansi(line_number)) - 2
 
+        file_path_string = "".join([
+            "-> ",
+            f"{colorama.Fore.WHITE}{colorama.Style.BRIGHT}",
+            ErrFmt.FILE_PATH,
+            f": [Tok: {start_token_index}]"
+            f"{colorama.Style.RESET_ALL}"])
+
         top_line_padding_string = "".join([
             " " * number_margin_len,
             f"{colorama.Fore.WHITE}{colorama.Style.BRIGHT}| {colorama.Style.RESET_ALL}"])
@@ -118,6 +126,7 @@ class ErrFmt:
 
         final_string = "\n".join([
             "",
+            file_path_string,
             top_line_padding_string,
             line_containing_error_string,
             error_description_string])
@@ -265,11 +274,13 @@ class Parser:
     _tokens: list[Token]
     _current: int
 
-    def __init__(self, tokens: list[Token]):
+    def __init__(self, tokens: list[Token], file_path: str):
+
         self._tokens = tokens
         self._current = 0
 
         ErrFmt.TOKENS = self._tokens
+        ErrFmt.FILE_PATH = file_path
 
     def parse(self) -> Ast.ProgramAst:
         try:
@@ -1258,7 +1269,7 @@ class Parser:
     def _parse_type_identifier_namespace_part(self) -> BoundParser:
         def inner():
             p1 = self._parse_identifier().parse_once()
-            return p1
+            return p1.to_generic_identifier()
         return BoundParser(self, inner)
 
     def _parse_type_identifier_upper_type(self) -> BoundParser:

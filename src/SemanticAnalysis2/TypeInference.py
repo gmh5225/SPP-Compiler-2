@@ -21,11 +21,9 @@ def enumerable_any(args: list) -> tuple[int, bool]:
 class TypeInfer:
     @staticmethod
     def infer_expression(ast: Ast.ExpressionAst, s: ScopeHandler, **kwargs) -> Ast.TypeAst:
-        """
-        - Match the actual AST type and calling the appropriate function.
-        - Example: Ast.IdentifierAst => "TypeInfer.infer_identifier(...)".
-        - Literals will always have the same type => return the literal's type.
-        """
+        # Match the AST node by its type, and call the appropriate function to infer the type. For example, if the AST
+        # node is an identifier, call infer_identifier() to infer the type of the identifier. Literals will always
+        # return the same type, so there is no need for their own special functions.
 
         match ast:
             case Ast.IdentifierAst(): return TypeInfer.infer_identifier(ast, s)
@@ -117,7 +115,7 @@ class TypeInfer:
             return sym
         else:
             ty = TypeInfer.infer_expression(ast.lhs, s)
-            sym = s.current_scope.get_symbol(ast.lhs.parts[-1], SymbolTypes.TypeSymbol)
+            sym = s.current_scope.get_symbol(ast.lhs.to_identifier(), SymbolTypes.TypeSymbol)
             return ty.parts[-1].generic_arguments[int(ast.op.identifier.integer)]
 
     @staticmethod
@@ -153,7 +151,7 @@ class TypeInfer:
             # Once reaching the identifier, get its type, and pull in the generic map from the class.
             if type(l) == Ast.IdentifierAst:
                 ty = TypeInfer.infer_identifier(l, s)
-                sym = scope.get_symbol(ty.parts[-1], SymbolTypes.TypeSymbol)
+                sym = scope.get_symbol(ty.to_identifier(), SymbolTypes.TypeSymbol)
                 if isinstance(sym.type, Ast.ClassPrototypeAst):
                     generic_parameters = sym.type.generic_parameters
                     generic_arguments  = ty.parts[-1].generic_arguments
@@ -272,7 +270,7 @@ class TypeInfer:
             # Add the generic map from any previous member accesses into this one too.
             return_type = copy.deepcopy(fn_type.return_type)
             for g, h in ast.op.generic_map.items():
-                TypeInfer.substitute_generic_type(return_type, g, h.parts[-1].identifier)
+                TypeInfer.substitute_generic_type(return_type, g, h.to_identifier())
             ast.op.arguments = original_call_arguments
             if not special_operation:
                 return overloads[i], return_type
@@ -310,9 +308,15 @@ class TypeInfer:
 
         # Check generic arguments given to the type
         try:
-            sym = s.current_scope.get_symbol(ast.parts[-1], SymbolTypes.TypeSymbol)
-        except Exception:
-            raise SystemExit(ErrFmt.err(ast._tok) + f"Unknown type '{ast}'.")
+            sym = s.current_scope.get_symbol(ast.to_identifier(), SymbolTypes.TypeSymbol)
+        except Exception as e:
+            # print([str(x.name) for x in s.current_scope.all_symbols(SymbolTypes.TypeSymbol)])
+            # print([type(x.name) for x in s.current_scope.all_symbols(SymbolTypes.TypeSymbol)])
+            # print([ast.to_identifier() == x.name for x in s.current_scope.all_symbols(SymbolTypes.TypeSymbol)])
+            # print(ast.to_identifier(), type(ast.to_identifier()))
+            raise SystemExit(
+                f"Could not find type symbol '{ast.to_identifier()}':" +
+                ErrFmt.err(ast._tok) + f"Type '{ast}' used here.")
 
         given_generic_arguments = ast.parts[-1].generic_arguments
         actual_generic_parameters = sym.type.generic_parameters.copy() if isinstance(sym.type, Ast.ClassPrototypeAst) else []
@@ -337,7 +341,7 @@ class TypeInfer:
         #   - Part of another generic type.
 
         if isinstance(ast, Ast.TypeSingleAst):
-            sym = s.current_scope.get_symbol(ast.parts[-1], SymbolTypes.TypeSymbol)
+            sym = s.current_scope.get_symbol(ast.to_identifier(), SymbolTypes.TypeSymbol)
             if sym is None or isinstance(sym.type, Ast.TypeSingleAst): return []
             ast = sym.type
             generics = sym.type.generic_parameters.copy()
@@ -387,7 +391,7 @@ class TypeInfer:
                     for t in ast.generic_arguments:
                         yield from inner(t, s, level + 1)
                 case Ast.TypeSingleAst():
-                    yield ast.parts[-1].identifier, level
+                    yield ast.to_identifier(), level
                     for t in ast.parts:
                         yield from inner(t, s, level + 1)
                 case Ast.TypeGenericArgumentAst():
@@ -417,7 +421,7 @@ class TypeInfer:
         # check = s.current_scope.has_symbol(ast if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1] if isinstance(ast, Ast.TypeSingleAst) else ast.identifier, sym_ty)
         # check = SemanticAnalysis.analyse_identifier(ast if isinstance(ast, Ast.IdentifierAst) else ast.parts[-1] if isinstance(ast, Ast.TypeSingleAst) else ast.identifier, s, no_throw=True)
         if isinstance(ast, Ast.TypeSingleAst):
-            ast = ast.parts[-1].to_identifier()
+            ast = ast.to_identifier()
 
         check = False
         if sym_ty == SymbolTypes.VariableSymbol:
@@ -498,9 +502,9 @@ class TypeInfer:
                     # an error, because this is a more specific error / specialised case.
                     # TODO : the ast being errored on isn't quite correct: highlight the correct generic argument
                     # TODO : don't throw an error here, just return it for handling by the caller?
-                    elif q1 in generic_map and generic_map[q1] and q2 != generic_map[q1].parts[-1].identifier and q2 not in generic_map:
-                        ty = TypeInfer.infer_expression(a1.value, s)  #a1.value.lhs.parts[-1]
-                        sym = s.current_scope.get_symbol(ty.parts[-1], SymbolTypes.TypeSymbol)
+                    elif q1 in generic_map and generic_map[q1] and q2 != generic_map[q1].to_identifier() and q2 not in generic_map:
+                        ty = TypeInfer.infer_expression(a1.value, s)  #a1.value.lhs.to_identifier()
+                        sym = s.current_scope.get_symbol(ty.to_identifier(), SymbolTypes.TypeSymbol)
                         gs = sym.type.generic_parameters
                         if gs:
                             gi = gs.index(Ast.TypeGenericParameterAst(Ast.IdentifierAst(q1, -1), [], None, False, -1))
@@ -509,7 +513,7 @@ class TypeInfer:
                         else:
                             raise SystemExit(ErrFmt.err(a1._tok) + f"Generic type '{q1}' is already bound to '{generic_map[q1]}', but is being re-bound to '{q2}'.")
 
-                    elif q1 in generic_map and generic_map[q1] and q2 != generic_map[q1].parts[-1].identifier and q2 in generic_map:
+                    elif q1 in generic_map and generic_map[q1] and q2 != generic_map[q1].to_identifier() and q2 in generic_map:
                         TypeInfer.substitute_generic_type(t2, q1, q2)
 
                     # Unbound Generic
@@ -540,7 +544,7 @@ class TypeInfer:
         return True
 
     @staticmethod
-    def substitute_generic_type(ty: Ast.TypeAst, q1: str, q2: str):
+    def substitute_generic_type(ty: Ast.TypeAst, q1: Ast.IdentifierAst, q2: str):
         if isinstance(ty, Ast.IdentifierAst):
             if ty.identifier == q1:
                 ty.identifier = q2
@@ -552,8 +556,10 @@ class TypeInfer:
             for j, q in enumerate(ty.generic_arguments):
                 TypeInfer.substitute_generic_type(q, q1, q2)
         elif isinstance(ty, Ast.TypeSingleAst):
-            for i, p in enumerate(ty.parts):
-                TypeInfer.substitute_generic_type(p, q1, q2)
+            # for i, p in enumerate(ty.parts):
+            #     TypeInfer.substitute_generic_type(p, q1, q2)
+            TypeInfer.substitute_generic_type(ty.parts[-1], q1, q2)
+
         elif isinstance(ty, Ast.TypeTupleAst):
             for p in ty.types:
                 TypeInfer.substitute_generic_type(p, q1, q2)
