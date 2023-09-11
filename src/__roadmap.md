@@ -16,6 +16,7 @@
 #### Variable related
 - [ ] Destructuring (especially for `if-patterns` and `let` statements).
 - [ ] Struct initialization: require stateful, non-default sub-classes in `sup=`
+- [ ] Would be nice to have assignment mutability check _before_ type check.
 
 #### Actual compiler Python code
 - [ ] Heavily extend errors to include their source declaration ie `let` statement etc.
@@ -24,10 +25,11 @@
 - [ ] Redo all error types regarding `SystemExit` etc.
 - [ ] Work out all error codes (will have to finish syntactic analysis first).
 
-#### Other
+#### Parser
 - [ ] Statements that require a `\n` at the end shouldn't if it's a one-line statement.
+
+#### Other
 - [ ] All things `yield`
-- [ ] Allow subtyping in the type-comparison algorithm.
 - [ ] Fold expressions
 - [ ] Disallow duplicate inheritance super-impositions onto a class.
 

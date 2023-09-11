@@ -47,10 +47,10 @@ cls FnRef[R, ...Ts] {
 
 cls __MOCK_a {}
 sup FnRef[Num, Num] for __MOCK_a {
-  fn call_ref(x: Num) -> Num { ... }
+  fn call_ref(&self, x: Num) -> Num { ... }
 }
 sup FnRef[Str, Str] for __MOCK_a {
-  fn call_ref(x: Str) -> Str { ... }
+  fn call_ref(&self, x: Str) -> Str { ... }
 }
 let a = __MOCK_a{}
 ```

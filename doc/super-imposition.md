@@ -21,6 +21,7 @@ sup Foo {
 - Methods can be declared in a `sup` block.
 - Methods that don't contain statement bodies are "abstract".
 - When super-imposing a class onto another class, "abstract" method _must_ be overridden.
+- Static methods can eb defined by omitting the special `self` parameter.
 
 ## Example (super-impose classes onto another class)
 ```s++
@@ -42,7 +43,7 @@ sup Default for Num {
 - Attributes are also inherited into the super-imposed class, allowing "state" to be inherited.
 
 ## Diamond problem
-### Situation
+### Scenario
 - `B` and `C` both super-impose `A`.
 - `D` super-imposes `B` and `C`.
 - `D` now has two base classes of `A`

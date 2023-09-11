@@ -9,7 +9,7 @@
 - Non-asynchronous return types are returned with the `yield` keyword.
 
 ## Commonly seen coroutines
-### Generators
+### [Generators](./generators.md)
 - Return a `Gen[Yield, Return, Send]` generator object.
 - Can be yielded into multiple times, and receive values sent back into the generator.
 - Can send values back into the generator with `gen.next(value)`, and `let x = yield 5`.

@@ -45,5 +45,7 @@ cls Alloc[T] {
 - When the function returns, the stack is deallocated.
 - This means that all local variables and references are deallocated.
 
-### Shadow stacks
-- A shadow stack is a special stack 
+### Recursion
+- All recursive functions are re-written to be tail-recursive.
+- This allows calling the function to _replace_ the current stack frame, rather than adding a new one.
+- This means that the stack size is constant, and the function can be called an infinite number of times.
