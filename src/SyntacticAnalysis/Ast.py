@@ -142,7 +142,7 @@ class ImportTypesAst:
     def __str__(self):
         s = ""
         s += "*" if self.import_all else ""
-        s += "{" + ", ".join([str(individual_type) for individual_type in self.individual_types]) + "}" if len(self.individual_types) > 1 else str(self.individual_types[0])
+        s += "{" + ", ".join([str(individual_type) for individual_type in self.individual_types]) + "}" if len(self.individual_types) > 1 else str(self.individual_types[0]) if not self.import_all else ""
         return s
 
 def ImportTypesAllAst(_tok: int):
@@ -279,7 +279,7 @@ class FunctionPrototypeAst:
         s += ("[" + ", ".join([str(param) for param in self.generic_parameters]) + "]" if self.generic_parameters else "")
         s += "(" + ", ".join([str(param) for param in self.parameters]) + ")"
         s += (" -> " + str(self.return_type) if self.return_type else "")
-        s += str(self.body)
+        # s += str(self.body)
         return s
 
 @dataclass

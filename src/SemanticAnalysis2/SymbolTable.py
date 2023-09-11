@@ -132,17 +132,19 @@ class Scope:
     symbol_table: SymbolTable
     children: list[Scope]
     sup_scopes: list[Scope]
+    is_mod: bool
 
     visited: bool
     hidden: bool
 
-    def __init__(self, id: Hashable, parent: Optional[Scope], hidden: bool = False):
+    def __init__(self, id: Hashable, parent: Optional[Scope], hidden: bool = False, is_mod: bool = False):
         self.name = id
         self.id = hash(id)
         self.parent = parent
         self.symbol_table = SymbolTable()
         self.children = []
         self.sup_scopes = []
+        self.is_mod = is_mod
 
         self.visited = False
         self.hidden = hidden
@@ -151,7 +153,7 @@ class Scope:
             parent.children.append(self)
 
     def where_to_look(self, name: Hashable, expected_sym_type: type[T], error=True) -> tuple[Optional[Scope], Optional[Hashable]]:
-        if expected_sym_type == SymbolTypes.TypeSymbol:
+        if expected_sym_type == SymbolTypes.TypeSymbol and "." in str(name):
             where = self
             while where.parent:
                 where = where.parent
@@ -326,8 +328,8 @@ class ScopeHandler:
         self.global_scope  = Scope(Ast.IdentifierAst("Global", -1), None)
         self.current_scope = self.global_scope
 
-    def enter_scope(self, name: Hashable, hidden: bool = False) -> None:
-        self.current_scope = Scope(name, self.current_scope, hidden=hidden)
+    def enter_scope(self, name: Hashable, hidden: bool = False, is_mod: bool = False) -> None:
+        self.current_scope = Scope(name, self.current_scope, hidden=hidden, is_mod=is_mod)
 
     def exit_scope(self) -> None:
         self.current_scope = self.current_scope.parent
@@ -336,8 +338,17 @@ class ScopeHandler:
         if any([not scope.visited for scope in self.current_scope.children]):
             unvisited_scopes = [scope for scope in self.current_scope.children if not scope.visited]
             next_scope = unvisited_scopes[0]
-            next_scope.visited = True
-            self.current_scope = next_scope
+
+            if next_scope.is_mod:
+                self.current_scope = next_scope
+                self.next_scope()
+
+            else:
+                next_scope.visited = True
+                self.current_scope = next_scope
+
+            # next_scope.visited = True
+            # self.current_scope = next_scope
 
         else:
             raise Exception("No unvisited scopes")

@@ -295,7 +295,7 @@ class Parser:
                 error_where, error = error.split(" ", 1)
                 error = ErrFmt.err(int(error_where)) + error
 
-                current_error = ErrFmt.escape_ansi(error.split("\n")[2])
+                current_error = ErrFmt.escape_ansi(error.split("\n")[3])
                 current_error_line_number = int(current_error[:current_error.index(" ")])
                 current_error_where_on_line = ErrFmt.escape_ansi(error.replace('\n', '\\n').split("\n")[-1]).index("^") + 1
 

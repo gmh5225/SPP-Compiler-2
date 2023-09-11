@@ -19,6 +19,10 @@ class Compiler:
 
         # Lex the code into a stream of tokens.
         self._tokens = Lexer(code).lex()
+        tok_str = ""
+        for i, tok in enumerate(self._tokens):
+            tok_str += f"{i}: {tok}\n"
+        open("_out/tokens.txt", "w").write(tok_str)
 
         # Parse the tokens into an AST.
         self._ast = Parser(self._tokens, root_path).parse()
