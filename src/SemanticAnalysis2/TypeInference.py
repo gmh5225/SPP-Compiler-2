@@ -242,14 +242,15 @@ class TypeInfer:
             #     for param_ty in substituted_param_tys:
             #         TypeInfer.substitute_generic_type(param_ty, g, h.parts[-1].identifier)
             # param_tys = substituted_param_tys
-            check = enumerable_any([not TypeInfer.types_equal_account_for_generic(
+            checks = [TypeInfer.types_equal_account_for_generic(
                 ast.op.arguments[i],
                 fn_type.parameters[i],
-                arg_ty, param_ty, ast.op.generic_map, s) for i, (arg_ty, param_ty) in enumerate(zip(arg_tys, param_tys))])
+                arg_ty, param_ty, ast.op.generic_map, s) for i, (arg_ty, param_ty) in enumerate(zip(arg_tys, param_tys))]
 
-            if check[1]:
-                mismatch_index = check[0]
-                errs.append(f"Expected argument {mismatch_index + 1} to be of type '{param_tys[mismatch_index]}', but got '{arg_tys[mismatch_index]}'.")
+            if any([not c[0] for c in checks]):
+                error = [c[1] for c in checks if not c[0]][0]
+                # errs.append(f"Expected argument {mismatch_index + 1} to be of type '{param_tys[mismatch_index]}', but got '{arg_tys[mismatch_index]}'.")
+                errs.append(error)
                 continue
 
             # Check the calling conventions match. A &mut argument cal collapse into an & parameter, but the __eq__
@@ -466,7 +467,7 @@ class TypeInfer:
         return s.current_scope.get_symbol(ast, SymbolTypes.TypeSymbol).type
 
     @staticmethod
-    def types_equal_account_for_generic(a1, a2, t1: Ast.TypeAst, t2: Ast.TypeAst, generic_map: dict[Ast.IdentifierAst, Ast.TypeAst], s: ScopeHandler) -> bool:
+    def types_equal_account_for_generic(a1, a2, t1: Ast.TypeAst, t2: Ast.TypeAst, generic_map: dict[Ast.IdentifierAst, Ast.TypeAst], s: ScopeHandler) -> tuple[bool, str]:
         t1, t2 = t2, t1
         if isinstance(t1, Ast.TypeSingleAst) and isinstance(t2, Ast.TypeSingleAst):
             # - Traverse each part of each type (dot separated)
@@ -479,69 +480,74 @@ class TypeInfer:
             #   - If the part is not a generic, check if the part is the same.
             #   - If the part is not the same, return False.
 
-            for p1, p2 in zip(t1.parts, t2.parts):
-                for q1, q2 in zip(TypeInfer.traverse_type(p1, s), TypeInfer.traverse_type(p2, s)):
-                    q1, l1 = q1
-                    q2, l2 = q2
+            q1 = t1.to_identifier().identifier
+            q2 = t2.to_identifier().identifier
+            # Non-Generic
+            # If the LHS is not a generic type parameter, then the LHS requires a direct match to the RHS. For
+            # example, 'Str' must match 'Str'. The parameter and arguments are direct type matches.
+            # TODO : allow for subtyping here.
+            if q1 not in generic_map and q1 != q2:
+                wrapped_q2 = Ast.TypeSingleAst([Ast.GenericIdentifierAst(q2, [], -1)], -1)
+                q2_sym = s.global_scope.get_child_scope(wrapped_q2)
+                if q1 in [str(x.name) for x in q2_sym.sup_scopes]:
+                    return True, ""
 
-                    # Non-Generic
-                    # If the LHS is not a generic type parameter, then the LHS requires a direct match to the RHS. For
-                    # example, 'Str' must match 'Str'. The parameter and arguments are direct type matches.
-                    # TODO : allow for subtyping here.
-                    if q1 not in generic_map and q1 != q2:
-                        wrapped_q2 = Ast.TypeSingleAst([Ast.GenericIdentifierAst(q2, [], -1)], -1)
-                        q2_sym = s.global_scope.get_child_scope(wrapped_q2)
-                        if q1 in [str(x.name) for x in q2_sym.sup_scopes]:
-                            continue
+                error = f"Expected type '{q1}' to match type '{q2}'."
+                return False, error
 
-                        return False
+            # Bound Generic
+            # If the LHS is in the generic map, but the RHS type argument is not the correct (ie it is already
+            # known that 'T' is 'Str', but 'T' is being bound to 'Int'), then instead of returning False, throw
+            # an error, because this is a more specific error / specialised case.
+            # TODO : the ast being errored on isn't quite correct: highlight the correct generic argument
+            # TODO : don't throw an error here, just return it for handling by the caller?
 
-                    # Bound Generic
-                    # If the LHS is in the generic map, but the RHS type argument is not the correct (ie it is already
-                    # known that 'T' is 'Str', but 'T' is being bound to 'Int'), then instead of returning False, throw
-                    # an error, because this is a more specific error / specialised case.
-                    # TODO : the ast being errored on isn't quite correct: highlight the correct generic argument
-                    # TODO : don't throw an error here, just return it for handling by the caller?
-                    elif q1 in generic_map and generic_map[q1] and q2 != generic_map[q1].to_identifier() and q2 not in generic_map:
-                        ty = TypeInfer.infer_expression(a1.value, s)  #a1.value.lhs.to_identifier()
-                        sym = s.current_scope.get_symbol(ty.to_identifier(), SymbolTypes.TypeSymbol)
-                        gs = sym.type.generic_parameters
-                        if gs:
-                            gi = gs.index(Ast.TypeGenericParameterAst(Ast.IdentifierAst(q1, -1), [], None, False, -1))
-                            ge = a1.value.lhs.parts[-1].generic_arguments[gi]
-                            raise SystemExit(ErrFmt.err(ge._tok) + f"Generic type '{q1}' is already bound to '{generic_map[q1]}', but is being re-bound to '{q2}'.")
-                        else:
-                            raise SystemExit(ErrFmt.err(a1._tok) + f"Generic type '{q1}' is already bound to '{generic_map[q1]}', but is being re-bound to '{q2}'.")
+            elif q1 in generic_map and generic_map[q1] and q2 != generic_map[q1].to_identifier().identifier and q2 not in generic_map:
+                ty = TypeInfer.infer_expression(a1.value, s)  #a1.value.lhs.to_identifier()
+                sym = s.current_scope.get_symbol(ty.to_identifier(), SymbolTypes.TypeSymbol)
+                gs = sym.type.generic_parameters
+                if gs:
+                    gi = gs.index(Ast.TypeGenericParameterAst(Ast.IdentifierAst(q1, -1), [], None, False, -1))
+                    ge = a1.value.lhs.parts[-1].generic_arguments[gi]
+                    error = f"Generic type '{q1}' is already bound to '{generic_map[q1]}', but is being re-bound to '{q2}'."
+                    return False, error
+                else:
+                    error = f"Generic type '{q1}' is already bound to '{generic_map[q1]}', but is being re-bound to '{q2}'."
+                    return False, error
 
-                    elif q1 in generic_map and generic_map[q1] and q2 != generic_map[q1].to_identifier() and q2 in generic_map:
-                        TypeInfer.substitute_generic_type(t2, q1, q2)
+            elif q1 in generic_map and generic_map[q1] and q2 != generic_map[q1].to_identifier() and q2 in generic_map:
+                TypeInfer.substitute_generic_type(t2, q1, q2)
 
-                    # Unbound Generic
-                    # If the LHS is an "unbound" generic, ie it's the first occurrence of an inferrable generic, then
-                    # add it to the generic map, and bind it to the RHS type argument. Then skip the rest of q2 because
-                    # it is the RHS type argument -- this is the same as jumping q2 to its sibling node rather than its
-                    # first child node.
-                    elif q1 in generic_map:
-                        generic_map[q1] = Ast.TypeSingleAst([Ast.IdentifierAst(q2, -1).to_generic_identifier()], -1)
+            # Unbound Generic
+            # If the LHS is an "unbound" generic, ie it's the first occurrence of an inferrable generic, then
+            # add it to the generic map, and bind it to the RHS type argument. Then skip the rest of q2 because
+            # it is the RHS type argument -- this is the same as jumping q2 to its sibling node rather than its
+            # first child node.
+            elif q1 in generic_map:
+                generic_map[q1] = Ast.TypeSingleAst([Ast.IdentifierAst(q2, -1).to_generic_identifier()], -1)
 
-                        # skip the q2 to sibling node. because Vec[T, Str] compared to Vec[Opt[Num], Str]. clearly the
-                        # 2nd one is Vec[Opt[Num], Str] required an extra skip over Num, so that T matches Opt[Num].
-                        # this is the same as jumping q2 to its sibling node rather than its first child node.
-                        # lx = -1
-                        # while lx != l2:
-                        #     q2, lx = next(TypeInfer.traverse_type(q2, s))
+                # skip the q2 to sibling node. because Vec[T, Str] compared to Vec[Opt[Num], Str]. clearly the
+                # 2nd one is Vec[Opt[Num], Str] required an extra skip over Num, so that T matches Opt[Num].
+                # this is the same as jumping q2 to its sibling node rather than its first child node.
+                # lx = -1
+                # while lx != l2:
+                #     q2, lx = next(TypeInfer.traverse_type(q2, s))
 
-                        # next, perform a substitution on the RHS type argument, so that all occurrences of the generic
-                        # type parameter (LHS) are replaced with the RHS type argument.
-                        TypeInfer.substitute_generic_type(t2, q1, q2)
+                # next, perform a substitution on the RHS type argument, so that all occurrences of the generic
+                # type parameter (LHS) are replaced with the RHS type argument.
+                TypeInfer.substitute_generic_type(t2, q1, q2)
 
         elif isinstance(t1, Ast.TypeTupleAst) and isinstance(t2, Ast.TypeTupleAst):
-            return all([TypeInfer.types_equal_account_for_generic(a1, a2, t1, t2, generic_map, s) for t1, t2 in zip(t1.types, t2.types)])
+            tests = [TypeInfer.types_equal_account_for_generic(a1, a2, t1, t2, generic_map, s) for t1, t2 in zip(t1.types, t2.types)]
+            if all([t[0] for t in tests]):
+                return True, ""
+            else:
+                return False, tests[0][1]
 
         else:
             raise SystemExit(ErrFmt.err(a1._tok) + f"Unknown 'Ast.{type(t2).__name__}' being inferred. Report as bug.")
 
-        return True
+        return True, ""
 
     @staticmethod
     def substitute_generic_type(ty: Ast.TypeAst, q1: Ast.IdentifierAst, q2: str):
@@ -551,7 +557,7 @@ class TypeInfer:
         if isinstance(ty, Ast.TypeGenericArgumentAst):
             TypeInfer.substitute_generic_type(ty.value, q1, q2)
         elif isinstance(ty, Ast.GenericIdentifierAst):
-            if ty.identifier == q1:
+            if ty.to_identifier() == q1:
                 ty.identifier = q2
             for j, q in enumerate(ty.generic_arguments):
                 TypeInfer.substitute_generic_type(q, q1, q2)

@@ -1,3 +1,4 @@
+import copy
 from typing import Iterable, Optional, TypeVar
 
 from src.LexicalAnalysis.Tokens import TokenType, Token
@@ -222,6 +223,40 @@ class SemanticAnalysis:
             TypeInfer.check_type(ast.super_class, s)
             for type_part in ast.super_class.parts if ast.super_class else []:
                 [TypeInfer.check_type(g, s) for g in type_part.generic_arguments]
+
+        # if its for a function (__MOCK_...) then check there are no duplicate overloads. get all the super-impositions
+        # of the __MOCK_... class
+        if str(ast.identifier).startswith("__MOCK_"):
+            scope = s.global_scope.get_child_scope(ast.identifier)
+            overloads = [x for x in scope.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
+            fn_protos = [f.meta_data["fn_proto"] for f in overloads]
+
+            # identify duplicates by parameters
+            fn_protos = [copy.deepcopy(f) for f in fn_protos]
+
+            # firstly, replace type parameters by a number for each type, so f[T](a: T) matches f[U](a: U) - this is the
+            # same signature
+            generic_mappers = []
+            for f in fn_protos:
+                generic_mapper = {}
+                generic_mappers.append(generic_mapper)
+                for i, g in enumerate(f.generic_parameters):
+                    if g not in generic_mapper:
+                        replacement_generic = f"__GENERIC_{i}"
+                        generic_mapper[g.identifier] = replacement_generic
+
+            for i, f in enumerate(fn_protos):
+                for p in f.parameters:
+                    for g in f.generic_parameters:
+                        TypeInfer.substitute_generic_type(p.type_annotation, g.identifier, generic_mappers[i][g.identifier])
+
+            for i, f in enumerate(fn_protos[:-1]):
+                for g in fn_protos[i + 1:]:
+                    if all([f_param.type_annotation == g_param.type_annotation for f_param, g_param in zip(f.parameters, g.parameters)]):
+                        raise SystemExit(
+                            "Duplicate function overloads are not allowed." +
+                            ErrFmt.err(f._tok) + f"First overload\n..." +
+                            ErrFmt.err(g._tok) + f"Second overload.")
 
         [SemanticAnalysis.analyse_sup_member(ast, m, s) for m in ast.body.members]
 

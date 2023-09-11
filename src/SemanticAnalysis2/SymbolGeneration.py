@@ -13,17 +13,14 @@ class SymbolGeneration:
     @staticmethod
     def generate(ast: Ast.ProgramAst) -> ScopeHandler:
         s = ScopeHandler()
-        AstReduction.reduce(ast)
-
-        from src.Compiler.Printer import save_json
-        save_json(dataclasses.asdict(ast), "_out/reduced-ast.json")
-
         SymbolGeneration.generate_program(ast, s)
         s.switch_to_global_scope()
         return s
 
     @staticmethod
     def generate_program(ast: Ast.ProgramAst, s: ScopeHandler):
+        AstReduction.reduce(ast)
+
         for member in ast.module.body.members:
             SymbolGeneration.generate_module_member(member, s)
 

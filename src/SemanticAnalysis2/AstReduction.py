@@ -126,6 +126,11 @@ class AstReduction:
             AstReduction.REDUCED_FUNCTIONS[AstReduction.merge_names(owner.identifier, ast.identifier.identifier)] = cls_ast
             owner.body.members.insert(i, cls_ast)
             f = True
+        # else:
+        #     # Check duplicate signature not added (check parameter types only - cannot overload return types)
+        #     currently_added = [v for k, v in AstReduction.REDUCED_FUNCTIONS.items() if k == AstReduction.merge_names(owner.identifier, ast.identifier.identifier)]
+        #     for added in currently_added:
+        #         print(added)
 
         ty = AstReduction.REDUCED_FUNCTIONS[AstReduction.merge_names(owner.identifier, ast.identifier.identifier)]
         ty = Ast.TypeSingleAst([ty.identifier.to_generic_identifier()], ty.identifier._tok)
