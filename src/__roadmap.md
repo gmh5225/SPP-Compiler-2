@@ -32,11 +32,14 @@
 - [ ] Disallow duplicate inheritance super-impositions onto a class.
 
 #### Imports
-- [ ] Only import what is specified in the actual import.
-- [ ] Currently `use std.num.Num` forces `std.Num` to be used
-  - [ ] Make everything imported at FQN level by default, ie `std.Num` usable with no import.
-  - [ ] Make `use std.num.Num` only import `Num` from `std.num`, so `Num` can be used as it
-    - [ ] Add links to child scopes to optionally bypass FQN
+- [ ] Fix
+###### Fix imports
+- By default, "import" all spp files with a `mod` declaration into the `main.spp` file, forcing use of FQN.
+- Using a `use` statement allows "namespace reduction" ie `use std.num.Num` => `Num` in scope.
+  - Perform reduction by adding the child scope (scope of the imported type) to the current scope.
+- Allow the `ImportStatement` parsing rule to be used as a regular statement, like the typedef.
+  - Allows reductions to be only applied to the current scope, not the entire file.
+
 
 #### Ideas that probably won't happen
 - [ ] Keyword renaming: `while` -> `do`, `else` -> `or` (matches 2 letter nature of `if`).
