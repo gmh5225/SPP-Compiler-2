@@ -730,9 +730,10 @@ class SemanticAnalysis:
                 gi = actual_ty.to_identifier()
                 ast.op.generic_map[gi] = given_ty
 
-            if not TypeInfer.types_equal_account_for_generic(ast.op.fields[sorted(given_fields).index(given)], actual, given_ty, actual_ty, ast.op.generic_map, s):
+            check = TypeInfer.types_equal_account_for_generic(ast.op.fields[sorted(given_fields).index(given)], actual, given_ty, actual_ty, ast.op.generic_map, s)
+            if not check[0]:
                 err_pos = (ast.op.fields[given_fields.index(given)].identifier or ast.op.fields[given_fields.index(given)].value)._tok
-                raise SystemExit(ErrFmt.err(err_pos) + f"Field '{given}' given to struct initializer is type '{given_ty}', but should be '{actual_ty}'.")
+                raise SystemExit(ErrFmt.err(err_pos) + check[1])  # f"Field '{given}' given to struct initializer is type '{given_ty}', but should be '{actual_ty}'.")
 
     @staticmethod
     def analyse_let_statement(ast: Ast.LetStatementAst, s: ScopeHandler):
