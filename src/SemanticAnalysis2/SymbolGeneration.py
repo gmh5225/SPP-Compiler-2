@@ -57,7 +57,7 @@ class SymbolGeneration:
         fp = ErrFmt.FILE_PATH
         open("_out/new_code.spp", "a").write(mod_code)
 
-        new_mod = Parser(Lexer(mod_code).lex(), f"{ast.module}.spp").parse()
+        new_mod = Parser(new_toks := Lexer(mod_code).lex(), f"{ast.module}.spp").parse()
 
         # Separate all the scopes -- for example, if the module is `a.b.c`, then we need to separate the scopes "a",
         # "b", and "c". Set the current scope to the global scope (where modules are all found, then layered from)
@@ -79,7 +79,7 @@ class SymbolGeneration:
 
             # Otherwise, we need to create a new scope, and generate the program if it's the last scope.
             else:
-                s.enter_scope(scope)
+                s.enter_scope(scope, is_mod=True)
                 if scope == scopes[-1]:
                     SymbolGeneration.generate_program(new_mod, s)
 
