@@ -216,7 +216,6 @@ class SemanticAnalysis:
         SemanticAnalysis.analyse_type_generic_parameters(ast.generic_parameters, s)
 
         for type_part in ast.identifier.parts:
-            print(f"CHECKING {type_part}")
             [TypeInfer.check_type(g, s) for g in type_part.generic_arguments]
 
         if type(ast) == Ast.SupPrototypeInheritanceAst:

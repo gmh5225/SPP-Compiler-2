@@ -153,7 +153,7 @@ class Scope:
             parent.children.append(self)
 
     def where_to_look(self, name: Hashable, expected_sym_type: type[T], error=True) -> tuple[Optional[Scope], Optional[Hashable]]:
-        if expected_sym_type == SymbolTypes.TypeSymbol:
+        if expected_sym_type == SymbolTypes.TypeSymbol and "." in str(name):
             where = self
             while where.parent:
                 where = where.parent
