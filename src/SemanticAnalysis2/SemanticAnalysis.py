@@ -161,9 +161,6 @@ class SemanticAnalysis:
                 ErrFmt.err(ast.return_type._tok) + f"Function return type is '{ast.return_type}'.\n..." +
                 ErrFmt.err(err_ast._tok) + f"Final statement is not a return statement.")
 
-        # todo : is it s.subtype_match(...) or ast.return_type.subtype_match(...)?
-        # todo : if return type is a generic this doesn't work
-        print("###", ast.return_type)
         if not t.subtype_match(ast.return_type, s) and ast.body.statements and isinstance(final_statement, Ast.ReturnStatementAst):
             err_ast = ast.body.statements[-1]
             raise SystemExit(
@@ -529,6 +526,11 @@ class SemanticAnalysis:
                 case _: return []
 
         for i, arg in enumerate(asts):
+            if type(arg.value) in Ast.TypeAst.__args__:
+                raise SystemExit(
+                    "Cannot pass a type as an argument to a function:" +
+                    ErrFmt.err(arg.value._tok) + f"Type '{arg.value}' passed as argument.")
+
             SemanticAnalysis.analyse_expression(arg.value, s)
 
             check_for_move = isinstance(func.lhs, Ast.IdentifierAst) and (not func.lhs.is_special() or (func.lhs.is_special() and i > 0))

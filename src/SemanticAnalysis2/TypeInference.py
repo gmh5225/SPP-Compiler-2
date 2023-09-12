@@ -403,8 +403,6 @@ class TypeInfer:
         else:
             generics = [a.value for a in ast.lhs.parts[-1].generic_arguments]
 
-        print(generics)
-
         struct_type = copy.deepcopy(TypeInfer.infer_expression(ast.lhs, s))
         struct_type.parts[-1].generic_arguments = [Ast.TypeGenericArgumentAst(None, v, -1) for v in generics]
         return struct_type
@@ -604,10 +602,8 @@ class TypeInfer:
             # If the LHS is an "unbound" generic, ie it's the first occurrence of an inferrable generic, then add it to
             # the generic map, and bind it to the RHS type argument.
             elif lhs_generic_type in generic_map.keys():
-                print(f"binding {t1} -> {repr(t2)}")
                 generic_map[lhs_generic_type] = t2
                 TypeInfer.substitute_generic_type(t1, lhs_generic_type, generic_map[lhs_generic_type].to_identifier())
-                print(f"[!] {repr(t1)}")
 
 
         # todo : untested with tuples:

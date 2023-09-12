@@ -10,9 +10,6 @@
 - [ ] Reassigning to moved _attributes_ makes the object no longer partially moved.
 - [ ] Can still assign to attributes of a moved object --  should not be allowed.
 
-#### Generics
-- [ ] If a return type is a generic, an error is thrown at the moment.
-
 #### Lambdas/closures related
 - [ ] Lambdas & capturing variables (apply the same borrow/move rules as parameters).
 
