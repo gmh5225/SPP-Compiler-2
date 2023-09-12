@@ -226,6 +226,12 @@ class TypeInfer:
 
     @staticmethod
     def infer_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler) -> tuple[Optional[SymbolTypes.VariableSymbol], Ast.TypeAst]:
+        if type(ast.lhs) in Ast.TypeAst.__args__:
+            raise SystemExit(
+                "Cannot call a type. Try using the struct initializer syntax instead." +
+                ErrFmt.err(ast._tok) + f"Type '{ast.lhs}' is being called here.")
+
+
         # A special method is a "__" prefixed method. It requires special behaviour in certain circumstances as seen
         # later on in this method.
         is_special_function = isinstance(ast.lhs, Ast.IdentifierAst) and ast.lhs.identifier in ["__set__", "__assign__"]

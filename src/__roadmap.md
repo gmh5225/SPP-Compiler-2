@@ -18,9 +18,6 @@
 - [ ] Struct initialization: require stateful, non-default sub-classes in `sup=`
 - [ ] Would be nice to have assignment mutability check _before_ type check.
 
-#### Types
-- [ ] Types called with `Type()` result in the wrong error -> manage to get to successful funtion calls?
-
 #### Actual compiler Python code
 - [ ] Heavily extend errors to include their source declaration ie `let` statement etc.
 - [ ] Check that `copy.deepcopy` is called on all types that require it (modifying local AST variable).

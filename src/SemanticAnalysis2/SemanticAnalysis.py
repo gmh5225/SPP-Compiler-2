@@ -528,7 +528,7 @@ class SemanticAnalysis:
         for i, arg in enumerate(asts):
             if type(arg.value) in Ast.TypeAst.__args__:
                 raise SystemExit(
-                    "Cannot pass a type as an argument to a function:" +
+                    "Cannot pass a type as an argument to a function - maybe\nyou meant to use it as a generic argument?:" +
                     ErrFmt.err(arg.value._tok) + f"Type '{arg.value}' passed as argument.")
 
             SemanticAnalysis.analyse_expression(arg.value, s)
