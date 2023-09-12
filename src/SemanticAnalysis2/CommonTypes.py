@@ -30,7 +30,7 @@ class CommonTypes:
         return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Arr", [element_type], -1)], -1)
 
     @staticmethod
-    def reg() -> Ast.TypeAst:
+    def rgx() -> Ast.TypeAst:
         # Regular expression type
         return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Rgx", [], -1)], -1)
 

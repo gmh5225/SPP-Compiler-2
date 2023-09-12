@@ -103,7 +103,7 @@ class SymbolGeneration:
 
     @staticmethod
     def generate_class_prototype(ast: Ast.ClassPrototypeAst, s: ScopeHandler, hidden: bool = False):
-        ty = Ast.TypeSingleAst([Ast.GenericIdentifierAst(ast.identifier.identifier, [], ast._tok)], ast._tok)
+        ty = Ast.TypeSingleAst([ast.identifier.to_generic_identifier()], ast._tok)
         s.current_scope.add_symbol(SymbolTypes.TypeSymbol(ty.to_identifier(), ast))
         s.enter_scope(ty, hidden=hidden)
         [s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier))) for g in ast.generic_parameters]
@@ -172,7 +172,7 @@ class SymbolGeneration:
 
     @staticmethod
     def dummy_generic_type(ast: Ast.IdentifierAst) -> Ast.TypeAst:
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst(ast.identifier, [], ast._tok)], ast._tok)
+        return Ast.TypeSingleAst([ast.to_generic_identifier()], ast._tok)
 
 
 x = False

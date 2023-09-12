@@ -161,7 +161,10 @@ class SemanticAnalysis:
                 ErrFmt.err(ast.return_type._tok) + f"Function return type is '{ast.return_type}'.\n..." +
                 ErrFmt.err(err_ast._tok) + f"Final statement is not a return statement.")
 
-        if t != ast.return_type and ast.body.statements and isinstance(final_statement, Ast.ReturnStatementAst):
+        # todo : is it s.subtype_match(...) or ast.return_type.subtype_match(...)?
+        # todo : if return type is a generic this doesn't work
+        print("###", ast.return_type)
+        if not t.subtype_match(ast.return_type, s) and ast.body.statements and isinstance(final_statement, Ast.ReturnStatementAst):
             err_ast = ast.body.statements[-1]
             raise SystemExit(
                 "Mismatch between function return type and function's final statement:" +
@@ -242,7 +245,7 @@ class SemanticAnalysis:
                 generic_mappers.append(generic_mapper)
                 for i, g in enumerate(f.generic_parameters):
                     if g not in generic_mapper:
-                        replacement_generic = f"__GENERIC_{i}"
+                        replacement_generic = Ast.IdentifierAst(f"__GENERIC_{i}", -1)
                         generic_mapper[g.identifier] = replacement_generic
 
             for i, f in enumerate(fn_protos):
@@ -498,6 +501,9 @@ class SemanticAnalysis:
         while isinstance(ast, Ast.PostfixExpressionAst) and isinstance(ast.lhs, Ast.PostfixExpressionAst):
             ast = ast.lhs
 
+        if not isinstance(ast.lhs, Ast.IdentifierAst):
+            return
+
         sym = s.current_scope.get_symbol(ast.lhs, SymbolTypes.VariableSymbol)
         if not sym.mem_info.is_initialized:
             raise SystemExit(
@@ -518,8 +524,9 @@ class SemanticAnalysis:
         def collapse_ast_to_list_of_identifiers(ast: Ast.PostfixExpressionAst | Ast.IdentifierAst | Ast.TokenAst):
             match ast:
                 case Ast.TokenAst() if ast.tok.token_type == TokenType.KwSelf: return [Ast.IdentifierAst("self", ast.tok)]
-                case Ast.IdentifierAst(): return [ast]
-                case Ast.PostfixExpressionAst(): return collapse_ast_to_list_of_identifiers(ast.lhs) + [ast.op.identifier]
+                case Ast.IdentifierAst() | Ast.TypeSingleAst(): return [ast]
+                case Ast.PostfixExpressionAst() if isinstance(ast.op, Ast.PostfixMemberAccessAst): return collapse_ast_to_list_of_identifiers(ast.lhs) + [ast.op.identifier]
+                case _: return []
 
         for i, arg in enumerate(asts):
             SemanticAnalysis.analyse_expression(arg.value, s)
@@ -627,7 +634,7 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_postfix_struct_initializer(ast: Ast.PostfixExpressionAst, s: ScopeHandler):
-        cls_ty = TypeInfer.check_type(ast.lhs, s)
+        cls_ty = TypeInfer.check_type(ast.lhs, s, check_generics=False)
         if isinstance(cls_ty, Ast.TypeSingleAst):
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Cannot initialize generic type '{cls_ty}'.")
         cls_ty = cls_ty.to_type()
@@ -713,7 +720,7 @@ class SemanticAnalysis:
         sym = s.current_scope.get_symbol(cls_ty.to_identifier(), SymbolTypes.TypeSymbol)
         gs = sym.type.generic_parameters
         for g in gs:
-            ast.op.generic_map[g.identifier.identifier] = None
+            ast.op.generic_map[g.identifier] = None
 
         # Check each field given is the correct type. Sort the two field lists, as they are going to be iterated at the
         # same time, so their order has to be the same.
@@ -730,7 +737,7 @@ class SemanticAnalysis:
                 gi = actual_ty.to_identifier()
                 ast.op.generic_map[gi] = given_ty
 
-            check = TypeInfer.types_equal_account_for_generic(ast.op.fields[sorted(given_fields).index(given)], actual, given_ty, actual_ty, ast.op.generic_map, s)
+            check = TypeInfer.types_equal_account_for_generic(actual_ty, given_ty, ast.op.generic_map, s)
             if not check[0]:
                 err_pos = (ast.op.fields[given_fields.index(given)].identifier or ast.op.fields[given_fields.index(given)].value)._tok
                 raise SystemExit(ErrFmt.err(err_pos) + check[1])  # f"Field '{given}' given to struct initializer is type '{given_ty}', but should be '{actual_ty}'.")
@@ -787,7 +794,8 @@ class SemanticAnalysis:
         # Because the assignment can handle multiple ie "x, y = (1, 2), all the variables will be passed to the
         # assignment in one go, and the assignment will handle the multiple function calls for tuples etc.
         if ast.value:
-            mock_assignment = Ast.AssignmentExpressionAst([x.identifier for x in ast.variables], Ast.TokenAst(Token("=", TokenType.TkAssign), ast._tok), ast.value, ast._tok)
+            mock_assignment_token = Ast.TokenAst(Token("=", TokenType.TkAssign), ast._tok)
+            mock_assignment = Ast.AssignmentExpressionAst([x.identifier for x in ast.variables], mock_assignment_token, ast.value, ast._tok)
             SemanticAnalysis.analyse_assignment_expression(mock_assignment, s, let=True)
 
         for sym in new_syms:

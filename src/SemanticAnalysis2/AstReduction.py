@@ -76,7 +76,7 @@ class AstReduction:
         for member in ast.body.members:
             if member.type_annotation.parts[-1].identifier == "Self":
                 member.type_annotation = ast.to_type()
-            TypeInfer.substitute_generic_type(member.type_annotation, Ast.IdentifierAst("Self", -1), ast.to_type())
+            TypeInfer.substitute_generic_type(member.type_annotation, Ast.IdentifierAst("Self", -1), ast.to_type().to_identifier())
 
         # Inject a mock method for assignment (type checking)
         # if ast.identifier.identifier.startswith("__"):
@@ -99,18 +99,18 @@ class AstReduction:
             for param in ast.parameters:
                 if param.type_annotation.parts[-1].identifier == "Self":
                     param.type_annotation = owner.to_type()
-                TypeInfer.substitute_generic_type(param.type_annotation, Ast.IdentifierAst("Self", -1), owner.to_type())
+                TypeInfer.substitute_generic_type(param.type_annotation, Ast.IdentifierAst("Self", -1), owner.to_type().to_identifier())
 
             if ast.return_type.parts[-1].identifier == "Self":
                 ast.return_type = owner.to_type()
-            TypeInfer.substitute_generic_type(ast.return_type, Ast.IdentifierAst("Self", -1), owner.to_type())
+            TypeInfer.substitute_generic_type(ast.return_type, Ast.IdentifierAst("Self", -1), owner.to_type().to_identifier())
 
             for statement in ast.body.statements:
                 match statement:
                     case Ast.LetStatementAst() if statement.type_annotation is not None:
                         if statement.type_annotation.parts[-1].identifier == "Self":
                             statement.type_annotation = owner.to_type()
-                        TypeInfer.substitute_generic_type(statement.type_annotation, Ast.IdentifierAst("Self", -1), owner.to_type())
+                        TypeInfer.substitute_generic_type(statement.type_annotation, Ast.IdentifierAst("Self", -1), owner.to_type().to_identifier())
 
         # Recursion break case
         if ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]:
@@ -156,7 +156,7 @@ class AstReduction:
     @staticmethod
     def deduce_function_type(is_method: bool, parameters: list[Ast.FunctionParameterAst], return_type: Ast.TypeAst) -> Ast.TypeAst:
         ty = "FnRef"
-        if is_method and parameters[0].is_self:
+        if is_method and parameters and parameters[0].is_self:
             match parameters[0].calling_convention:
                 case None: ty = "FnOne"
                 case _ if parameters[0].calling_convention.is_mutable: ty = "FnMut"

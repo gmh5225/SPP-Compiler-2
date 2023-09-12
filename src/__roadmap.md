@@ -10,6 +10,9 @@
 - [ ] Reassigning to moved _attributes_ makes the object no longer partially moved.
 - [ ] Can still assign to attributes of a moved object --  should not be allowed.
 
+#### Generics
+- [ ] If a return type is a generic, an error is thrown at the moment.
+
 #### Lambdas/closures related
 - [ ] Lambdas & capturing variables (apply the same borrow/move rules as parameters).
 
@@ -17,6 +20,9 @@
 - [ ] Destructuring (especially for `if-patterns` and `let` statements).
 - [ ] Struct initialization: require stateful, non-default sub-classes in `sup=`
 - [ ] Would be nice to have assignment mutability check _before_ type check.
+
+#### Types
+- [ ] Types called with `Type()` result in the wrong error -> manage to get to successful funtion calls?
 
 #### Actual compiler Python code
 - [ ] Heavily extend errors to include their source declaration ie `let` statement etc.
@@ -32,6 +38,8 @@
 - [ ] All things `yield`
 - [ ] Fold expressions
 - [ ] Disallow duplicate inheritance super-impositions onto a class.
+- [ ] Postfix member access doesn't work with function calls in the middle ie `a.func().b` fails on `func()`.
+- [ ] Check tuple indexing ie `let x = tup.0` marks the object as partially moved.
 
 #### Imports
 - [ ] Fix

@@ -52,7 +52,7 @@ class IdentifierAst:
     identifier: str
     _tok: int
 
-    def __init__(self, identifier, tok):
+    def __init__(self, identifier: str, tok: int):
         self.identifier = identifier
         self._tok = tok
 
@@ -74,6 +74,9 @@ class IdentifierAst:
 
     def to_generic_identifier(self) -> GenericIdentifierAst:
         return GenericIdentifierAst(self.identifier, [], self._tok)
+
+    def to_type(self) -> TypeSingleAst:
+        return TypeSingleAst([GenericIdentifierAst(part, [], -1) for part in self.identifier.split(".")], self._tok)
 
     def is_special(self):
         return self.identifier.startswith("__") and self.identifier.endswith("__")
@@ -486,7 +489,7 @@ class TypeGenericParameterAst:
     _tok: int
 
     def as_type(self) -> TypeAst:
-        return TypeSingleAst([GenericIdentifierAst(self.identifier.identifier, [], self.identifier._tok)], self.identifier._tok)
+        return TypeSingleAst([self.identifier.to_generic_identifier()], self.identifier._tok)
 
     def __str__(self):
         return ("..." if self.is_variadic else "") + self.identifier.identifier
@@ -546,6 +549,11 @@ class TypeSingleAst:
     def to_identifier(self):
         s = ".".join([part.to_identifier().identifier for part in self.parts])
         return IdentifierAst(s, self._tok)
+
+    def subtype_match(self, other: TypeSingleAst, s) -> bool:
+        other_scope = s.global_scope.get_child_scope(other)
+        if not other_scope: return False
+        return self == other or self in [t2_sup_scope.name for t2_sup_scope in other_scope.sup_scopes]
 
 @dataclass
 class TypeTupleAst:
