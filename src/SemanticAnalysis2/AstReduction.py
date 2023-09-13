@@ -28,13 +28,22 @@ directly. It can be overriden by an identifier, but again this doesn't matter, a
 This decision was made, because a class can be made callable with multiple overloads anyway. If the decision of treating
 "fn" functions differently was made, then there would be 2 ways to do the same thing, so the Fn[...] super-imposition
 decision was made to force only 1 way of functions being callable.
+
+2. Self type substitution:
+- Substitute "Self" in class members to the class type
+- Substitute "Self" in sup function parameters to the class type
+- Substitute "Self" in sup function return types to the class type
+
+This helps simplify type checking later on -- rather than having to lookup "Self" every time to get the type for it
+(especially in lots of different places), it makes more sense to convert them all out to the class type, which is
+already known.
 """
 from src.SemanticAnalysis2.CommonTypes import CommonTypes
 from src.SemanticAnalysis2.TypeInference import TypeInfer
 from src.SyntacticAnalysis import Ast
 from functools import cmp_to_key
 
-from src.SyntacticAnalysis.Parser import ErrFmt
+# todo : change type.parts[-1].identifier == "Self" to type == CommonTypes.self()
 
 
 class AstReduction:
@@ -74,22 +83,9 @@ class AstReduction:
     def reduce_class_prototype(mod: Ast.ModulePrototypeAst, ast: Ast.ClassPrototypeAst):
         # Convert "Self" in class members to the class type
         for member in ast.body.members:
-            if member.type_annotation.parts[-1].identifier == "Self":
+            if member.type_annotation == CommonTypes.self():
                 member.type_annotation = ast.to_type()
             TypeInfer.substitute_generic_type(member.type_annotation, CommonTypes.self(), ast.to_type())
-
-        # Inject a mock method for assignment (type checking)
-        # if ast.identifier.identifier.startswith("__"):
-        #     return
-        #
-        # mock_method = Ast.FunctionPrototypeAst(
-        #     [], False, Ast.IdentifierAst("__assign__", -1), [], [
-        #         Ast.FunctionParameterSelfAst(Ast.ParameterPassingConventionReferenceAst(True, -1), -1),
-        #         Ast.FunctionParameterRequiredAst(False, Ast.IdentifierAst("value", -1), None, ast.to_type(), -1)
-        #     ], CommonTypes.void(), None, Ast.FunctionImplementationAst([], -1), -1)
-        #
-        # mock_sup = Ast.SupPrototypeNormalAst([], ast.to_type(), None, Ast.SupImplementationAst([mock_method], -1), -1)
-        # mod.body.members.append(mock_sup)
 
     @staticmethod
     def reduce_function_prototype(owner: Ast.ModulePrototypeAst | Ast.SupPrototypeAst, ast: Ast.FunctionPrototypeAst):
@@ -97,18 +93,18 @@ class AstReduction:
 
         if not isinstance(owner, Ast.ModulePrototypeAst):
             for param in ast.parameters:
-                if param.type_annotation.parts[-1].identifier == "Self":
+                if param.type_annotation == CommonTypes.self():
                     param.type_annotation = owner.to_type()
                 TypeInfer.substitute_generic_type(param.type_annotation, CommonTypes.self(), owner.to_type())
 
-            if ast.return_type.parts[-1].identifier == "Self":
+            if ast.return_type == CommonTypes.void():
                 ast.return_type = owner.to_type()
             TypeInfer.substitute_generic_type(ast.return_type, CommonTypes.self(), owner.to_type())
 
             for statement in ast.body.statements:
                 match statement:
                     case Ast.LetStatementAst() if statement.type_annotation is not None:
-                        if statement.type_annotation.parts[-1].identifier == "Self":
+                        if statement.type_annotation == CommonTypes.self():
                             statement.type_annotation = owner.to_type()
                         TypeInfer.substitute_generic_type(statement.type_annotation, CommonTypes.self(), owner.to_type())
 
@@ -126,11 +122,6 @@ class AstReduction:
             AstReduction.REDUCED_FUNCTIONS[AstReduction.merge_names(owner.identifier, ast.identifier.identifier)] = cls_ast
             owner.body.members.insert(i, cls_ast)
             f = True
-        # else:
-        #     # Check duplicate signature not added (check parameter types only - cannot overload return types)
-        #     currently_added = [v for k, v in AstReduction.REDUCED_FUNCTIONS.items() if k == AstReduction.merge_names(owner.identifier, ast.identifier.identifier)]
-        #     for added in currently_added:
-        #         print(added)
 
         ty = AstReduction.REDUCED_FUNCTIONS[AstReduction.merge_names(owner.identifier, ast.identifier.identifier)]
         ty = Ast.TypeSingleAst([ty.identifier.to_generic_identifier()], ty.identifier._tok)
