@@ -76,7 +76,7 @@ class AstReduction:
         for member in ast.body.members:
             if member.type_annotation.parts[-1].identifier == "Self":
                 member.type_annotation = ast.to_type()
-            TypeInfer.substitute_generic_type(member.type_annotation, Ast.IdentifierAst("Self", -1), ast.to_type().to_identifier())
+            TypeInfer.substitute_generic_type(member.type_annotation, CommonTypes.self(), ast.to_type())
 
         # Inject a mock method for assignment (type checking)
         # if ast.identifier.identifier.startswith("__"):
@@ -99,18 +99,18 @@ class AstReduction:
             for param in ast.parameters:
                 if param.type_annotation.parts[-1].identifier == "Self":
                     param.type_annotation = owner.to_type()
-                TypeInfer.substitute_generic_type(param.type_annotation, Ast.IdentifierAst("Self", -1), owner.to_type().to_identifier())
+                TypeInfer.substitute_generic_type(param.type_annotation, CommonTypes.self(), owner.to_type())
 
             if ast.return_type.parts[-1].identifier == "Self":
                 ast.return_type = owner.to_type()
-            TypeInfer.substitute_generic_type(ast.return_type, Ast.IdentifierAst("Self", -1), owner.to_type().to_identifier())
+            TypeInfer.substitute_generic_type(ast.return_type, CommonTypes.self(), owner.to_type())
 
             for statement in ast.body.statements:
                 match statement:
                     case Ast.LetStatementAst() if statement.type_annotation is not None:
                         if statement.type_annotation.parts[-1].identifier == "Self":
                             statement.type_annotation = owner.to_type()
-                        TypeInfer.substitute_generic_type(statement.type_annotation, Ast.IdentifierAst("Self", -1), owner.to_type().to_identifier())
+                        TypeInfer.substitute_generic_type(statement.type_annotation, CommonTypes.self(), owner.to_type())
 
         # Recursion break case
         if ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]:

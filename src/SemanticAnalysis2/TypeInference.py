@@ -271,18 +271,6 @@ class TypeInfer:
                 default_generic_map |= {g: h for g, h in current_lhs.op.generic_map.items() if h}
                 current_lhs = current_lhs.lhs
 
-            # Once reaching the identifier, get its type, and pull in the generic map from the class.
-            # todo : comment this more clearly
-            # if type(current_lhs) == Ast.IdentifierAst:
-            #     overload_manager_ty = TypeInfer.infer_identifier(current_lhs, s)
-            #     sym = overload_manager_scope.get_symbol(overload_manager_ty.to_identifier(), SymbolTypes.TypeSymbol)
-            #     if isinstance(sym.type, Ast.ClassPrototypeAst):
-            #         generic_parameters = sym.type.generic_parameters
-            #         generic_arguments  = overload_manager_ty.parts[-1].generic_arguments
-            #         default_generic_map = {gp.identifier.identifier: ga.value for gp, ga in zip(generic_parameters, generic_arguments)}
-            #     else:
-            #         default_generic_map = {}  # todo: ?
-
         # Get all the argument types, and the argument calling conventions. The types are inferred from the value of the
         # arguments, and the calling conventions are members of the argument ASTs.
         argument_tys = [TypeInfer.infer_expression(arg.value, s) for arg in ast.op.arguments]
@@ -379,7 +367,7 @@ class TypeInfer:
             #  constraining overload.
             return_type = copy.deepcopy(fn_type.return_type)
             for g, h in ast.op.generic_map.items():
-                TypeInfer.substitute_generic_type(return_type, g, h.to_identifier())
+                TypeInfer.substitute_generic_type(return_type, g, h)
             ast.op.arguments = original_call_arguments
             if not is_special_function:
                 return overload_symbols[i], return_type
@@ -583,9 +571,12 @@ class TypeInfer:
         if isinstance(t1, Ast.TypeSingleAst) and isinstance(t2, Ast.TypeSingleAst):
             # t1 will be something like "T", so simplify it down to an identifier AST.
             lhs_generic_type = t1.to_identifier()
+            print("-" * 100)
 
+            print("- checking generic arguments")
             # Recursively do this for the generic arguments of the type
             for i, (a1, a2) in enumerate(zip(t1.parts[-1].generic_arguments, t2.parts[-1].generic_arguments)):
+                print(f"- checking {a1} == {a2}, with a generic map of {generic_map}")
                 tests = [TypeInfer.types_equal_account_for_generic(a1.value, a2.value, generic_map, s)]
                 if not tests[0][0]:
                     return False, tests[0][1]
@@ -593,6 +584,9 @@ class TypeInfer:
             # Non-Generic
             # If the LHS is not a generic type parameter, then the LHS requires a direct match to the RHS. For
             # example, 'Str' must match 'Str'. The parameter and arguments are direct type matches.
+
+            print(f"- checking {t1} == {t2}, with a generic map of {generic_map}")
+            print(f"\t{repr(lhs_generic_type)}, {lhs_generic_type in generic_map.keys()}")
             if lhs_generic_type not in generic_map.keys() and not t1.subtype_match(t2, s):
                 error = f"Expected type '{t1}', but got type '{t2}'. These types are not equal, and not linked by super-imposition."
                 return False, error
@@ -609,7 +603,9 @@ class TypeInfer:
             # the generic map, and bind it to the RHS type argument.
             elif lhs_generic_type in generic_map.keys():
                 generic_map[lhs_generic_type] = t2
-                TypeInfer.substitute_generic_type(t1, lhs_generic_type, generic_map[lhs_generic_type].to_identifier())
+                orig_t1 = copy.deepcopy(t1)
+                TypeInfer.substitute_generic_type(t1, t1, generic_map[lhs_generic_type])
+                print(f"### {orig_t1} is now {t1}")
 
 
         # todo : untested with tuples:
@@ -626,23 +622,22 @@ class TypeInfer:
         return True, ""
 
     @staticmethod
-    def substitute_generic_type(ty: Any, q1: Ast.IdentifierAst, q2: Ast.IdentifierAst):
-        if isinstance(ty, Ast.IdentifierAst):
-            if ty == q1:
-                ty.identifier = q2.identifier
-        elif isinstance(ty, Ast.TypeGenericArgumentAst):
-            TypeInfer.substitute_generic_type(ty.value, q1, q2)
-        elif isinstance(ty, Ast.GenericIdentifierAst):
-            if ty.to_identifier() == q1:
-                ty.identifier = q2.identifier
-            for j, q in enumerate(ty.generic_arguments):
-                TypeInfer.substitute_generic_type(q, q1, q2)
-        elif isinstance(ty, Ast.TypeSingleAst):
+    def substitute_generic_type(ty: Any, q1: Ast.TypeSingleAst, q2: Ast.TypeSingleAst):
+        # if isinstance(ty, Ast.IdentifierAst):
+        #     if ty == q1:
+        #         ty.identifier = q2.identifier
+        # elif isinstance(ty, Ast.TypeGenericArgumentAst):
+        #     TypeInfer.substitute_generic_type(ty.value, q1, q2)
+        # elif isinstance(ty, Ast.GenericIdentifierAst):
+        #     if ty.to_identifier() == q1:
+        #         ty.identifier = q2.identifier
+        #     for j, q in enumerate(ty.generic_arguments):
+        #         TypeInfer.substitute_generic_type(q, q1, q2)
+        if isinstance(ty, Ast.TypeSingleAst):
             # for i, p in enumerate(ty.parts):
             #     TypeInfer.substitute_generic_type(p, q1, q2)
-            if ty.parts[-1].to_identifier() == q1:
-                ty.parts.pop(-1)
-                ty.parts.extend(q2.to_type().parts)
+            if ty == q1:
+                ty.parts = q2.parts
 
         elif isinstance(ty, Ast.TypeTupleAst):
             for p in ty.types:

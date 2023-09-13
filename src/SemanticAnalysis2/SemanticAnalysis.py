@@ -242,7 +242,7 @@ class SemanticAnalysis:
                 generic_mappers.append(generic_mapper)
                 for i, g in enumerate(f.generic_parameters):
                     if g not in generic_mapper:
-                        replacement_generic = Ast.IdentifierAst(f"__GENERIC_{i}", -1)
+                        replacement_generic = Ast.TypeSingleAst([Ast.GenericIdentifierAst(f"__GENERIC_{i}", [], -1)], -1)
                         generic_mapper[g.identifier] = replacement_generic
 
             for i, f in enumerate(fn_protos):

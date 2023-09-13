@@ -43,3 +43,8 @@ class CommonTypes:
     def tup(element_types: list[Ast.TypeAst]) -> Ast.TypeAst:
         # Tuple type - add the types of the tuple as the generic arguments
         return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst("Tup", element_types, -1)], -1)
+
+    @staticmethod
+    def self() -> Ast.TypeAst:
+        # Self type
+        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Self", [], -1)], -1)
