@@ -326,6 +326,9 @@ class FunctionParameterAst:
         s += (" = " + str(self.default_value)) if self.default_value else ""
         return s
 
+    def is_required(self):
+        return not (self.default_value or self.is_variadic)
+
 def FunctionParameterSelfAst(calling_convention: Optional[ParameterPassingConventionReferenceAst] | TokenAst, _tok: int):
     self_type = TypeSingleAst([GenericIdentifierAst("Self", [], _tok)], _tok)
     param = None

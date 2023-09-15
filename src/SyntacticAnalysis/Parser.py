@@ -1163,6 +1163,15 @@ class Parser:
     # Type Identifiers
 
     def _parse_type_identifier(self) -> BoundParser:
+        """
+        [TypeIdentifier] => [SingleTypeIdentifier | TupleTypeIdentifier]
+        - [SingleTypeIdentifier] => A single type, such as std.Num.
+        - [TupleTypeIdentifier] => A tuple of types, such as (std.Num, std.Str).
+
+        A type identifier can be either a single or a tuple type. Both can be used in all contexts of a "type", so the
+        choice to parse either happens at the top level of the type identifier parser.
+        """
+
         def inner():
             p1 = self._parse_single_type_identifier().delay_parse()
             p2 = self._parse_tuple_type_identifiers().delay_parse()
@@ -1185,6 +1194,12 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_single_type_identifier(self) -> BoundParser:
+        """
+        [SingleTypeIdentifier] => [TypeIdentifierWithSelf | TypeIdentifierNoSelf]
+        - [TypeIdentifierWithSelf] => A type identifier that starts with "Self::", such as "Self.Output.A".
+        - [TypeIdentifierNoSelf] => A type identifier that does not start with "Self::", such as "std.Num".
+        """
+
         def inner():
             c1 = self._current
             p1 = self._parse_single_type_identifier_with_self().delay_parse()
@@ -1194,6 +1209,16 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_tuple_type_identifiers(self) -> BoundParser:
+        """
+        [TupleTypeIdentifier] => [Token(ParenL)] [TypeIdentifiers?] [Token(ParenR)]
+        - [Token(ParenL)] => The left parenthesis that opens the tuple type.
+        - [TypeIdentifiers]? => The optional types that make up the tuple type.
+        - [Token(ParenR)] => The right parenthesis that closes the tuple type.
+
+        A tuple type identifier is a collection of different types, that form a numerically accessible type. For
+        example, "(std.Num, std.Str).0" is a valid expression, and will return the type std.Num.
+        """
+
         def inner():
             c1 = self._current
             p1 = self._parse_token(TokenType.TkParenL).parse_once()
@@ -1203,7 +1228,16 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_single_type_identifier_with_self(self) -> BoundParser:
-        # Self::Output::A
+        """
+        [TypeIdentifierWithSelf] => [Token(KwSelfType)] [TypeIdentifierUpperTypesFollowingSelf?]
+        - [Token(KwSelfType)] => The "Self" keyword, which is a type identifier.
+        - [TypeIdentifierUpperTypesFollowingSelf?] => The optional types that follow the "Self" keyword.
+
+        Only uppercase types (ie no namespacing) can follow the "Self" that starts a type. This means that while
+        "Self.A" is valid, "Self.std.Num" is invalid at the parser level. Types following "Self" are optional, as the
+        type "Self" is valid on it's own (context dependant).
+        """
+
         def inner():
             c1 = self._current
             p1 = self._parse_token(TokenType.KwSelfType).parse_once()
@@ -1219,42 +1253,34 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_single_type_identifier_no_self(self) -> BoundParser:
-        # std::io::Console::WriteOutput
-        # Console::WriteOutput
-        # TODO => type must end in a type (can't just be a namespace) => change from an "if" to actual parsing rules
         def inner():
-            p1 = self._parse_type_identifiers_namespace_then_types().parse_once()
-            if not (isinstance(p1[-1], int) or p1[-1].identifier[0].isupper()):
-                raise ParseSyntaxError("A [TypeIdentifier] must contain a type after the namespace", self._current)
-            return Ast.TypeSingleAst(p1, p1[0]._tok)
-        return BoundParser(self, inner)
-
-    def _parse_type_identifiers_namespace_then_types(self) -> BoundParser:
-        def inner():
-            # issue here: at least 1 upper type is needed, otherwise std[T] is valid -- needs a type after the ns
-            p1 = self._parse_type_identifier_namespace().delay_parse()
-            p2 = self._parse_type_identifier_upper_types().delay_parse()
-            p3 = (p1 | p2).parse_once()
-            return p3
+            p1 = self._parse_type_identifier_namespace_then_types().parse_once()
+            return p1
         return BoundParser(self, inner)
 
     def _parse_type_identifier_namespace(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_identifier_namespace_part().parse_once()
-            p2 = self._parse_type_identifier_rest_of_namespace().parse_optional() or []
-            return [p1, *p2]
+            p2 = self._parse_type_identifier_namespace_parts().parse_zero_or_more()
+            return p2
         return BoundParser(self, inner)
 
-    def _parse_type_identifier_rest_of_namespace(self) -> BoundParser:
+    def _parse_type_identifier_namespace_parts(self) -> BoundParser:
         def inner():
+            p2 = self._parse_identifier().parse_once()
             p1 = self._parse_token(TokenType.TkDot).parse_once()
-            p2 = self._parse_type_identifiers_namespace_then_types().parse_once()
-            return p2
+            return p2.to_generic_identifier()
+        return BoundParser(self, inner)
+
+    def _parse_type_identifier_namespace_then_types(self) -> BoundParser:
+        def inner():
+            p1 = self._parse_type_identifier_namespace().parse_optional() or []
+            p2 = self._parse_type_identifier_upper_types().parse_once()
+            return Ast.TypeSingleAst([*p1, *p2], p1[0]._tok if p1 else p2[0]._tok)
         return BoundParser(self, inner)
 
     def _parse_type_identifier_upper_types(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_identifier_upper_type().parse_once()
+            p1 = self._parse_type_identifier_upper_type_exclusive().parse_once()
             p2 = self._parse_type_identifier_next_upper_type().parse_zero_or_more()
             return [p1, *p2]
         return BoundParser(self, inner)
@@ -1266,30 +1292,18 @@ class Parser:
             return p2
         return BoundParser(self, inner)
 
-    def _parse_type_identifier_namespace_part(self) -> BoundParser:
+    def _parse_type_identifier_upper_type_exclusive(self) -> BoundParser:
         def inner():
-            p1 = self._parse_identifier().parse_once()
-            return p1.to_generic_identifier()
-        return BoundParser(self, inner)
-
-    def _parse_type_identifier_upper_type(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_generic_identifier().parse_once()
-            return p1
+            p2 = self._parse_generic_identifier().parse_once()
+            return p2
         return BoundParser(self, inner)
 
     def _parse_type_identifier_upper_type_or_number(self) -> BoundParser:
         def inner():
-            p1 = self._parse_type_identifier_upper_type().delay_parse()
-            p2 = self._parse_type_identifier_number().delay_parse()
+            p1 = self._parse_generic_identifier().delay_parse()
+            p2 = self._parse_numeric_integer().delay_parse()
             p3 = (p1 | p2).parse_once()
             return p3
-        return BoundParser(self, inner)
-
-    def _parse_type_identifier_number(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_numeric_integer().parse_once()
-            return int(p1)
         return BoundParser(self, inner)
 
     # Type Generic Arguments
