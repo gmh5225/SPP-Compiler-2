@@ -617,15 +617,23 @@ class SemanticAnalysis:
                         identifier_chain = collapse_ast_to_list_of_identifiers(arg.value)
                         # todo [1] : handle partial moves here
 
-                        outermost_symbol = s.current_scope.get_symbol(identifier_chain[0], SymbolTypes.VariableSymbol, error=False)
-                        if outermost_symbol.mem_info.is_borrowed():
-                            raise SystemExit(
-                                "Cannot move from a borrowed context:\n" +
-                                ErrFmt.err(outermost_symbol.mem_info.borrow_ast._tok) + f"Value '{arg.value}' borrowed here.\n..." +
-                                ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' moved here.")
-                        else:
-                            outermost_symbol.mem_info.is_partially_moved = True
-                            outermost_symbol.mem_info.partially_moved_asts.append(arg.value)
+                        outermost_item = arg.value
+                        while isinstance(outermost_item, Ast.PostfixExpressionAst):
+                            outermost_item = outermost_item.lhs
+
+                        # This check can only happen if the outermost item is an identifier. Otherwise, the outermost
+                        # symbol is either a function or struct-initialization -- in either case, an initialized, owned
+                        # value.
+                        if isinstance(outermost_item, Ast.IdentifierAst):
+                            outermost_symbol = s.current_scope.get_symbol(identifier_chain[0], SymbolTypes.VariableSymbol, error=False)
+                            if outermost_symbol.mem_info.is_borrowed():
+                                raise SystemExit(
+                                    "Cannot move from a borrowed context:\n" +
+                                    ErrFmt.err(outermost_symbol.mem_info.borrow_ast._tok) + f"Value '{arg.value}' borrowed here.\n..." +
+                                    ErrFmt.err(arg.value._tok) + f"Value '{arg.value}' moved here.")
+                            else:
+                                outermost_symbol.mem_info.is_partially_moved = True
+                                outermost_symbol.mem_info.partially_moved_asts.append(arg.value)
 
     @staticmethod
     def analyse_postfix_function_call(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):

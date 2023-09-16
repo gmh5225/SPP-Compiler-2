@@ -346,11 +346,11 @@ class Parser:
 
     def _parse_module_prototype(self) -> BoundParser:
         """
-        [ModulePrototype] => [Decorators]? [Token(MOD)] [ModuleIdentifier] [Token(;)] [ModuleImplementation]
+        [ModulePrototype] => [Decorators]? [Token(Mod)] [ModuleIdentifier] [Token(NewLine)] [ModuleImplementation]
         - [Decorators]? => Zero or more [Decorators] used to decorate the module.
-        - [Token(MOD)] => The [Token(MOD)] token, which is the keyword "mod", identifying that this is a module.
+        - [Token(Mod)] => The [Token(Mod)] token, which is the keyword "mod", identifying that this is a module.
         - [ModuleIdentifier] => The [ModuleIdentifier] of the module, which is the name of the module.
-        - [Token(;)] => The [Token(;)] token, which is the semicolon at the end of the module prototype.
+        - [Token(NewLine)] => The [Token(NewLine)] token, which terminates the end of the line
         - [ModuleImplementation] => The [ModuleImplementation] of the module, which is the contents of the module.
 
         The [ModulePrototype] parser parses for the prototype of the module. It parses checks for decorators, and the
@@ -498,6 +498,10 @@ class Parser:
     # Classes
 
     def _parse_class_prototype(self) -> BoundParser:
+        """
+        [ClassPrototype] => [Decorators*] [Token(cls)
+        @return:
+        """
         def inner():
             c1 = self._current
             p1 = self._parse_decorators().parse_optional() or []
@@ -1229,8 +1233,8 @@ class Parser:
 
     def _parse_single_type_identifier_with_self(self) -> BoundParser:
         """
-        [TypeIdentifierWithSelf] => [Token(KwSelfType)] [TypeIdentifierUpperTypesFollowingSelf?]
-        - [Token(KwSelfType)] => The "Self" keyword, which is a type identifier.
+        [TypeIdentifierWithSelf] => [Token(SelfType)] [TypeIdentifierUpperTypesFollowingSelf?]
+        - [Token(SelfType)] => The "Self" keyword, which is a type identifier.
         - [TypeIdentifierUpperTypesFollowingSelf?] => The optional types that follow the "Self" keyword.
 
         Only uppercase types (ie no namespacing) can follow the "Self" that starts a type. This means that while
@@ -1246,6 +1250,15 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_type_identifier_upper_types_following_self(self) -> BoundParser:
+        """
+        [TypeIdentifierUpperTypesFollowingSelf] => [Token(Dot)] [TypeIdentifierUpperTypes?]
+        - [Token(Dot)] => The dot that separates the "Self" keyword from the types that follow it.
+        - [TypeIdentifierUpperTypes?] => The optional types that follow the "Self" keyword.
+
+        This method checks for types following the "Self" keyword. Firstly check for a "." after the "Self", and then
+        for multiple following types.
+        @return:
+        """
         def inner():
             p1 = self._parse_token(TokenType.TkDot).parse_once()
             p2 = self._parse_type_identifier_upper_types().parse_optional() or []
@@ -1817,7 +1830,6 @@ class Parser:
         def inner():
             p1 = self._parse_postfix_operator_member_access().delay_parse()
             p2 = self._parse_postfix_operator_function_call().delay_parse()
-            # p3 = self._parse_postfix_operator_struct_initializer().delay_parse()
             p3 = self._parse_token(TokenType.TkQst).delay_parse()
             p4 = (p1 | p2 | p3).parse_once()
             return p4
