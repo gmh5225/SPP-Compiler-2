@@ -1036,6 +1036,14 @@ class Parser:
         return BoundParser(self, inner)
 
     def _parse_primary_expression(self) -> BoundParser:
+        """
+        [PrimaryExpression] => [SelfKeyword] | [SingleTypeIdentifierForInitialization] | [TypeIdentifier] | [Identifier]
+                             | [Literal] | [Lambda] | [OperatorIdentifierVariadic] | [ExpressionPlaceholder]
+                             | [StatementIf] | [StatementWhile] | [StatementNewScope] | [StatementYield]
+                             | [StatementWith]
+        [SelfKeyword] => "self" can be used as part of an identifier. Its a keyword so needs own parsing function.
+        TODO
+        """
         def inner():
             p1 = self._parse_self_keyword().delay_parse()  # self.function();
             p2 = self._parse_single_type_identifier_for_initialization().delay_parse()  # let x: std.Num{};

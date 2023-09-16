@@ -28,15 +28,23 @@
 #### Parser
 - [ ] Statements that require a `\n` at the end shouldn't if it's a one-line statement.
 - [ ] Sometimes multiple newlines in spp code causes error?
+- [ ] Remove requirement of newlines completely?
+- [ ] Semantic analysis for `self` in postfix expression.
+- [ ] Change the type rules to allow `Self` anywhere in upper-case type identifier
+  - [ ] Use semantic analysis to ensure correct positioning 
+
+#### Type system
+- [ ] All things `nested types / typedefs`
 
 #### Other
 - [ ] All things `yield`
-- [ ] Fold expressions
-- [ ] Disallow duplicate inheritance super-impositions onto a class.
+- [ ] Fold expressions (requires variadic implementation).
+- [ ] Disallow duplicate inheritance super-impositions onto a class (recursive sup-scope analysis).
 - [ ] Postfix member access doesn't work with function calls in the middle ie `a.func().b` fails on `func()`.
 - [ ] Check tuple indexing ie `let x = tup.0` marks the object as partially moved.
 
 #### Imports
+- [ ] Relative imports using the `sup` keyword.
 - [ ] Fix
 ###### Fix imports
 - By default, "import" all spp files with a `mod` declaration into the `main.spp` file, forcing use of FQN.
