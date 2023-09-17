@@ -8,7 +8,7 @@
 
 #### Memory
 - [ ] Reassigning to moved _attributes_ makes the object no longer partially moved.
-- [ ] Can still assign to attributes of a moved object --  should not be allowed.
+- [ ] Can still assign to attributes of a moved object -- should not be allowed.
 
 #### Lambdas/closures related
 - [ ] Type analysis (infer return type, what about param types?).
@@ -18,6 +18,14 @@
 - [ ] Destructuring (especially for `if-patterns` and `let` statements).
 - [ ] Struct initialization: require stateful, non-default sub-classes in `sup=`
 - [ ] Would be nice to have assignment mutability check _before_ type check.
+
+#### Statements
+- [ ] Non-final return statements must return the correct type.
+
+#### Operators
+- [ ] Re-introduce `<<`, `>>` bit shifts
+- [ ] Look at bit-rotate operators `<<<`, `>>>`
+- [ ] Any new operators need to be integrated into the precedence table.
 
 #### Actual compiler Python code
 - [ ] Heavily extend errors to include their source declaration ie `let` statement etc.
@@ -30,14 +38,17 @@
 - [ ] Sometimes multiple newlines in spp code causes error?
 - [ ] Remove requirement of newlines completely?
 - [ ] Semantic analysis for `self` in postfix expression.
-- [ ] Change the type rules to allow `Self` anywhere in upper-case type identifier
+- [ ] Change the type rules to allow `Self` anywhere in upper-case type identifier.
   - [ ] Use semantic analysis to ensure correct positioning 
 
 #### Type system
 - [ ] All things `nested types / typedefs`
+- [ ] Maybe split `Num` to `U8`, `U16`, `U32`, `U64`, `I8`, `I16`, `I32`, `I64`, `F32`, `F64`?
+  - [ ] Then add `Num` as a `BigNum` type that can be used for all arithmetic.
+  - [ ] Then add `Dec` like Python's `decimal.Decimal` class?
 
 #### Other
-- [ ] All things `yield`
+- [ ] All things `yield` / coroutines
 - [ ] Fold expressions (requires variadic implementation).
 - [ ] Disallow duplicate inheritance super-impositions onto a class (recursive sup-scope analysis).
 - [ ] Postfix member access doesn't work with function calls in the middle ie `a.func().b` fails on `func()`.
