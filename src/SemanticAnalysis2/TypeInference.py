@@ -1,4 +1,5 @@
 import copy
+import pprint
 from difflib import SequenceMatcher
 from typing import Generator, Optional, Any
 import inspect
@@ -287,6 +288,10 @@ class TypeInfer:
         original_args_tys = argument_tys.copy()
         original_args_ccs = argument_ccs.copy()
 
+        # Create a list to store all valid overloads in -- this is so that the list can be scanned and ordered based on
+        # how constraining the parameters are, in order to select the most constraining overload.
+        valid_overloads = []
+
         # Check each overload in the function prototypes list.
         for i, fn_type in enumerate(function_prototypes):
 
@@ -302,6 +307,8 @@ class TypeInfer:
             param_names = [param.identifier.identifier for param in fn_type.parameters]
             param_tys = [param.type_annotation for param in fn_type.parameters]
             param_ccs = [param.calling_convention for param in fn_type.parameters]
+
+            num_required_parameters = len([p for p in fn_type.parameters if p.is_required()])
 
             # Stringify the function prototype, and add it to the list of function signatures to display later if there
             # is an error.
@@ -343,7 +350,7 @@ class TypeInfer:
                     ast.op.arguments.insert(0, Ast.FunctionArgumentAst(None, ast.lhs.lhs, copy.deepcopy(param_ccs[0]), False, -1))
 
                 # Check if the function is callable with the number of given arguments.
-                if len(param_tys) != len(argument_tys):
+                if len(argument_tys) != num_required_parameters:
                     errs.append(f"Expected {len(param_tys)} arguments, but got {len(argument_tys)}.")
                     continue
 
@@ -362,17 +369,34 @@ class TypeInfer:
                 continue
 
             # Add the generic map from any previous member accesses into this one too.
-            # todo : don't return here, as a more constraining method that matches could be found after. append the
-            #  overload to a list of overloads, and then check the list at the end / sort it to get the most
-            #  constraining overload.
             return_type = copy.deepcopy(fn_type.return_type)
             for g, h in ast.op.generic_map.items():
                 TypeInfer.substitute_generic_type(return_type, g, h)
             ast.op.arguments = original_call_arguments
             if not is_special_function:
-                return overload_symbols[i], return_type
+                valid_overloads.append((overload_symbols[i], return_type))
             else:
-                return None, return_type
+                valid_overloads.append((None, return_type))
+
+        # Selection of the most constraining overload will occur here
+        # todo : implement this
+        if valid_overloads:
+
+            # If there is only one valid overload, then return it.
+            if len(valid_overloads) == 1:
+                return valid_overloads[0]
+
+            # The most constraining is the overload with the least number of parameters whose types are generic types.
+            # This is because the generic types are the least constraining, as they can be any type, and fixed types are
+            # the most constraining, as they can only be one type.
+            else:
+                print("-" * 100)
+                pprint.pprint([str(x.meta_data["fn_proto"]) for x in [x[0] for x in valid_overloads]])
+                generic_param_counts = []
+
+                # todo (for now) return first overload
+                return valid_overloads[0]
+
 
         ast.op.arguments = original_call_arguments
 
@@ -571,12 +595,9 @@ class TypeInfer:
         if isinstance(t1, Ast.TypeSingleAst) and isinstance(t2, Ast.TypeSingleAst):
             # t1 will be something like "T", so simplify it down to an identifier AST.
             lhs_generic_type = t1.to_identifier()
-            print("-" * 100)
 
-            print("- checking generic arguments")
             # Recursively do this for the generic arguments of the type
             for i, (a1, a2) in enumerate(zip(t1.parts[-1].generic_arguments, t2.parts[-1].generic_arguments)):
-                print(f"- checking {a1} == {a2}, with a generic map of {generic_map}")
                 tests = [TypeInfer.types_equal_account_for_generic(a1.value, a2.value, generic_map, s)]
                 if not tests[0][0]:
                     return False, tests[0][1]
@@ -584,9 +605,6 @@ class TypeInfer:
             # Non-Generic
             # If the LHS is not a generic type parameter, then the LHS requires a direct match to the RHS. For
             # example, 'Str' must match 'Str'. The parameter and arguments are direct type matches.
-
-            print(f"- checking {t1} == {t2}, with a generic map of {generic_map}")
-            print(f"\t{repr(lhs_generic_type)}, {lhs_generic_type in generic_map.keys()}")
             if lhs_generic_type not in generic_map.keys() and not t1.subtype_match(t2, s):
                 error = f"Expected type '{t1}', but got type '{t2}'. These types are not equal, and not linked by super-imposition."
                 return False, error
@@ -605,7 +623,6 @@ class TypeInfer:
                 generic_map[lhs_generic_type] = t2
                 orig_t1 = copy.deepcopy(t1)
                 TypeInfer.substitute_generic_type(t1, t1, generic_map[lhs_generic_type])
-                print(f"### {orig_t1} is now {t1}")
 
 
         # todo : untested with tuples:
