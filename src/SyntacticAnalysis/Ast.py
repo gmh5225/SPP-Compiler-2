@@ -554,8 +554,10 @@ class TypeSingleAst:
         return IdentifierAst(s, self._tok)
 
     def subtype_match(self, other: TypeSingleAst, s) -> bool:
+        # Is the other type (other) a subtype of this type (self)? Determine by checking if this type (self) is in the
+        # super-types of the other type (other).
         other_scope = s.global_scope.get_child_scope(other)
-        if not other_scope: return False
+        if not other_scope: return self == other # generic
         return self == other or self in [t2_sup_scope.name for t2_sup_scope in other_scope.sup_scopes]
 
 @dataclass
