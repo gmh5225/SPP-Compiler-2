@@ -121,39 +121,36 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_function_prototype(ast: Ast.FunctionPrototypeAst, s: ScopeHandler, **kwargs):
-        # print("-" * 50)
-        # print(ast)
-        # print(s.current_scope.name, f"{[str(s.name) for s in s.current_scope.children]}")
-        # print(s.current_scope.name, f"{[s.visited for s in s.current_scope.children]}")
-
-        # special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
-        # function_symbol = s.current_scope.get_symbol(ast.identifier, SymbolTypes.VariableSymbol)  # if not special else None
+        # Enter the next scope, which will be the function scope. This is to load in the parameters and subsequently
+        # declared variables into the sy,bol table in the correct scope.
         s.next_scope()
 
-        # Mark global methods as "static" ie don't have a "self" parameter
-        # if not special and s.current_scope == s.global_scope:
-        #     function_symbol.static = True
-
-
-        # Analyse all the decorators and parameters, and the return type
+        # Analyse all the decorators, parameters, generic type parameters, and the return type. This is to ensure
+        # correct parameter order and that all the return types are valid.
         [SemanticAnalysis.analyse_decorator(ast, d, s) for d in ast.decorators]
         SemanticAnalysis.analyse_function_parameters(ast.parameters, s, **kwargs)
         SemanticAnalysis.analyse_type_generic_parameters(ast.generic_parameters, s)
         TypeInfer.check_type(ast.return_type, s)
 
-        # Analyse each statement
-        # if not special and not function_symbol.meta_data.get("abstract", False) or special:
+        # Analyse each statement in the body of the function.
         for statement in ast.body.statements:
             SemanticAnalysis.analyse_statement(statement, s)
 
         # Make sure the return type of the last statement matches the return type of the function, unless the method is
-        # abstract, in which case it is allowed to not have a return statement.
+        # abstract, in which case it is allowed to not have a return statement. An empty function body has special
+        # behaviour as detailed beneath.
         final_statement = ast.body.statements[-1] if ast.body.statements else None
+
+        # The detected return type of a function is the inferred type of the final (return) statement in the function's
+        # body, and std.Void otherwise -- this is to ensure that the final statement (returning) is actually a return
+        # statement, forcing there to only be 1 way to do anything, in this case, returning a value.
         if not isinstance(final_statement, Ast.ReturnStatementAst):
             t = CommonTypes.void()
         else:
             t = TypeInfer.infer_statement(final_statement, s) if ast.body.statements else CommonTypes.void()
 
+        # If there is a non-void return type and the final statement is not a return statement, then raise an erorr,
+        # because
         if ast.return_type != CommonTypes.void() and ast.body.statements and not isinstance(final_statement, Ast.ReturnStatementAst):
             err_ast = ast.body.statements[-1]
             raise SystemExit(
@@ -175,9 +172,27 @@ class SemanticAnalysis:
         TypeInfer.check_type(ast.type_annotation, s)
 
         # Analyse the parameter type, and Add the parameter to the current scope.
-        ty = ast.type_annotation   # if not isinstance(ast.type_annotation.parts[0], Ast.SelfTypeAst) else Ast.IdentifierAst("Self", ast.type_annotation._tok)
+        ty = ast.type_annotation
         sym = SymbolTypes.VariableSymbol(ast.identifier, ty, is_mutable=ast.is_mutable, is_initialized=True)
         sym.mem_info.initialization_ast = ast
+
+        # Check that if a default value if provided, making the parameter optional, that the parameter type is not a
+        # reference, and that the default value is of the correct type.
+        if ast.default_value:
+            if ast.calling_convention:
+                raise SystemExit(
+                    "Cannot have a default value for a parameter with a calling\nconvention:" +
+                    ErrFmt.err(ast.calling_convention._tok) + f"Parameter has the calling convention '{ast.calling_convention}'.\n..." +
+                    ErrFmt.err(ast.default_value._tok) + "Default value.")
+
+            # todo : maybe change this to a different error if the parameter type is generic? Just a more concise error
+            #  message maybe. also maybe not because all other assignments would need the duplicated adjustment.
+            #  probably easier to stick with this error message for all mismatches.
+            if not ast.type_annotation.subtype_match(default_type := TypeInfer.infer_expression(ast.default_value, s), s):
+                raise SystemExit(
+                    "Default value must match the parameter type:" +
+                    ErrFmt.err(ast.type_annotation._tok) + f"Parameter has type '{ast.type_annotation}'.\n..." +
+                    ErrFmt.err(ast.default_value._tok) + f"Default value has the type '{default_type}'.")
 
         # Set the symbol borrow information based on the parameter passing convention.
         match ast.calling_convention:
@@ -252,9 +267,22 @@ class SemanticAnalysis:
 
             for i, f in enumerate(fn_protos[:-1]):
                 for g in fn_protos[i + 1:]:
-                    if all([f_param.type_annotation == g_param.type_annotation for f_param, g_param in zip(f.parameters, g.parameters)]):
+                    required_f_params = [p for p in f.parameters if p.is_required()]
+                    required_g_params = [p for p in g.parameters if p.is_required()]
+                    if all([f_param.type_annotation == g_param.type_annotation for f_param, g_param in zip(required_f_params, required_g_params)]):
+                        extra = ""
+                        if len(f.parameters) != len(g.parameters):
+                            extra = (
+                                " One overload\ncannot be a 'subset' of another overload, ie the same but\nwith optional or"
+                                "variadic parameters, as calling the function\nwithout any optional or variadic parameters "
+                                "would lead to\neither overload being available to call.\n")
+                        elif len(required_f_params) == len(required_g_params):
+                            extra = (
+                                " One overload\ncannot have the same required parameters but different optional or\n"
+                                "variadic parameters, as calling the function without any optional or\nvariadic parameters "
+                                "would lead to either overload being available\nto call.\n")
                         raise SystemExit(
-                            "Duplicate function overloads are not allowed." +
+                            "Duplicate function overloads are not allowed." + extra +
                             ErrFmt.err(f._tok) + f"First overload\n..." +
                             ErrFmt.err(g._tok) + f"Second overload.")
 
