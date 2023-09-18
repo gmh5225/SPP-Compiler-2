@@ -847,6 +847,15 @@ class SemanticAnalysis:
         # A manual mutability check is performed here, because whilst the function call handles all the memory and
         # mutability checks, the "set" function doesn't exist, so the mutability check has to be done manually.
         for lhs in ast.lhs:
+
+            # Check the LHS is valid for assignment. Only allow assignment to variables or attributes.
+            match lhs:
+                case Ast.IdentifierAst(): pass
+                case Ast.PostfixExpressionAst() if isinstance(lhs.op, Ast.PostfixMemberAccessAst): pass
+                case _: raise SystemExit(
+                    "Cannot assign to a value that is not a variable or attribute:\n" +
+                    ErrFmt.err(lhs._tok) + f"Value '{lhs}' is not a variable or attribute.")
+
             SemanticAnalysis.analyse_expression(lhs, s)
 
             # For postfix member access operations, check that the outermost identifier is mutable. Field mutability is

@@ -18,6 +18,7 @@
 - [ ] Destructuring (especially for `if-patterns` and `let` statements).
 - [ ] Struct initialization: require stateful, non-default sub-classes in `sup=`
 - [ ] Would be nice to have assignment mutability check _before_ type check.
+- [ ] Most things concerning tuples need fixing -- `(...) vs Tup[...]`.
 
 #### Statements
 - [ ] Non-final return statements must return the correct type.
