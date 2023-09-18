@@ -363,7 +363,6 @@ class Parser:
             p1 = self._parse_decorators().parse_optional() or []
             p2 = self._parse_token(TokenType.KwMod).parse_once()
             p3 = self._parse_module_identifier().parse_once()
-            p4 = self._parse_token(TokenType.TkNewLine).parse_once()
             p5 = self._parse_module_implementation().parse_once()
             return Ast.ModulePrototypeAst(p1, p3, p5, c1)
         return BoundParser(self, inner)
@@ -416,7 +415,6 @@ class Parser:
             p1 = self._parse_token(TokenType.KwUse).parse_once()
             p2 = self._parse_import_identifier().parse_once()
             p3 = self._parse_import_what().parse_once()
-            p4 = self._parse_token(TokenType.TkNewLine).parse_once()
             return Ast.ImportStatementAst(p2, p3, c1)
         return BoundParser(self, inner)
 
@@ -643,7 +641,6 @@ class Parser:
             c1 = self._current
             p1 = self._parse_enum_member().parse_once()
             p2 = self._parse_enum_member_next().parse_zero_or_more()
-            p3 = self._parse_token(TokenType.TkNewLine).parse_once()
             return Ast.EnumImplementationAst([p1, *p2], c1)
         return BoundParser(self, inner)
 
@@ -1547,7 +1544,6 @@ class Parser:
             c1 = self._current
             p1 = self._parse_token(TokenType.KwRet).parse_once()
             p2 = self._parse_expression().parse_optional()
-            p3 = self._parse_token(TokenType.TkNewLine).parse_once()
             return Ast.ReturnStatementAst(p2, c1)
         return BoundParser(self, inner)
 
@@ -1567,7 +1563,6 @@ class Parser:
             p2 = self._parse_generic_identifier().parse_once()
             p3 = self._parse_token(TokenType.KwAs).parse_once()
             p4 = self._parse_type_identifier().parse_once()
-            p5 = self._parse_token(TokenType.TkNewLine).parse_once()
             return Ast.TypedefStatementAst(Ast.TypeSingleAst([p2], c1), p4, c1)
         return BoundParser(self, inner)
 
@@ -1576,7 +1571,6 @@ class Parser:
             p1 = self._parse_statement_let_with_value().delay_parse()
             p2 = self._parse_statement_let_with_type().delay_parse()
             p3 = (p1 | p2).parse_once()
-            p4 = self._parse_token(TokenType.TkNewLine).parse_once()
             return p3
         return BoundParser(self, inner)
 
@@ -1651,12 +1645,11 @@ class Parser:
             return p6
         return BoundParser(self, inner)
 
-    def _parse_statement_expression(self) -> BoundParser:
-        def inner():
-            p1 = self._parse_expression().parse_once()
-            p2 = self._parse_token(TokenType.TkNewLine).parse_once()
-            return p1
-        return BoundParser(self, inner)
+    # def _parse_statement_expression(self) -> BoundParser:
+    #     def inner():
+    #         p1 = self._parse_expression().parse_once()
+    #         return p1
+    #     return BoundParser(self, inner)
 
     # Identifiers
 
