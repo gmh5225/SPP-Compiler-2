@@ -16,6 +16,14 @@ class TokenType(Enum):
     TkPipeEquals = "|="
     TkCaret = "^"
     TkCaretEquals = "^="
+    TkDoubleAngleL = "<<"
+    TkDoubleAngleLEquals = "<<="
+    TkDoubleAngleR = ">>"
+    TkDoubleAngleREquals = ">>="
+    TkTripleAngleL = "<<<"
+    TkTripleAngleLEquals = "<<<="
+    TkTripleAngleR = ">>>"
+    TkTripleAngleREquals = ">>>="
 
     # Comparison operations (EQ, NE, LE, GE, LT, GT, CMP)
     TkEq = "=="

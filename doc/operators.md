@@ -7,34 +7,46 @@
 
 
 ## Binary operators
-| Symbol | Name                      | Description                                                                  | Class                |
-|--------|---------------------------|------------------------------------------------------------------------------|----------------------|
-| `=`    | Assignment                | Assigns the value of the right hand side to the left hand side.              |                      |
-| `+=`   | Addition assignment       | Adds the right value to the left value, and assigns the result to it         | `std.ops.AddAssign`  |
-| `-=`   | Subtraction assignment    | Subtracts the right value from the left value, and assigns the result to it. | `std.ops.SubAssign`  |
-| `*=`   | Multiplication assignment | Multiplies the left value by the right value, and assigns the result to it.  | `std.ops.MulAssign`  |
-| `/=`   | Division assignment       | Divides the left value by the right value, and assigns the result to it.     | `std.ops.DivAssign`  |
-| `\|=`  | Or assignment             | Takes the logical OR of two values, and assigns the result to it             | `std.ops.OrAssign`   |
-| `&&=`  | And assignment            | Takes the logical AND of two values, and assigns the result to it            | `std.ops.AndAssign`  |
-| `&=`   | Bitwise and assignment    | Takes the bitwise AND of two values, and assigns the result to it            | `std.ops.BAndAssign` |
-| `^=`   | Bitwise xor assignment    | Takes the bitwise XOR of two values, and assigns the result to it            | `std.ops.BXorAssign` |
-| `+`    | Addition                  | Adds the right value to the left value.                                      | `std.ops.Add`        |
-| `-`    | Subtraction               | Subtracts the right value from the left value.                               | `std.ops.Sub`        |
-| `*`    | Multiplication            | Multiplies the left value by the right value.                                | `std.ops.Mul`        |
-| `/`    | Division                  | Divides the left value by the right value.                                   | `std.ops.Div`        |
-| `\|\|` | Or                        | Takes the logical OR of two values                                           | `std.ops.Or`         |
-| `&&`   | And                       | Takes the logical AND of two values                                          | `std.ops.And`        |
-| `\|`   | Bitwise or                | Takes the bitwise OR of two values                                           | `std.ops.BOr`        |
-| `\|= ` | Bitwise or assignment     | Takes the bitwise OR of two values, and assigns the result to it             | `std.ops.BOrAssign`  |
-| `&`    | Bitwise and               | Takes the bitwise AND of two values                                          | `std.ops.BAnd`       |
-| `^`    | Bitwise xor               | Takes the bitwise XOR of two values                                          | `std.ops.BXor`       |
-| `==`   | Equals                    | Checks if two values are equal                                               | `std.ops.Eq`         |
-| `!=`   | Not equals                | Checks if two values are not equal                                           | `std.ops.Ne`         |
-| `<`    | Less than                 | Checks if the left value is less than the right value                        | `std.ops.Lt`         |
-| `<=`   | Less than or equal to     | Checks if the left value is less than or equal to the right value            | `std.ops.Le`         |
-| `>`    | Greater than              | Checks if the left value is greater than the right value                     | `std.ops.Gt`         |
-| `>=`   | Greater than or equal to  | Checks if the left value is greater than or equal to the right value         | `std.ops.Ge`         |
-| `<=>`  | Compare                   | Compares two values                                                          | `std.ops.Cmp`        |
+| Symbol | Name                        | Description                                                                   | Class                | CPU instruction |
+|--------|-----------------------------|-------------------------------------------------------------------------------|----------------------|-----------------|
+| `=`    | Assignment                  | Assigns the value of the right hand side to the left hand side.               |                      |
+| `*=`   | Multiplication assignment   | Multiplies the left value by the right value, and assigns the result to it.   | `std.ops.MulAssign`  |
+| `/=`   | Division assignment         | Divides the left value by the right value, and assigns the result to it.      | `std.ops.DivAssign`  |
+| `\|=`  | Or assignment               | Takes the logical OR of two values, and assigns the result to it              | `std.ops.OrAssign`   |
+| `&&=`  | And assignment              | Takes the logical AND of two values, and assigns the result to it             | `std.ops.AndAssign`  |
+| `&=`   | Bitwise and assignment      | Takes the bitwise AND of two values, and assigns the result to it             | `std.ops.BAndAssign` |
+| `^=`   | Bitwise xor assignment      | Takes the bitwise XOR of two values, and assigns the result to it             | `std.ops.BXorAssign` |
+| `<<=`  | Bit shift left assignment   | Shifts the left value left by the right value, and assigns the result to it   | `std.ops.ShlAssign`  |
+| `>>=`  | Bit shift right assignment  | Shifts the left value right by the right value, and assigns the result to it  | `std.ops.ShrAssign`  |
+| `<<<=` | Bit rotate left assignment  | Rotates the left value left by the right value, and assigns the result to it  | `std.ops.RolAssign`  |
+| `>>>=` | Bit rotate right assignment | Rotates the left value right by the right value, and assigns the result to it | `std.ops.RorAssign`  |
+| `+`    | Addition                    | Adds the right value to the left value.                                       | `std.ops.Add`        | `ADD`           |
+| `-`    | Subtraction                 | Subtracts the right value from the left value.                                | `std.ops.Sub`        | `SBB`           |
+| `*`    | Multiplication              | Multiplies the left value by the right value.                                 | `std.ops.Mul`        | `MUL`           |
+| `/`    | Division                    | Divides the left value by the right value.                                    | `std.ops.Div`        | `DIV`           |
+| `%`    | Remainder                   | Takes the remainder of two values                                             | `std.ops.Rem`        |
+| `\|\|` | Or                          | Takes the logical OR of two values                                            | `std.ops.Or`         | `OR`            |
+| `&&`   | And                         | Takes the logical AND of two values                                           | `std.ops.And`        | `AND`           |
+| `\|`   | Bitwise or                  | Takes the bitwise OR of two values                                            | `std.ops.BOr`        |
+| `\|= ` | Bitwise or assignment       | Takes the bitwise OR of two values, and assigns the result to it              | `std.ops.BOrAssign`  |
+| `&`    | Bitwise and                 | Takes the bitwise AND of two values                                           | `std.ops.BAnd`       |
+| `^`    | Bitwise xor                 | Takes the bitwise XOR of two values                                           | `std.ops.BXor`       |
+| `<<`   | Bit shift left              | Shifts the left value left by the right value                                 | `std.ops.Shl`        | `SHL`           |
+| `>>`   | Bit shift right             | Shifts the left value right by the right value                                | `std.ops.Shr`        | `SHR`           |
+| `<<<`  | Bit rotate left             | Rotates the left value left by the right value                                | `std.ops.Rol`        | `ROL`           |
+| `>>>`  | Bit rotate right            | Rotates the left value right by the right value                               | `std.ops.Ror`        | `ROR`           |
+| `==`   | Equals                      | Checks if two values are equal                                                | `std.ops.Eq`         |
+| `!=`   | Not equals                  | Checks if two values are not equal                                            | `std.ops.Ne`         |
+| `<`    | Less than                   | Checks if the left value is less than the right value                         | `std.ops.Lt`         |
+| `<=`   | Less than or equal to       | Checks if the left value is less than or equal to the right value             | `std.ops.Le`         |
+| `>`    | Greater than                | Checks if the left value is greater than the right value                      | `std.ops.Gt`         |
+| `>=`   | Greater than or equal to    | Checks if the left value is greater than or equal to the right value          | `std.ops.Ge`         |
+| `<=>`  | Compare                     | Compares two values                                                           | `std.ops.Cmp`        |
+|        | Not                         | Takes the logical NOT of a value                                              | `std.ops.Not`        | `NOT`           |
+|        | Bitwise not                 | Takes the bitwise NOT of a value                                              | `std.ops.BNot`       | `NEG`           |
+|        | Remainder                   | Takes the remainder of two values                                             | `std.ops.Rem`        |
+|        | Modulo                      | Takes the modulo of two values                                                | `std.ops.Mod`        |
+
 
 ### Precedence
 | Precedence | Operators                               |
@@ -43,8 +55,9 @@
 | 2          | `\|\|`                                  |
 | 3          | `&&`                                    |
 | 4          | `==`, `!=`, `<`, `<=`, `>`, `>=`, `<=>` |
-| 5          | `+`, `-`, `\|`, `^`                     |
-| 6          | `*`, `/`, `&`                           |
+| 5          | `<<`, `>>`, `<<<`, `>>>`                |
+| 6          | `+`, `-`, `\|`, `^`                     |
+| 7          | `*`, `/`, `&`, `%`                      |
 
 ### Operator overloading
 - Super-impose the corresponding class onto the type to overload the operator.
@@ -54,11 +67,11 @@ cls Add[Rhs, Output=Self] {
     use Rhs as Rhs
     use Output as Output
 
-    fn add(self: &Self, other: T) -> Output { ... }
+    fn add(&self, that: T) -> Output { ... }
 }
 
 sup Add[Num] for Num {
-    fn add(self: &Num, other: Num) -> Num { ... }
+    fn add(&self, that: Num) -> Self { ... }
 }
 ```
 - Because `Num` also implements the `Copy` trait, the RHS isn't consumed in the addition operation.

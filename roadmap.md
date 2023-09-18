@@ -23,16 +23,13 @@
 - [ ] Non-final return statements must return the correct type.
 
 #### Operators
-- [ ] Re-introduce `<<`, `>>` bit shifts
-- [ ] Look at bit-rotate operators `<<<`, `>>>`
-- [ ] Any new operators need to be integrated into the precedence table.
 - [ ] Operator chaining: allow, like Python, for ` a < b < c` to be `a < b && b < c`.
 
 #### Actual compiler Python code
 - [ ] Heavily extend errors to include their source declaration ie `let` statement etc.
 - [ ] Redo all error types regarding `SystemExit` etc.
 - [ ] Work out all error codes (will have to finish syntactic analysis first).
-- [ ] Change the error handler to recieve the extra string as a parameter for multiline support (not just `... + "..."` )
+- [ ] Change the error handler to receive the extra string as a parameter for multiline support (not just `... + "..."` )
 - [ ] Check that `copy.deepcopy` is called on all types that require it (modifying local AST variable).
 
 #### Type system

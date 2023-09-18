@@ -1020,9 +1020,15 @@ class Parser:
 
     def _parse_stage_5_binary_expression(self) -> BoundParser:
         return self._parse_binary_expression(
-            self._parse_postfix_expression(),
+            self._parse_stage_6_binary_expression(),
             self._parse_stage_5_binary_operator_identifier(),
             self._parse_stage_5_binary_expression)
+
+    def _parse_stage_6_binary_expression(self) -> BoundParser:
+        return self._parse_binary_expression(
+            self._parse_postfix_expression(),
+            self._parse_stage_6_binary_operator_identifier(),
+            self._parse_stage_6_binary_expression)
 
     def _parse_postfix_expression(self) -> BoundParser:
         def inner():
@@ -1756,8 +1762,12 @@ class Parser:
             p8 = self._parse_token(TokenType.TkMulEq).delay_parse()
             p9 = self._parse_token(TokenType.TkDivEq).delay_parse()
             p10 = self._parse_token(TokenType.TkRemEq).delay_parse()
-            p11 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10).parse_once()
-            return p11
+            p11 = self._parse_token(TokenType.TkDoubleAngleLEquals).delay_parse()
+            p12 = self._parse_token(TokenType.TkDoubleAngleREquals).delay_parse()
+            p13 = self._parse_token(TokenType.TkTripleAngleLEquals).delay_parse()
+            p14 = self._parse_token(TokenType.TkTripleAngleREquals).delay_parse()
+            p15 = (p1 | p2 | p3 | p4 | p5 | p6 | p7 | p8 | p9 | p10 | p11 | p12 | p13 | p14).parse_once()
+            return p15
         return BoundParser(self, inner)
 
     def _parse_stage_1_binary_operator_identifier(self) -> BoundParser:
@@ -1787,6 +1797,16 @@ class Parser:
 
     def _parse_stage_4_binary_operator_identifier(self) -> BoundParser:
         def inner():
+            p1 = self._parse_token(TokenType.TkDoubleAngleL).delay_parse()
+            p2 = self._parse_token(TokenType.TkDoubleAngleR).delay_parse()
+            p3 = self._parse_token(TokenType.TkTripleAngleL).delay_parse()
+            p4 = self._parse_token(TokenType.TkTripleAngleR).delay_parse()
+            p5 = (p1 | p2 | p3 | p4).parse_once()
+            return p5
+        return BoundParser(self, inner)
+
+    def _parse_stage_5_binary_operator_identifier(self) -> BoundParser:
+        def inner():
             p1 = self._parse_token(TokenType.TkAdd).delay_parse()
             p2 = self._parse_token(TokenType.TkSub).delay_parse()
             p3 = self._parse_token(TokenType.TkPipe).delay_parse()
@@ -1795,7 +1815,7 @@ class Parser:
             return p5
         return BoundParser(self, inner)
 
-    def _parse_stage_5_binary_operator_identifier(self) -> BoundParser:
+    def _parse_stage_6_binary_operator_identifier(self) -> BoundParser:
         def inner():
             p1 = self._parse_token(TokenType.TkMul).delay_parse()
             p2 = self._parse_token(TokenType.TkDiv).delay_parse()
