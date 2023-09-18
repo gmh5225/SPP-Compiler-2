@@ -3,20 +3,25 @@
 - Allows for "interior" iteration, ie iteration without a counter.
 
 ## Example
-- Rust vs S++:
-```rust
-RUST
-for i in 0..100 {
-    if i % 2 == 0 {
-        println!("{}", func(i));
+- C++ vs S++:
+```c++
+// C++
+std::vector<int> vec(100)
+std::iota(vec.begin(), vec.end(), 0);
+for (auto i : vec) {
+    if (i % 3 == 0) {
+        std::cout << i << std::endl;
     }
 }
 ```
 
 ```s++
-S++
+# S++
 Vec.new_range(0, 100)
     .filter((i) -> { i % 3 == 0 })
-    .map(func)       # shorthand for .map((i) -> { func(i) })
-    .for_each(print) # shorthand for .for_each((i) -> { print(i) })
+    .map(func)
+    .for_each(print)
+    
+# shorthand for .map((i) -> { func(i) })
+# shorthand for .for_each((i) -> { print(i) })
 ```

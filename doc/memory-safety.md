@@ -7,6 +7,7 @@
 - References can only be created at function call sites.
 - References cannot be stored in objects.
 - References cannot be returned from functions.
+- This means they can be stored on the _stack_, for better performance.
 
 ## Lifetime analysis
 - Due to 2nd-class references, lifetime analysis is trivial.

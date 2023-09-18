@@ -26,20 +26,14 @@
 - [ ] Re-introduce `<<`, `>>` bit shifts
 - [ ] Look at bit-rotate operators `<<<`, `>>>`
 - [ ] Any new operators need to be integrated into the precedence table.
+- [ ] Operator chaining: allow, like Python, for ` a < b < c` to be `a < b && b < c`.
 
 #### Actual compiler Python code
 - [ ] Heavily extend errors to include their source declaration ie `let` statement etc.
-- [ ] Check that `copy.deepcopy` is called on all types that require it (modifying local AST variable).
 - [ ] Redo all error types regarding `SystemExit` etc.
 - [ ] Work out all error codes (will have to finish syntactic analysis first).
-
-#### Parser
-- [ ] Statements that require a `\n` at the end shouldn't if it's a one-line statement.
-- [ ] Sometimes multiple newlines in spp code causes error?
-- [ ] Remove requirement of newlines completely?
-- [ ] Semantic analysis for `self` in postfix expression.
-- [ ] Change the type rules to allow `Self` anywhere in upper-case type identifier.
-  - [ ] Use semantic analysis to ensure correct positioning 
+- [ ] Change the error handler to recieve the extra string as a parameter for multiline support (not just `... + "..."` )
+- [ ] Check that `copy.deepcopy` is called on all types that require it (modifying local AST variable).
 
 #### Type system
 - [ ] All things `nested types / typedefs`
@@ -53,6 +47,7 @@
 - [ ] Disallow duplicate inheritance super-impositions onto a class (recursive sup-scope analysis).
 - [ ] Postfix member access doesn't work with function calls in the middle ie `a.func().b` fails on `func()`.
 - [ ] Check tuple indexing ie `let x = tup.0` marks the object as partially moved.
+- [ ] Error needs to be thrown for unreachable code after a `return` statement.
 
 #### Imports
 - [ ] Relative imports using the `sup` keyword.

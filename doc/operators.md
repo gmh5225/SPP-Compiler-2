@@ -64,6 +64,6 @@ sup Add[Num] for Num {
 - Because `Num` also implements the `Copy` trait, the RHS isn't consumed in the addition operation.
 
 ### Other common binary operators not in S++
-- `<<` and `>>` are not in S++. Instead, use the `std.bit` module.
 - `++` and `--` are not in S++. Instead, use the `+=` and `-=` operators.
 - `?:` is not in S++. Instead, use the `if`/`else` expression.
+- `**` is not an operator, as there is no dedicated CPU instruction for exponentiation.
