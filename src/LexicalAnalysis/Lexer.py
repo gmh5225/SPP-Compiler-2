@@ -51,7 +51,8 @@ class Lexer:
                     # regex will keep searching until the longest match is made. Increment the counter by the length of
                     # the found regex match.
                     case "Lx" if matched := re.match(value, self._code[current:]):
-                        output.append(Token(matched.group(0), TokenType[token]))
+                        if TokenType[token] != TokenType.LxSingleLineComment:
+                            output.append(Token(matched.group(0), TokenType[token]))
                         current += len(matched.group(0))
                         break
 
