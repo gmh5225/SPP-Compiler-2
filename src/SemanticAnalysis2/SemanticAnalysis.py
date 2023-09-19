@@ -151,7 +151,7 @@ class SemanticAnalysis:
 
         # If there is a non-void return type and the final statement is not a return statement, then raise an erorr,
         # because
-        if ast.return_type != CommonTypes.void() and ast.body.statements and not isinstance(final_statement, Ast.ReturnStatementAst):
+        if not ast.return_type.symbolic_based_eq(CommonTypes.void(), s) and ast.body.statements and not isinstance(final_statement, Ast.ReturnStatementAst):
             err_ast = ast.body.statements[-1]
             raise SystemExit(
                 f"Function returning '{ast.return_type}' must end with a return statement:" +
@@ -288,7 +288,6 @@ class SemanticAnalysis:
 
 
         if isinstance(ast, Ast.SupPrototypeInheritanceAst) and (super_class_type_parts := ast.super_class.parts_as_strings()) and super_class_type_parts[0] == "std" and super_class_type_parts[1] not in ["FnRef", "FnMut", "FnOne"]:
-            print("HERE", ast.super_class)
             cls_scope = s.current_scope.parent.get_child_scope(ast.identifier)
             super_class_scope = s.global_scope.get_child_scope(ast.super_class)
             cls_scope.sup_scopes.append(super_class_scope)
@@ -515,7 +514,6 @@ class SemanticAnalysis:
         rhs = Ast.FunctionArgumentAst(None, ast.rhs, None, False, pos)
         fn_call = Ast.PostfixFunctionCallAst([], [rhs], pos)
         fn_call = Ast.PostfixExpressionAst(fn, fn_call, pos)
-        print(fn_call)
         SemanticAnalysis.analyse_expression(fn_call, s)
 
     @staticmethod

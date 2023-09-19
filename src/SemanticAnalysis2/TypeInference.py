@@ -698,7 +698,7 @@ class TypeInfer:
         if isinstance(ty, Ast.TypeSingleAst):
             # for i, p in enumerate(ty.parts):
             #     TypeInfer.substitute_generic_type(p, q1, q2)
-            if ty == q1:
+            if ty.textual_based_eq(q1):
                 ty.parts = q2.parts
 
         elif isinstance(ty, Ast.TypeTupleAst):

@@ -83,7 +83,7 @@ class AstReduction:
     def reduce_class_prototype(mod: Ast.ModulePrototypeAst, ast: Ast.ClassPrototypeAst):
         # Convert "Self" in class members to the class type
         for member in ast.body.members:
-            if member.type_annotation == CommonTypes.self():
+            if member.type_annotation.textual_based_eq(CommonTypes.self()):
                 member.type_annotation = ast.to_type()
             TypeInfer.substitute_generic_type(member.type_annotation, CommonTypes.self(), ast.to_type())
 
@@ -93,11 +93,11 @@ class AstReduction:
 
         if not isinstance(owner, Ast.ModulePrototypeAst):
             for param in ast.parameters:
-                if param.type_annotation == CommonTypes.self():
+                if param.type_annotation.textual_based_eq(CommonTypes.self()):
                     param.type_annotation = owner.to_type()
                 TypeInfer.substitute_generic_type(param.type_annotation, CommonTypes.self(), owner.to_type())
 
-            if ast.return_type == CommonTypes.void():
+            if ast.return_type.textual_based_eq(CommonTypes.self()):
                 ast.return_type = owner.to_type()
             TypeInfer.substitute_generic_type(ast.return_type, CommonTypes.self(), owner.to_type())
 

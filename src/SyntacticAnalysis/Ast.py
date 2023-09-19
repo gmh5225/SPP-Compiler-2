@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import inspect
 from typing import Optional
 from dataclasses import dataclass, field
 
@@ -542,6 +543,21 @@ class TypeSingleAst:
     _tok: int
 
     def __eq__(self, other):
+        # print("OTH", other)
+        # print(f"CMP {self.parts_as_strings()} {other.parts_as_strings()}")
+        # return isinstance(other, TypeSingleAst) and self.parts == other.parts
+        print("#" * 100)
+        print("Please use 'TypeSingleAst.[textual|symbolic]_based_eq' instead.")
+        print(" -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
+        return self.textual_based_eq(other)
+
+    def symbolic_based_eq(self, other: TypeSingleAst, s) -> bool:
+        from src.SemanticAnalysis2.SymbolTable import SymbolTypes
+        s1 = s.current_scope.get_symbol(self.to_identifier(), SymbolTypes.TypeSymbol)
+        s2 = s.current_scope.get_symbol(other.to_identifier(), SymbolTypes.TypeSymbol)
+        return s1.type == s2.type
+
+    def textual_based_eq(self, other: TypeSingleAst) -> bool:
         return isinstance(other, TypeSingleAst) and self.parts == other.parts
 
     def __hash__(self):
@@ -558,8 +574,14 @@ class TypeSingleAst:
         # Is the other type (other) a subtype of this type (self)? Determine by checking if this type (self) is in the
         # super-types of the other type (other).
         other_scope = s.global_scope.get_child_scope(other)
-        if not other_scope: return self == other # generic
-        return self == other or self in [t2_sup_scope.name for t2_sup_scope in other_scope.sup_scopes]
+        if not other_scope: return self.textual_based_eq(other)
+        if self.symbolic_based_eq(other, s): return True
+
+        for t in [t2_sup_scope.name for t2_sup_scope in other_scope.sup_scopes if isinstance(t2_sup_scope.name, TypeSingleAst)]:
+            if self.symbolic_based_eq(t, s): return True
+
+        return False
+
 
     def without_generics(self) -> TypeSingleAst:
         parts = copy.deepcopy(self.parts)

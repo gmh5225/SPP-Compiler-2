@@ -73,7 +73,7 @@ class SymbolGeneration:
 
             # If the scope already exists, ie a module in the same directory, then we can just set the current scope
             # to that scope, and generate the program if it's the last scope.
-            if scope in [y.name for y in current.children]:
+            if scope in [y.name for y in current.children if isinstance(y.name, Ast.IdentifierAst)]:
                 c = s.current_scope
                 s.current_scope = current.get_child_scope(scope)
                 if scope == scopes[-1]:
