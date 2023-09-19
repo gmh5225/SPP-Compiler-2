@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 from typing import Optional
 from dataclasses import dataclass, field
@@ -559,6 +560,19 @@ class TypeSingleAst:
         other_scope = s.global_scope.get_child_scope(other)
         if not other_scope: return self == other # generic
         return self == other or self in [t2_sup_scope.name for t2_sup_scope in other_scope.sup_scopes]
+
+    def without_generics(self) -> TypeSingleAst:
+        parts = copy.deepcopy(self.parts)
+        for part in parts:
+            if isinstance(part, GenericIdentifierAst):
+                part.generic_arguments = []
+        return TypeSingleAst(parts, self._tok)
+
+    def has_namespace(self) -> bool:
+        return len(self.parts) > 1 and self.parts[0].identifier.islower()
+
+    def parts_as_strings(self) -> list[str]:
+        return [str(part) for part in self.parts]
 
 @dataclass
 class TypeTupleAst:
