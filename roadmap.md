@@ -19,11 +19,13 @@
 - [ ] Would be nice to have assignment mutability check _before_ type check.
 - [ ] Most things concerning tuples need fixing -- `(...) vs Tup[...]`.
 
-#### Statements
+#### Types
 - [ ] Non-final return statements must return the correct type.
+- [ ] Variadics & variadic generics.
 
 #### Operators
 - [ ] Operator chaining: allow, like Python, for ` a < b < c` to be `a < b && b < c`.
+- [ ] Allow `a == b == b` to become `a == b && b == c`.
 
 #### Actual compiler Python code
 - [ ] Heavily extend errors to include their source declaration ie `let` statement etc.
