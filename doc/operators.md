@@ -49,6 +49,8 @@
 | `<=>`   | Compare                     | Compares two values                                                           | `std.ops.Cmp`        |
 |         | Modulo                      | Takes the modulo of two values                                                | `std.ops.Mod`        |
 |         | Power                       | Raises the left value to the power of the right value                         | `std.ops.Pow`        |
+- Modulo might get the `%%` operator.
+- Power might get the `**` operator.
 
 
 ### Precedence
@@ -69,12 +71,14 @@
 cls Add[Rhs, Output=Self] {
     use Rhs as Rhs
     use Output as Output
+}
 
-    fn add(&self, that: T) -> Output { ... }
+sup[Rhs, Output=Self] Add[Rhs, Output] {
+    fn add(self, that: Rhs) -> Output { ... }
 }
 
 sup Add[Num] for Num {
-    fn add(&self, that: Num) -> Self { ... }
+    fn add(self, that: Num) -> Self { ... }
 }
 ```
 - Because `Num` also implements the `Copy` trait, the RHS isn't consumed in the addition operation.

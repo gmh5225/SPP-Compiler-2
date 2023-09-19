@@ -36,9 +36,13 @@
 
 #### Type system
 - [ ] All things `nested types / typedefs`
+- [ ] Currently `Num` in `std.num` doesn't equal `std.Num` used elsewhere.
 - [ ] Maybe split `Num` to `U8`, `U16`, `U32`, `U64`, `I8`, `I16`, `I32`, `I64`, `F32`, `F64`?
   - [ ] Then add `Num` as a `BigNum` type that can be used for all arithmetic.
   - [ ] Then add `Dec` like Python's `decimal.Decimal` class?
+
+#### Statements
+- [ ] Currently no borrow checking on returning or yielding from a function.
 
 #### Other
 - [ ] All things `yield` / coroutines
@@ -47,6 +51,7 @@
 - [ ] Postfix member access doesn't work with function calls in the middle ie `a.func().b` fails on `func()`.
 - [ ] Check tuple indexing ie `let x = tup.0` marks the object as partially moved.
 - [ ] Error needs to be thrown for unreachable code after a `return` statement.
+- [ ] Make some classes non-instantiable (operators etc)
 
 #### Imports
 - [ ] Relative imports using the `sup` keyword.
