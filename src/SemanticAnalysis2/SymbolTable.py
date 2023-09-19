@@ -193,6 +193,7 @@ class Scope:
 
         sym = None
         try:
+            # print(str(name), [str(s.name) for s in combined_symbol_tables.symbols.values()])
             sym = combined_symbol_tables.get(name, expected_sym_type)
         except KeyError:
             if where.parent and where == self:

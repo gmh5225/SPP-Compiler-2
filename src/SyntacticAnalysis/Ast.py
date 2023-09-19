@@ -553,6 +553,14 @@ class TypeSingleAst:
 
     def symbolic_based_eq(self, other: TypeSingleAst, s) -> bool:
         from src.SemanticAnalysis2.SymbolTable import SymbolTypes
+
+        print(self, other)
+        c = s.current_scope
+        while c:
+            print(c.name, end=" -> ")
+            c = c.parent
+        print("\n" + "-" * 100)
+
         s1 = s.current_scope.get_symbol(self.to_identifier(), SymbolTypes.TypeSymbol)
         s2 = s.current_scope.get_symbol(other.to_identifier(), SymbolTypes.TypeSymbol)
         return s1.type == s2.type
