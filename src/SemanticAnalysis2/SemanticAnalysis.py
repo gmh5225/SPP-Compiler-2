@@ -239,10 +239,10 @@ class SemanticAnalysis:
             for type_part in ast.super_class.parts if ast.super_class else []:
                 [TypeInfer.check_type(g, s) for g in type_part.generic_arguments]
 
-        # if its for a function (__MOCK_...) then check there are no duplicate overloads. get all the super-impositions
-        # of the __MOCK_... class
+        # If it's for a function (__MOCK_...) then check there are no duplicate overloads. Get all the super-impositions
+        # of the __MOCK_... class.
         if str(ast.identifier).startswith("__MOCK_"):
-            scope = s.global_scope.get_child_scope(ast.identifier)
+            scope = s.current_scope.parent.get_child_scope(ast.identifier)
             overloads = [x for x in scope.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
             fn_protos = [f.meta_data["fn_proto"] for f in overloads]
 
@@ -286,6 +286,14 @@ class SemanticAnalysis:
                             ErrFmt.err(f._tok) + f"First overload\n..." +
                             ErrFmt.err(g._tok) + f"Second overload.")
 
+
+        if isinstance(ast, Ast.SupPrototypeInheritanceAst) and (super_class_type_parts := ast.super_class.parts_as_strings()) and super_class_type_parts[0] == "std" and super_class_type_parts[1] not in ["FnRef", "FnMut", "FnOne"]:
+            print("HERE", ast.super_class)
+            cls_scope = s.current_scope.parent.get_child_scope(ast.identifier)
+            super_class_scope = s.global_scope.get_child_scope(ast.super_class)
+            cls_scope.sup_scopes.append(super_class_scope)
+            cls_scope.sup_scopes.extend(super_class_scope.sup_scopes)
+
         [SemanticAnalysis.analyse_sup_member(ast, m, s) for m in ast.body.members]
 
         s.prev_scope()
@@ -298,9 +306,17 @@ class SemanticAnalysis:
             case Ast.ClassPrototypeAst():
                 if isinstance(owner, Ast.SupPrototypeInheritanceAst):
                     super_class_scope = s.global_scope.get_child_scope(owner.super_class)
-                    reduced_identifier = Ast.IdentifierAst(ast.identifier.identifier.split("__MOCK_")[1], ast.identifier._tok)
-                    if not super_class_scope.has_symbol_exclusive(reduced_identifier, SymbolTypes.VariableSymbol): # todo : this check needed?
-                        raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{reduced_identifier}' not found in super class '{owner.super_class}'.")
+                    super_class_method_type = super_class_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.TypeSymbol, error=False)
+                    if not super_class_method_type:
+                        # todo : improve error message to include the current class being super-imposed onto
+                        raise SystemExit(
+                            f"Method '{ast.identifier.identifier.removeprefix('__MOCK_')}' does not exist in super class '{owner.super_class}'.\n" +
+                            ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier.identifier.removeprefix('__MOCK_')}' not found in super class '{owner.super_class}'.")
+
+                    super_class_method_scope = s.current_scope.get_child_scope(super_class_method_type.type.to_type())
+                    super_class_method_overloads = super_class_method_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol)
+
+                    # todo : ensure the signatures match.
 
                 SemanticAnalysis.analyse_class_prototype(ast, s)
             case Ast.LetStatementAst(): pass  # SemanticAnalysis.analyse_let_statement(ast, s)
@@ -312,16 +328,24 @@ class SemanticAnalysis:
     @staticmethod
     def analyse_sup_method_prototype(owner: Ast.SupPrototypeAst, ast: Ast.SupMethodPrototypeAst, s: ScopeHandler):
         if isinstance(owner, Ast.SupPrototypeInheritanceAst):
-            super_class_scope = s.global_scope.get_child_scope(owner.super_class)
+            # super_class_scope = s.global_scope.get_child_scope(owner.super_class)
+            # super_class_method_symbol = super_class_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol, error=False)
+
+            # print("-" * 100)
+            # print(owner.identifier, ast, super_class_scope.name)
+            # print(super_class_method_symbol)
+            # print(owner.identifier, owner.super_class)
             # special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
-
-            if not super_class_scope:
-                raise SystemExit(ErrFmt.err(owner.super_class._tok) + f"Super class '{owner.super_class}' not found.")
-
-            # Make sure the method exists in the super class.
-            # print(super_class_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol))
-            # if not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
+            #
+            # if not super_class_scope:
+            #     raise SystemExit(ErrFmt.err(owner.super_class._tok) + f"Super class '{owner.super_class}' not found.")
+            #
+            # # Make sure the method exists in the super class.
+            # # print(super_class_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol))
+            # print(owner.identifier, ast.identifier)
+            # if not str(owner.identifier).startswith("__MOCK") and not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
             #     raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' not found in super class '{owner.super_class}'.")
+            ...
 
         SemanticAnalysis.analyse_function_prototype(ast, s, in_class=True)
 
@@ -491,6 +515,7 @@ class SemanticAnalysis:
         rhs = Ast.FunctionArgumentAst(None, ast.rhs, None, False, pos)
         fn_call = Ast.PostfixFunctionCallAst([], [rhs], pos)
         fn_call = Ast.PostfixExpressionAst(fn, fn_call, pos)
+        print(fn_call)
         SemanticAnalysis.analyse_expression(fn_call, s)
 
     @staticmethod
@@ -519,6 +544,7 @@ class SemanticAnalysis:
 
         # Else, check the attribute exists on the LHS.
         elif not class_scope.has_symbol_exclusive(ast.op.identifier, SymbolTypes.VariableSymbol): #or s.current_scope.has_symbol("__MOCK_" + ast.op.identifier, SymbolTypes.TypeSymbol)):
+            # todo : "what" is sometimes incorrect -- just add the "call" **kwarg from all correct caller methods
             what = "Attribute" if not kwargs.get("call", False) else "Method"
             raise SystemExit(ErrFmt.err(ast.op.identifier._tok) + f"{what} '{ast.op.identifier}' not found on type '{lhs_type}'.")
 
@@ -785,6 +811,8 @@ class SemanticAnalysis:
         # The "let" statement has the same semantics as a regular assignment, so treat it the same way. Assignment has
         # the same semantics as a function call, so treat it like that. Ultimately, "let x = 5" becomes "let x: Num" and
         # "x.set(5)", which is then analysed as a function call. There are some extra checks for the "let" though.
+        if ast.value:
+            SemanticAnalysis.analyse_expression(ast.value, s)
 
         # Check that the type of the variable is not "Void". This is because "Void" values don't exist, and therefore
         # cannot be assigned to a variable.
@@ -803,19 +831,17 @@ class SemanticAnalysis:
         # Handle the tuple assignment case. There are a few special checks that need to take place, mostly concerning
         # destructuring.
         else:
-            ty = TypeInfer.infer_expression(ast.value, s)
-
             # Ensure that the RHS is a tuple type. # todo ?
-            if not ty.to_identifier().identifier != "std.Tup":
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a non-tuple type ({ty}) into to {len(ast.variables)} variables.")
+            if not let_statement_type.to_identifier().identifier != "std.Tup":
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a non-tuple type ({let_statement_type}) into to {len(ast.variables)} variables.")
 
             # Ensure that the tuple contains the correct number of elements.
-            if len(ty.parts[-1].generic_arguments) != len(ast.variables):
-                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a {len(ty.parts[-1].generic_arguments)}-tuple to {len(ast.variables)} variables.")
+            if len(let_statement_type.parts[-1].generic_arguments) != len(ast.variables):
+                raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot unpack a {len(let_statement_type.parts[-1].generic_arguments)}-tuple to {len(ast.variables)} variables.")
 
             # Infer the type of each variable, and set it in the symbol table.
             for variable in ast.variables:
-                t = TypeInfer.infer_expression(ty.parts[-1].generic_arguments[ast.variables.index(variable)], s)
+                t = TypeInfer.infer_expression(let_statement_type.parts[-1].generic_arguments[ast.variables.index(variable)], s)
                 sym = SymbolTypes.VariableSymbol(variable.identifier, t, is_mutable=variable.is_mutable)
                 new_syms.append(sym)
                 s.current_scope.add_symbol(sym)
@@ -875,6 +901,7 @@ class SemanticAnalysis:
         # Create a mock function call for the assignment, and analyse it. Do 1 per variable, so that the function call
         # analysis can handle the multiple function calls for tuples etc. Don't analyse the RHS, because the mock
         # function call will analyse the RHS value(s) as arguments, and double-analysis will lead to double-moves etc.
+        SemanticAnalysis.analyse_expression(ast.rhs, s)
         rhs_ty = TypeInfer.infer_expression(ast.rhs, s)
         if len(ast.lhs) == 1:
             # lhs_sym = s.current_scope.get_symbol(ast.lhs[0], SymbolTypes.VariableSymbol)

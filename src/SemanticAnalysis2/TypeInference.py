@@ -259,8 +259,8 @@ class TypeInfer:
             # Infer the lhs of the function call, getting the object that has the overloads on. For example, a() would
             # get the __MOCK_a type. Get the symbol for the __MOCK_a class. Get all the "call_[ref|mut|one]" functions
             # on the overload manager. Store the corresponding function prototype ASTs in a list.
-            overload_manager_ty = TypeInfer.infer_expression(ast.lhs, s, all=True)
-            overload_manager_scope = s.global_scope.get_child_scope(overload_manager_ty)
+            method_object_owner_scope = s.global_scope.get_child_scope(TypeInfer.infer_expression(ast.lhs.lhs, s))
+            overload_manager_scope = method_object_owner_scope.get_child_scope(TypeInfer.infer_expression(ast.lhs, s, all=True))
             overload_symbols = [x for x in overload_manager_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
             function_prototypes = [copy.deepcopy(f.meta_data["fn_proto"]) for f in overload_symbols]
 

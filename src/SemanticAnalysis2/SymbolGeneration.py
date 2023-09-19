@@ -10,6 +10,8 @@ from src.SemanticAnalysis2.SymbolTable import ScopeHandler, SymbolTypes
 
 
 class SymbolGeneration:
+    IMPORTED = []
+
     @staticmethod
     def generate(ast: Ast.ProgramAst) -> ScopeHandler:
         s = ScopeHandler()
@@ -42,6 +44,9 @@ class SymbolGeneration:
 
     @staticmethod
     def generate_import(root: Ast.ProgramAst, ast: Ast.ImportStatementAst, s: ScopeHandler):
+        if ast.module in SymbolGeneration.IMPORTED:
+            return
+
         mod_name = f"./TestCode/{ast.module}.spp"
         try:
             mod_code = open(mod_name, "r").read()
@@ -52,6 +57,7 @@ class SymbolGeneration:
 
         ts = ErrFmt.TOKENS.copy()
         fp = ErrFmt.FILE_PATH
+        SymbolGeneration.IMPORTED.append(ast.module)
         open("_out/new_code.spp", "a").write(mod_code)
 
         new_mod = Parser(new_toks := Lexer(mod_code).lex(), f"{ast.module}.spp").parse()
@@ -120,22 +126,29 @@ class SymbolGeneration:
     def generate_sup_prototype(ast: Ast.SupPrototypeAst, s: ScopeHandler, hidden: bool = False):
         s.enter_scope(ast.identifier.to_identifier().identifier + "#SUP", hidden=hidden)
 
+        # todo : ultimately, i want to remove this constraint, but it throws some errors at the moment that i will
+        #  handle another time.
+        if ast.identifier.has_namespace():
+            raise SystemExit(
+                "Cannot super-impose onto a class from another module." +
+                ErrFmt.err(ast.identifier._tok) + f"Class '{ast.identifier}' is from another module.")
+
         if not (ast.identifier.parts[-1].identifier.startswith("__") or ast.identifier.parts[-1].identifier[0].islower()):
             s.current_scope.add_symbol(SymbolTypes.TypeSymbol(Ast.IdentifierAst("Self", ast.identifier._tok), ast.identifier))
 
         for g in ast.generic_parameters: s.current_scope.add_symbol(SymbolTypes.TypeSymbol(g.identifier, SymbolGeneration.dummy_generic_type(g.identifier)))
         for member in ast.body.members: SymbolGeneration.generate_sup_member(member, s)
 
-        c = copy.deepcopy(ast)
-        c.identifier.parts[-1] = ("__MOCK_" + c.identifier.parts[-1].to_identifier()).to_generic_identifier()
-        cls_scope = s.global_scope.get_child_scope(ast.identifier) or s.global_scope.get_child_scope(c.identifier) or s.current_scope.parent.get_child_scope(c.identifier)
+        cls_scope = s.current_scope.parent.get_child_scope(ast.identifier)
         if not cls_scope:
             raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Class '{ast.identifier}' not found.")
 
         cls_scope.sup_scopes.append(s.current_scope)
-        if isinstance(ast, Ast.SupPrototypeInheritanceAst) and ast.super_class.parts[-1].identifier not in ["FnRef", "FnMut", "FnOne"]:
-            cls_scope.sup_scopes.append(s.global_scope.get_child_scope(ast.super_class))
-            cls_scope.sup_scopes.extend(s.global_scope.get_child_scope(ast.super_class).sup_scopes)
+        # if isinstance(ast, Ast.SupPrototypeInheritanceAst) and ast.super_class.parts[-1].identifier not in ["FnRef", "FnMut", "FnOne"]:
+        #     super_class_scope = s.global_scope.get_child_scope(ast.super_class)
+        #
+        #     cls_scope.sup_scopes.append(s.global_scope.get_child_scope(ast.super_class))
+        #     cls_scope.sup_scopes.extend(s.global_scope.get_child_scope(ast.super_class).sup_scopes)
 
         s.exit_scope()
 

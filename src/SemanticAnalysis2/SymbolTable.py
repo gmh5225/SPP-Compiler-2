@@ -289,45 +289,34 @@ class Scope:
 
     def get_child_scope(self, id: Hashable) -> Optional[Scope]:
 
-        # sup_children = []
-        # for sup_scope in self.sup_scopes:
-        #     sup_children.extend(sup_scope.children)
-        # children = self.children + sup_children
-        # matches = (c for c in children if c.id == hash(id))
-
-        # matches = (c for c in self.children if c.id == hash(id))
-        # return next(matches, None)
-
         def inner(part, scope):
-            # print("=>")
-            # print(hash(part), type(part))
-            # print(part, scope.name, [str(x.name) for x in scope.children])
-            # print(part, scope.name, [type(x.name) for x in scope.children])
-            # print(part, scope.name, [x.id for x in scope.children])
-            matches = [c for c in scope.children if c.id == hash(part)]
-            if not any(matches):
-                for c in scope.children:
-                    match = c.get_child_scope(part)
-                    if match:
-                        return match
-            else:
-                return matches[0]
+            print(part, scope.name)
+            all_scopes_to_check = [scope] + scope.sup_scopes
+            children = []
+            for sc in all_scopes_to_check:
+                children += sc.children
+            matches = [c for c in children if c.id == hash(part)]
+            return matches[0] if matches else None
 
         if isinstance(id, Ast.TypeSingleAst):
             current = self
-            # print("-" * 50)
-            # print(current.name)
-            # print(id, [str(x.name) for x in self.children])
-            # print([q for q in str(id).split(".") if q[0].islower()])
+
+            # For each part of the namespace, ie std.a.b.C, we want to find the scope for std, then a, then b, as these
+            # are all just nested scopes. Move in a scope for each part of the namespace, and if we can't find a scope
+            # for a part, then we know that the namespace is invalid.
             for p in [q for q in str(id).split(".") if q[0].islower()]:
                 current = inner(Ast.IdentifierAst(p, id._tok), current)
-                if not current:
-                    # print("!" * 50)
-                    # print(id, [str(x.name) for x in self.children])
-                    return None # todo : error?
-            if str(id).split(".")[0][0].islower():
-                return current
-            return inner(id, current)
+                if not current: return None # todo : error?
+
+            # Get the class from the last part of the namespace, ie std.a.b.C. If there was no namespace, then it is
+            # just the type in the global namespace, ie the scope will be the global scope, so works in the same way.
+            # todo : are branches below duplicate code?
+            if len(id.parts) > 1 and id.parts[-1].identifier[0].isupper():
+                final_type = Ast.TypeSingleAst([id.parts[-1]], -1)
+                final_type = final_type.without_generics()
+                print(current.name, final_type)
+                return inner(final_type, current)
+            return inner(id.without_generics(), current)
         else:
             return inner(id, self)
 
