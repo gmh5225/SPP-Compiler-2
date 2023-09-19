@@ -152,6 +152,19 @@ class Scope:
         if parent is not None:
             parent.children.append(self)
 
+    def level_of_sup_scope(self, other: Scope) -> int:
+        def inner(s: Scope, t: Scope, level: int) -> int:
+
+            if s == t: return level
+            if not s.sup_scopes: return -1
+
+            for sup_scope in [sc for sc in s.sup_scopes if not isinstance(sc.name, str)]:
+                l = inner(sup_scope, t, level + 1)
+                if l != -1: return l
+            return -1
+
+        return inner(self, other, 0)
+
     def where_to_look(self, name: Hashable, expected_sym_type: type[T], error=True) -> tuple[Optional[Scope], Optional[Hashable]]:
         if expected_sym_type == SymbolTypes.TypeSymbol and "." in str(name):
             where = self

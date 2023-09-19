@@ -250,7 +250,7 @@ class TypeInfer:
                 Ast.FunctionParameterAst(True, False, Ast.IdentifierAst("self", -1), Ast.ParameterPassingConventionReferenceAst(True, -1), TypeInfer.infer_expression(ast.op.arguments[0].value, s), None, False, -1),
                 Ast.FunctionParameterRequiredAst(False, Ast.IdentifierAst("value", -1), None, TypeInfer.infer_expression(ast.op.arguments[0].value, s), -1)
             ], CommonTypes.void(), None, Ast.FunctionImplementationAst([], -1), -1)
-            function_prototypes = [fn_proto]
+            function_prototypes = [copy.deepcopy(fn_proto)]
             default_generic_map = {}
 
         # Otherwise, perform a number of operations to obtain the existing function prototypes, and handle some generic
@@ -262,7 +262,7 @@ class TypeInfer:
             overload_manager_ty = TypeInfer.infer_expression(ast.lhs, s, all=True)
             overload_manager_scope = s.global_scope.get_child_scope(overload_manager_ty)
             overload_symbols = [x for x in overload_manager_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
-            function_prototypes = [f.meta_data["fn_proto"] for f in overload_symbols]
+            function_prototypes = [copy.deepcopy(f.meta_data["fn_proto"]) for f in overload_symbols]
 
             # Construct the default generic map. Pull in proceeding postfix expressions' generic maps for fallthrough,
             # so that generic types on owner classes etc can be used etc. ie Vec[Str].new() can pull [T -> Str].
@@ -350,8 +350,13 @@ class TypeInfer:
                     ast.op.arguments.insert(0, Ast.FunctionArgumentAst(None, ast.lhs.lhs, copy.deepcopy(param_ccs[0]), False, -1))
 
                 # Check if the function is callable with the number of given arguments.
-                if len(argument_tys) != num_required_parameters:
-                    errs.append(f"Expected {len(param_tys)} arguments, but got {len(argument_tys)}.")
+                if len(argument_tys) < num_required_parameters or len(argument_tys) > len(param_tys):
+                    if any([p.default_value for p in fn_type.parameters]):
+                        msg = f"between {num_required_parameters} and {len(param_tys)}"
+                    else:
+                        msg = f"{len(param_tys)}"
+
+                    errs.append(f"Expected {msg} arguments, but got {len(argument_tys)}.")
                     continue
 
             # Check if the function is callable with the given argument types.
@@ -388,14 +393,54 @@ class TypeInfer:
 
             # The most constraining is the overload with the least number of parameters whose types are generic types.
             # This is because the generic types are the least constraining, as they can be any type, and fixed types are
-            # the most constraining, as they can only be one type.
+            # the most constraining, as they can only be one type. After generic checks, the type closest in
+            # the inheritance tree is matched per parameter.
             else:
-                print("-" * 100)
-                pprint.pprint([str(x.meta_data["fn_proto"]) for x in [x[0] for x in valid_overloads]])
-                generic_param_counts = []
 
-                # todo (for now) return first overload
-                return valid_overloads[0]
+                generic_param_counts = [len([p for p in x.meta_data["fn_proto"].parameters if p.type_annotation.to_identifier() in [g.identifier for g in x.meta_data["fn_proto"].generic_parameters]]) for x in [x[0] for x in valid_overloads]]
+                least_generic_param_count = min(generic_param_counts)
+                indexes_of_least_generic_param_count = [i for i, x in enumerate(generic_param_counts) if x == least_generic_param_count]
+
+                # Only 1 function with the least number of generics, so return this function.
+                if len(indexes_of_least_generic_param_count) == 1:
+                    return valid_overloads[indexes_of_least_generic_param_count[0]]
+
+                # Multiple functions with the least number of generics, so select the function with the most
+                # constraining types. If B super-imposes A, and the argument is of the type B, and there is an overload
+                # for A and for B, then the overload for B is more constraining, as it is closer in the inheritance
+                # tree.
+                else:
+                    valid_overloads = [valid_overloads[i] for i in indexes_of_least_generic_param_count]
+
+                    # For each valid overload, check (left to right) each parameter to see how close it is to the target
+                    # type. Record the number of sup-scope differences (0 being an exact match).
+                    overload_type_level_differences = []
+                    for v in valid_overloads:
+                        type_level_differences = []
+                        v = v[0].meta_data["fn_proto"]
+                        for param_ty, arg_ty in zip([p.type_annotation for p in v.parameters], argument_tys):
+                            param_ty_symbol = s.global_scope.get_child_scope(param_ty)
+                            arg_ty_symbol = s.global_scope.get_child_scope(arg_ty)
+                            level = arg_ty_symbol.level_of_sup_scope(param_ty_symbol)
+                            type_level_differences.append(level)
+                        overload_type_level_differences.append(type_level_differences)
+
+                    # After generating the lists of how close the argument types are to the parameter types in the
+                    # hierarchy tree, move left to right through each list simultaneously, and every time there is an
+                    # index greater than the lowest, discard the list that this higher index is from. This is because
+                    # the higher index means that the type is further away in the hierarchy tree, and therefore less
+                    # constraining.
+                    active_indexes = list(range(0, len(valid_overloads)))
+                    for i in range(len(argument_tys)):
+                        lowest = min([overload_type_level_differences[x][i] for x in active_indexes])
+                        active_indexes = [x for x in active_indexes if overload_type_level_differences[x][i] == lowest]
+
+                    # If there is only one valid overload, then return it.
+                    if len(active_indexes) == 1:
+                        return valid_overloads[active_indexes[0]]
+
+                    # If there are multiple valid overloads, then there is an ambiguity, so raise an error.
+                    raise SystemExit("Should never reach this error. Report as bug.")
 
 
         ast.op.arguments = original_call_arguments

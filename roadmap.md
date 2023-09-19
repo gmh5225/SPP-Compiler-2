@@ -1,9 +1,8 @@
 # Compiler Roadmap
 ### Language features for syntactic analysis
 #### Function & argument related
-- [ ] Overload selection with optional & variadic parameters (+ most constraining chosen first).
+- [ ] Overload selection with variadic parameters
 - [ ] Named (type) parameters and arguments binding to the correct ones.
-- [ ] Generic type substitution when checking return type is matched by final statement.
 - [ ] All things type-constraints.
 
 #### Memory
