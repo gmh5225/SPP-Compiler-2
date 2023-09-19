@@ -47,7 +47,6 @@
 | `>`     | Greater than                | Checks if the left value is greater than the right value                      | `std.ops.Gt`         |
 | `>=`    | Greater than or equal to    | Checks if the left value is greater than or equal to the right value          | `std.ops.Ge`         |
 | `<=>`   | Compare                     | Compares two values                                                           | `std.ops.Cmp`        |
-|         | Remainder                   | Takes the remainder of two values                                             | `std.ops.Rem`        |
 |         | Modulo                      | Takes the modulo of two values                                                | `std.ops.Mod`        |
 |         | Power                       | Raises the left value to the power of the right value                         | `std.ops.Pow`        |
 
