@@ -87,6 +87,10 @@ class AstReduction:
                 member.type_annotation = ast.to_type()
             TypeInfer.substitute_generic_type(member.type_annotation, CommonTypes.self(), ast.to_type())
 
+        # Prepend module name to class type
+        # ast._mod = mod.identifier.remove_last()
+        # print(ast._mod, ast.identifier)
+
     @staticmethod
     def reduce_function_prototype(owner: Ast.ModulePrototypeAst | Ast.SupPrototypeAst, ast: Ast.FunctionPrototypeAst):
         i = owner.body.members.index(ast)
@@ -97,7 +101,7 @@ class AstReduction:
                     param.type_annotation = owner.to_type()
                 TypeInfer.substitute_generic_type(param.type_annotation, CommonTypes.self(), owner.to_type())
 
-            if ast.return_type == CommonTypes.void():
+            if ast.return_type == CommonTypes.self():
                 ast.return_type = owner.to_type()
             TypeInfer.substitute_generic_type(ast.return_type, CommonTypes.self(), owner.to_type())
 
@@ -152,7 +156,8 @@ class AstReduction:
                 case None: ty = "FnOne"
                 case _ if parameters[0].calling_convention.is_mutable: ty = "FnMut"
                 case _: ty = "FnRef"
-        return Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst(ty, [return_type] + [p.type_annotation for p in parameters], return_type._tok)], return_type._tok)
+        t = Ast.TypeSingleAst([Ast.GenericIdentifierAst("std", [], -1), Ast.GenericIdentifierAst(ty, [return_type] + [p.type_annotation for p in parameters], return_type._tok)], return_type._tok)
+        return t
 
     @staticmethod
     def deduce_call_method_from_function_type(function_type: Ast.TypeSingleAst) -> Ast.IdentifierAst:

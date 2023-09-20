@@ -1,14 +1,14 @@
-import copy
-import pprint
 from difflib import SequenceMatcher
 from typing import Generator, Optional, Any
+import copy
 import inspect
 
 from src.LexicalAnalysis.Tokens import TokenType
+from src.SemanticAnalysis2.NsSubstitution import NsSubstitution
 from src.SyntacticAnalysis import Ast
 from src.SyntacticAnalysis.Parser import ErrFmt
 
-from src.SemanticAnalysis2.SymbolTable import ScopeHandler, SymbolTypes, VariableSymbolMemoryStatus
+from src.SemanticAnalysis2.SymbolTable import ScopeHandler, SymbolTypes
 from src.SemanticAnalysis2.CommonTypes import CommonTypes
 
 
@@ -41,7 +41,7 @@ class TypeInfer:
 
             case Ast.WhileStatementAst():
                 # Cannot return from a while statement, so return the std.Void type.
-                return CommonTypes.void()
+                return CommonTypes.void(s)
 
             case Ast.YieldStatementAst():
                 # Yield statement analysis is not implemented yet.
@@ -65,7 +65,7 @@ class TypeInfer:
 
             case Ast.AssignmentExpressionAst():
                 # Assignment always returns the std.Void type.
-                return CommonTypes.void()
+                return CommonTypes.void(s)
 
             case Ast.PlaceholderAst():
                 # Placeholder analysis is not implemented yet.
@@ -77,35 +77,35 @@ class TypeInfer:
 
             case Ast.BoolLiteralAst():
                 # A boolean literal always returns the std.Bool type.
-                return CommonTypes.bool()
+                return CommonTypes.bool(s)
 
             case Ast.StringLiteralAst():
                 # A string literal always returns the std.Str type.
-                return CommonTypes.str()
+                return CommonTypes.str(s)
 
             case Ast.ArrayLiteralAst():
                 # An array literal always returns the std.Arr type, inferring the generic type from the first element.
-                return CommonTypes.arr(TypeInfer.infer_expression(ast.values[0], s))
+                return CommonTypes.arr(TypeInfer.infer_expression(ast.values[0], s), s)
 
             case Ast.RegexLiteralAst():
                 # A regex literal always returns the std.Rgx type.
-                return CommonTypes.rgx()
+                return CommonTypes.rgx(s)
 
             case Ast.TupleLiteralAst():
                 # A tuple literal always returns the std.Tup type, inferring the generic types from the elements.
-                return CommonTypes.tup([TypeInfer.infer_expression(e, s) for e in ast.values])
+                return CommonTypes.tup([TypeInfer.infer_expression(e, s) for e in ast.values], s)
 
             case Ast.NumberLiteralBase02Ast():
                 # A binary number literal always returns the std.Num type.
-                return CommonTypes.num()
+                return CommonTypes.num(s)
 
             case Ast.NumberLiteralBase10Ast():
                 # A decimal number literal always returns the std.Num type.
-                return CommonTypes.num()
+                return CommonTypes.num(s)
 
             case Ast.NumberLiteralBase16Ast():
                 # A hexadecimal number literal always returns the std.Num type.
-                return CommonTypes.num()
+                return CommonTypes.num(s)
 
             case Ast.TokenAst() if ast.tok.token_type == TokenType.KwSelf:
                 # A "self" token always returns the "Self" type (has own function as symbol discovery is required).
@@ -134,7 +134,7 @@ class TypeInfer:
             return TypeInfer.infer_statement(ast.branches[0].body[-1], s)
 
         # Otherwise, either the if statement has no branches, or the branches return the std.Void type, so return that.
-        return CommonTypes.void()
+        return CommonTypes.void(s)
 
     @staticmethod
     def infer_statement(ast: Ast.StatementAst, s: ScopeHandler) -> Ast.TypeAst:
@@ -144,19 +144,19 @@ class TypeInfer:
         match ast:
             case Ast.TypedefStatementAst():
                 # Typedef statements don't manage variables, so the return type will always be the std.Void type.
-                return CommonTypes.void()
+                return CommonTypes.void(s)
 
             case Ast.ReturnStatementAst():
                 # The type of a return statement is the type of the expression being returned, or std.Void.
-                return TypeInfer.infer_expression(ast.value, s) if ast.value else CommonTypes.void()
+                return TypeInfer.infer_expression(ast.value, s) if ast.value else CommonTypes.void(s)
 
             case Ast.LetStatementAst():
                 # The type of a let statement is std.Void.
-                return CommonTypes.void()
+                return CommonTypes.void(s)
 
             case Ast.FunctionPrototypeAst():
                 # todo : surely this should be the function prototype type ie std.FnRef[...] ?
-                return CommonTypes.void()
+                return CommonTypes.void(s)
 
     @staticmethod
     def infer_binary_expression(ast: Ast.BinaryExpressionAst, s: ScopeHandler) -> Ast.TypeAst:
@@ -220,7 +220,7 @@ class TypeInfer:
             index = int(ast.op.identifier.integer)
             return ty.parts[-1].generic_arguments[index]
 
-        else:
+        else: # todo : this error should be in SemanticAnalysis.analyse_postfix_member_access()
             raise SystemExit(
                 "An incorrect AST is being attempted to be type-inferred as a postfix member access. Report as bug." +
                 ErrFmt.err(ast._tok) + f"{type(ast).__name__} is being inferred an an postfix member access here.")
@@ -232,6 +232,8 @@ class TypeInfer:
                 "Cannot call a type. Try using the struct initializer syntax instead." +
                 ErrFmt.err(ast._tok) + f"Type '{ast.lhs}' is being called here.")
 
+        # print("-" * 100)
+        # print(f"inferring the return type of the function call {ast}")
 
         # A special method is a "__" prefixed method. It requires special behaviour in certain circumstances as seen
         # later on in this method.
@@ -241,7 +243,7 @@ class TypeInfer:
         # function, but as this function doesn't actually exist, no analysis needs to be performed. Instead, return a
         # None symbol and the std.Void type.
         if isinstance(ast.lhs, Ast.IdentifierAst) and ast.lhs.identifier == "__set__":
-            return None, CommonTypes.void()
+            return None, CommonTypes.void(s)
 
         # The "__assign__" special method is used for the "assignment expression", to allow mock analysis for modelling
         # it as a function. Create the mock function prototype.
@@ -249,7 +251,7 @@ class TypeInfer:
             fn_proto = Ast.FunctionPrototypeAst([], False, Ast.IdentifierAst("__assign__", -1), [], [
                 Ast.FunctionParameterAst(True, False, Ast.IdentifierAst("self", -1), Ast.ParameterPassingConventionReferenceAst(True, -1), TypeInfer.infer_expression(ast.op.arguments[0].value, s), None, False, -1),
                 Ast.FunctionParameterRequiredAst(False, Ast.IdentifierAst("value", -1), None, TypeInfer.infer_expression(ast.op.arguments[0].value, s), -1)
-            ], CommonTypes.void(), None, Ast.FunctionImplementationAst([], -1), -1)
+            ], CommonTypes.void(s), None, Ast.FunctionImplementationAst([], -1), -1)
             function_prototypes = [copy.deepcopy(fn_proto)]
             default_generic_map = {}
 
@@ -259,10 +261,18 @@ class TypeInfer:
             # Infer the lhs of the function call, getting the object that has the overloads on. For example, a() would
             # get the __MOCK_a type. Get the symbol for the __MOCK_a class. Get all the "call_[ref|mut|one]" functions
             # on the overload manager. Store the corresponding function prototype ASTs in a list.
-            method_object_owner_scope = s.global_scope.get_child_scope(TypeInfer.infer_expression(ast.lhs.lhs, s))
-            overload_manager_scope = method_object_owner_scope.get_child_scope(TypeInfer.infer_expression(ast.lhs, s, all=True))
-            overload_symbols = [x for x in overload_manager_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
+            # todo : will this break for global functions? => no method object owner. also static methods?
+            method_object_owner_scope = s.global_scope.get_child_scope(TypeInfer.infer_expression(ast.lhs.lhs, s)) if type(ast.lhs) == Ast.PostfixExpressionAst else s.global_scope
+            overload_manager_scope = method_object_owner_scope.get_child_scope(TypeInfer.infer_expression(ast.lhs, s))
+            overload_symbols = [x for x in overload_manager_scope.all_symbols_exclusive_no_fn(SymbolTypes.VariableSymbol) if x.name.identifier in ["call_ref", "call_mut", "call_one"]]
             function_prototypes = [copy.deepcopy(f.meta_data["fn_proto"]) for f in overload_symbols]
+
+            # print(f"object owner of the function: {method_object_owner_scope.name}")
+            # print(f"overload manager of the function: {overload_manager_scope.name}")
+            # print(f"sup-scopes analysed for function overloads: {[str(x.name) for x in overload_manager_scope.sup_scopes]}")
+            # print(f"{len(function_prototypes)} overloads found for {ast}")
+            # for fp in function_prototypes:
+            #     print(f"\t- {fp}")
 
             # Construct the default generic map. Pull in proceeding postfix expressions' generic maps for fallthrough,
             # so that generic types on owner classes etc can be used etc. ie Vec[Str].new() can pull [T -> Str].
@@ -294,7 +304,6 @@ class TypeInfer:
 
         # Check each overload in the function prototypes list.
         for i, fn_type in enumerate(function_prototypes):
-
             # Create local copies of the generic map, call arguments, argument types, and argument calling conventions.
             # These are used to check the current function prototype, and are reset after each check.
             ast.op.generic_map = default_generic_map.copy()
@@ -360,6 +369,7 @@ class TypeInfer:
                     continue
 
             # Check if the function is callable with the given argument types.
+
             checks = [TypeInfer.types_equal_account_for_generic(param_ty, arg_ty, ast.op.generic_map, s) for i, (arg_ty, param_ty) in enumerate(zip(argument_tys, param_tys))]
             if any([not c[0] for c in checks]):
                 error = [c[1] for c in checks if not c[0]][0]
@@ -384,7 +394,7 @@ class TypeInfer:
                 valid_overloads.append((None, return_type))
 
         # Selection of the most constraining overload will occur here
-        # todo : implement this
+        # todo : generic constraints will need to be merged into this at some point too
         if valid_overloads:
 
             # If there is only one valid overload, then return it.
@@ -466,9 +476,10 @@ class TypeInfer:
         else:
             generics = [a.value for a in ast.lhs.parts[-1].generic_arguments]
 
-        struct_type = copy.deepcopy(TypeInfer.infer_expression(ast.lhs, s))
-        struct_type.parts[-1].generic_arguments = [Ast.TypeGenericArgumentAst(None, v, -1) for v in generics]
-        return struct_type
+        cls_ty = copy.deepcopy(TypeInfer.infer_expression(ast.lhs, s))
+        cls_ty.parts[-1].generic_arguments = [Ast.TypeGenericArgumentAst(None, v, -1) for v in generics]
+        NsSubstitution.do_substitution(cls_ty, s)
+        return cls_ty
 
     @staticmethod
     def infer_identifier(ast: Ast.IdentifierAst, s: ScopeHandler) -> Ast.TypeAst:
@@ -481,6 +492,7 @@ class TypeInfer:
 
         # Check generic arguments given to the type
         try:
+            # print(s.current_scope.name, s.current_scope.all_symbols_names(SymbolTypes.TypeSymbol))
             sym = s.current_scope.get_symbol(ast.to_identifier(), SymbolTypes.TypeSymbol)
         except Exception as e:
             extra = " Did you mean to declare it as a generic?" if len(str(ast)) == 1 else ""
@@ -522,7 +534,6 @@ class TypeInfer:
 
         generics_names = [g.identifier for g in generics]
         sym = s.global_scope.get_child_scope(ast.to_type())
-
 
         # For each attribute of the class, if the type is the generic or composes the generic ie Vec[T], then the type
         # is inferrable, and is therefore not required. Remove it from the list of required generics.

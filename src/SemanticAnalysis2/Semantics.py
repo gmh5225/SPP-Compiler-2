@@ -1,7 +1,6 @@
 from src.SyntacticAnalysis import Ast
 
 from src.SemanticAnalysis2.SymbolGeneration import SymbolGeneration
-from src.SemanticAnalysis2.SemanticAnalysis import SemanticAnalysis
 from src.Compiler.Printer import save_json
 
 
@@ -10,5 +9,3 @@ class Semantics:
         self._ast = ast
         s = SymbolGeneration.generate(ast)
         save_json(s.json(), "_out/symbol_table.json")
-
-        SemanticAnalysis.analyse(ast, s)

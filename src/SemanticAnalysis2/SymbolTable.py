@@ -214,6 +214,9 @@ class Scope:
             raise Exception(f"Could not find {expected_sym_type.__name__} '{name}'.")
         return sym
 
+    def get_type_symbol(self, name: Hashable, error=False):
+        return self.get_symbol(name, SymbolTypes.TypeSymbol, error=error)
+
 
         # try:
         #     sym = self.symbol_table.get(name, expected_sym_type)
@@ -283,9 +286,13 @@ class Scope:
         return combined_symbol_tables
 
     def all_symbols_exclusive_no_fn(self, expected_sym_type: type) -> list[SymbolTypes.Symbol]:
-        syms = self.all_symbols_exclusive(expected_sym_type)
-        syms = [s for s in syms if s.type.identifier.identifier not in ["FnRef", "FnMut", "FnOne"]]
-        return syms
+        combined_symbol_tables = [a for a in self.symbol_table.symbols.values() if isinstance(a, expected_sym_type)]
+        for sup_scope in self.sup_scopes:
+            if sup_scope.parent and sup_scope.parent.name == Ast.IdentifierAst("std", -1) and sup_scope.name in ["FnRef#SUP", "FnMut#SUP", "FnOne#SUP"]:
+                continue
+
+            combined_symbol_tables += [a for a in sup_scope.symbol_table.symbols.values() if isinstance(a, expected_sym_type)]
+        return combined_symbol_tables
 
     def get_child_scope(self, id: Hashable) -> Optional[Scope]:
 
@@ -317,6 +324,18 @@ class Scope:
             return inner(id.without_generics(), current)
         else:
             return inner(id, self)
+
+
+    def ancestors(self) -> list[Scope]:
+        ancestors = []
+        current = self
+        while current.parent:
+            ancestors.append(current.parent)
+            current = current.parent
+        return ancestors
+
+    def ancestors_names(self):
+        return [str(a.name) for a in self.ancestors()]
 
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import inspect
 from typing import Optional
 from dataclasses import dataclass, field
 
@@ -90,6 +91,16 @@ class ModuleIdentifierAst:
     def __str__(self):
         return ".".join([str(part) for part in self.parts])
 
+    @staticmethod
+    def empty():
+        return ModuleIdentifierAst([], -1)
+
+    def remove_last(self):
+        return ModuleIdentifierAst(self.parts[:-1], self._tok)
+
+    def as_file_path(self):
+        return "\\".join([str(part) for part in self.parts]) + ".spp"
+
 @dataclass
 class GenericIdentifierAst:
     identifier: str
@@ -107,24 +118,6 @@ class GenericIdentifierAst:
 
     def to_identifier(self) -> IdentifierAst:
         return IdentifierAst(self.identifier, self._tok)
-
-# @dataclass
-# class SelfTypeAst:
-#     _tok: int
-#     identifier: str
-#
-#     def __init__(self, _tok: int):
-#         self._tok = _tok
-#         self.identifier = "Self"
-#
-#     def __eq__(self, other):
-#         return isinstance(other, SelfTypeAst)
-#
-#     def __str__(self):
-#         return "Self"
-#
-#     def __hash__(self):
-#         return hash(IdentifierAst("Self", self._tok))
 
 @dataclass
 class ImportTypeAst:
@@ -194,7 +187,7 @@ class ImportBlockAst:
 
 @dataclass
 class ModuleImplementationAst:
-    import_block: ImportBlockAst
+    import_block: Optional[ImportBlockAst]
     members: list[ModuleMemberAst]
     _tok: int
 
@@ -386,7 +379,7 @@ class WhereBlockAst:
 
 @dataclass
 class WhereConstraintAst:
-    types_to_constrain: list[TypeAst]
+    types_to_constrain: list[TypeAst] # generics
     constraints: list[TypeAst]
     _tok: int
 
@@ -541,8 +534,31 @@ class TypeSingleAst:
     parts: list[GenericIdentifierAst | int]
     _tok: int
 
+    # def __setattr__(self, key, value):
+    #     print(f"Set {key} to {value}.")
+    #     super().__setattr__(key, value)
+
+    # def __copy__(self):
+    #     t = TypeSingleAst(copy.deepcopy(self.parts), self._tok)
+    #     if hasattr(self, "_sym"): t.register_symbol(getattr(self, "_sym"))
+    #     return t
+
+    def register_symbol(self, symbol):
+        if hasattr(self, "_sym") and symbol.name != getattr(self, "_sym").name: raise Exception(
+            f"TypeSingleAst {self} already has a symbol registered: {getattr(self, '_sym').name}\n" +
+            f"Trying to register the symbol {symbol.name}\n" +
+            " -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
+        setattr(self, "_sym", symbol)
+
     def __eq__(self, other):
         return isinstance(other, TypeSingleAst) and self.parts == other.parts
+
+    def symbolic_eq(self, other):
+        if not hasattr(self, "_sym"): raise Exception(f"SELF ({self} {id(self)}) " + " -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
+        if not hasattr(other, "_sym"): raise Exception(f"OTHER ({self} {id(self)}) " + " -> ".join(list(reversed([f.frame.f_code.co_name for f in inspect.stack()]))))
+        self_sym = getattr(self, "_sym")
+        other_sym = getattr(other, "_sym")
+        return self_sym.type == other_sym.type
 
     def __hash__(self):
         return hash(tuple(self.parts))
@@ -555,11 +571,20 @@ class TypeSingleAst:
         return IdentifierAst(s, self._tok)
 
     def subtype_match(self, other: TypeSingleAst, s) -> bool:
+        # print(f"matching '{self}' against '{other}', in scope: '{s.current_scope.parent.name}'")
+
         # Is the other type (other) a subtype of this type (self)? Determine by checking if this type (self) is in the
         # super-types of the other type (other).
         other_scope = s.global_scope.get_child_scope(other)
-        if not other_scope: return self == other # generic
-        return self == other or self in [t2_sup_scope.name for t2_sup_scope in other_scope.sup_scopes]
+        if not other_scope: return self.symbolic_eq(other) # generic
+        if self.symbolic_eq(other): return True
+
+        # if self in [t2_sup_scope.name for t2_sup_scope in other_scope.sup_scopes]
+        # print("attempting a subtype match")
+        for t2_sup_scope in other_scope.sup_scopes:
+            if not isinstance(t2_sup_scope.name, TypeSingleAst): continue
+            if self.subtype_match(t2_sup_scope.name, s): return True
+        return False
 
     def without_generics(self) -> TypeSingleAst:
         parts = copy.deepcopy(self.parts)
@@ -967,7 +992,7 @@ BIN_FN = {
     TokenType.TkSub: "sub",
     TokenType.TkMul: "mul",
     TokenType.TkDiv: "div",
-    TokenType.TkRem: "mod",
+    TokenType.TkRem: "rem",
 
     TokenType.TkDoubleAmpersand: "and",
     TokenType.TkDoublePipe: "or",

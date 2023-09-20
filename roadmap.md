@@ -37,13 +37,16 @@
 
 #### Type system
 - [ ] All things `nested types / typedefs`
-- [ ] Currently `Num` in `std.num` doesn't equal `std.Num` used elsewhere.
 - [ ] Maybe split `Num` to `U8`, `U16`, `U32`, `U64`, `I8`, `I16`, `I32`, `I64`, `F32`, `F64`?
   - [ ] Then add `Num` as a `BigNum` type that can be used for all arithmetic.
   - [ ] Then add `Dec` like Python's `decimal.Decimal` class?
+- [ ] Change the typedef to allow "type reductions" from namespaced types too.
+- [ ] Allow typedefs as top-level module members too.
+- [ ] Currenly FQN is always needed, even in file of definition - should just be able to use class name in same file.
 
 #### Statements
 - [ ] Currently no borrow checking on returning or yielding from a function.
+- [ ] Change `for` to `on` for super-imposition based inheritance.
 
 #### Other
 - [ ] All things `yield` / coroutines
@@ -56,14 +59,6 @@
 
 #### Imports
 - [ ] Relative imports using the `sup` keyword.
-- [ ] Fix
-###### Fix imports
-- By default, "import" all spp files with a `mod` declaration into the `main.spp` file, forcing use of FQN.
-- Using a `use` statement allows "namespace reduction" ie `use std.num.Num` => `Num` in scope.
-  - Perform reduction by adding the child scope (scope of the imported type) to the current scope.
-- Allow the `ImportStatement` parsing rule to be used as a regular statement, like the typedef.
-  - Allows reductions to be only applied to the current scope, not the entire file.
-
 
 #### Ideas that probably won't happen
 - [ ] Keyword renaming: `while` -> `do`, `else` -> `or` (matches 2 letter nature of `if`).

@@ -372,9 +372,9 @@ class Parser:
     def _parse_module_implementation(self) -> BoundParser:
         def inner():
             c1 = self._current_token_index()
-            p1 = self._parse_import_block().parse_optional()
+            # p1 = self._parse_import_block().parse_optional()
             p2 = self._parse_module_member().parse_zero_or_more()
-            return Ast.ModuleImplementationAst(p1, p2, c1)
+            return Ast.ModuleImplementationAst(None, p2, c1)
         return BoundParser(self, inner)
 
     def _parse_module_identifier(self) -> BoundParser:
@@ -1824,6 +1824,7 @@ class Parser:
             p3 = self._parse_token(TokenType.TkRem).delay_parse()
             p4 = self._parse_token(TokenType.TkAmpersand).delay_parse()
             p5 = (p1 | p2 | p3 | p4).parse_once()
+            return p5
         return BoundParser(self, inner)
 
 

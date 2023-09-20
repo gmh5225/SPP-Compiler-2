@@ -1,7 +1,9 @@
 import copy
+import inspect
 from typing import Iterable, Optional, TypeVar
 
 from src.LexicalAnalysis.Tokens import TokenType, Token
+from src.SemanticAnalysis2.NsSubstitution import NsSubstitution
 from src.SyntacticAnalysis import Ast
 from src.SyntacticAnalysis.Parser import ErrFmt
 
@@ -44,6 +46,7 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_function_parameters(asts: list[Ast.FunctionParameterAst], s: ScopeHandler, **kwargs):
+
         # check no duplicate parameter names
         for i, p in enumerate(asts):
             if p.identifier in [q.identifier for q in asts[i + 1:]]:
@@ -145,20 +148,20 @@ class SemanticAnalysis:
         # body, and std.Void otherwise -- this is to ensure that the final statement (returning) is actually a return
         # statement, forcing there to only be 1 way to do anything, in this case, returning a value.
         if not isinstance(final_statement, Ast.ReturnStatementAst):
-            t = CommonTypes.void()
+            t = CommonTypes.void(s)
         else:
-            t = TypeInfer.infer_statement(final_statement, s) if ast.body.statements else CommonTypes.void()
+            t = TypeInfer.infer_statement(final_statement, s) if ast.body.statements else CommonTypes.void(s)
 
-        # If there is a non-void return type and the final statement is not a return statement, then raise an erorr,
-        # because
-        if ast.return_type != CommonTypes.void() and ast.body.statements and not isinstance(final_statement, Ast.ReturnStatementAst):
+        # If there is a non-void return type, and the final statement is not a return statement, then raise an error,
+        # because todo
+        if ast.body.statements and not isinstance(final_statement, Ast.ReturnStatementAst) and not ast.return_type.symbolic_eq(CommonTypes.void(s)):
             err_ast = ast.body.statements[-1]
             raise SystemExit(
                 f"Function returning '{ast.return_type}' must end with a return statement:" +
                 ErrFmt.err(ast.return_type._tok) + f"Function return type is '{ast.return_type}'.\n..." +
                 ErrFmt.err(err_ast._tok) + f"Final statement is not a return statement.")
 
-        if not t.subtype_match(ast.return_type, s) and ast.body.statements and isinstance(final_statement, Ast.ReturnStatementAst):
+        if ast.body.statements and isinstance(final_statement, Ast.ReturnStatementAst) and not t.subtype_match(ast.return_type, s):
             err_ast = ast.body.statements[-1]
             raise SystemExit(
                 "Mismatch between function return type and function's final statement:" +
@@ -207,7 +210,7 @@ class SemanticAnalysis:
         # Add the symbol to the scope.
         s.current_scope.add_symbol(sym)
 
-        # Analyse the default value
+        # Analyse the default value.
         if ast.default_value:
             SemanticAnalysis.analyse_expression(ast.default_value, s)
 
@@ -269,7 +272,7 @@ class SemanticAnalysis:
                 for g in fn_protos[i + 1:]:
                     required_f_params = [p for p in f.parameters if p.is_required()]
                     required_g_params = [p for p in g.parameters if p.is_required()]
-                    if all([f_param.type_annotation == g_param.type_annotation for f_param, g_param in zip(required_f_params, required_g_params)]):
+                    if all([(f_param.type_annotation == g_param.type_annotation) and (f_param.calling_convention == g_param.calling_convention) for f_param, g_param in zip(required_f_params, required_g_params)]) and len(required_f_params) == len(required_g_params):
                         extra = ""
                         if len(f.parameters) != len(g.parameters):
                             extra = (
@@ -287,9 +290,13 @@ class SemanticAnalysis:
                             ErrFmt.err(g._tok) + f"Second overload.")
 
 
-        if isinstance(ast, Ast.SupPrototypeInheritanceAst) and (super_class_type_parts := ast.super_class.parts_as_strings()) and super_class_type_parts[0] == "std" and super_class_type_parts[1] not in ["FnRef", "FnMut", "FnOne"]:
+        if isinstance(ast, Ast.SupPrototypeInheritanceAst): # and (super_class_type_parts := ast.super_class.parts_as_strings()) and super_class_type_parts[0] == "std" and super_class_type_parts[1] not in ["FnRef", "FnMut", "FnOne"]:
             cls_scope = s.current_scope.parent.get_child_scope(ast.identifier)
             super_class_scope = s.global_scope.get_child_scope(ast.super_class)
+
+            # if not super_class_scope:
+            #     raise SystemExit(ErrFmt.err(ast.super_class._tok) + f"Super class '{ast.super_class}' not found.")
+
             cls_scope.sup_scopes.append(super_class_scope)
             cls_scope.sup_scopes.extend(super_class_scope.sup_scopes)
 
@@ -307,13 +314,20 @@ class SemanticAnalysis:
                     super_class_scope = s.global_scope.get_child_scope(owner.super_class)
                     super_class_method_type = super_class_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.TypeSymbol, error=False)
                     if not super_class_method_type:
-                        # todo : improve error message to include the current class being super-imposed onto
-                        raise SystemExit(
+                        raise SystemExit(  # todo : improve error message to include the current class being super-imposed onto.
                             f"Method '{ast.identifier.identifier.removeprefix('__MOCK_')}' does not exist in super class '{owner.super_class}'.\n" +
                             ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier.identifier.removeprefix('__MOCK_')}' not found in super class '{owner.super_class}'.")
 
-                    super_class_method_scope = s.current_scope.get_child_scope(super_class_method_type.type.to_type())
-                    super_class_method_overloads = super_class_method_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol)
+                    # super_class_method_scope = super_class_scope.get_child_scope(super_class_method_type.type.to_type())
+                    # print(f"=" * 100)
+                    # print(f"current scope: {s.current_scope.name}")
+                    # print(f"sup identifier: {owner.identifier}")
+                    # print(f"sup super-class: {owner.super_class}")
+                    # print(f"sup member to add: {ast}")
+                    # print(f"super class scope: {super_class_scope.name}")
+                    # print(f"super class scope's sup scopes: {[str(x.name) for x in super_class_scope.sup_scopes]}")
+                    # print(f"super class method type: {super_class_method_type.type}")
+                    # super_class_method_overloads = super_class_method_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol)
 
                     # todo : ensure the signatures match.
 
@@ -326,26 +340,6 @@ class SemanticAnalysis:
 
     @staticmethod
     def analyse_sup_method_prototype(owner: Ast.SupPrototypeAst, ast: Ast.SupMethodPrototypeAst, s: ScopeHandler):
-        if isinstance(owner, Ast.SupPrototypeInheritanceAst):
-            # super_class_scope = s.global_scope.get_child_scope(owner.super_class)
-            # super_class_method_symbol = super_class_scope.get_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol, error=False)
-
-            # print("-" * 100)
-            # print(owner.identifier, ast, super_class_scope.name)
-            # print(super_class_method_symbol)
-            # print(owner.identifier, owner.super_class)
-            # special = ast.identifier.identifier in ["call_ref", "call_mut", "call_one"]
-            #
-            # if not super_class_scope:
-            #     raise SystemExit(ErrFmt.err(owner.super_class._tok) + f"Super class '{owner.super_class}' not found.")
-            #
-            # # Make sure the method exists in the super class.
-            # # print(super_class_scope.all_symbols_exclusive(SymbolTypes.VariableSymbol))
-            # print(owner.identifier, ast.identifier)
-            # if not str(owner.identifier).startswith("__MOCK") and not super_class_scope.has_symbol_exclusive(ast.identifier, SymbolTypes.VariableSymbol):
-            #     raise SystemExit(ErrFmt.err(ast.identifier._tok) + f"Method '{ast.identifier}' not found in super class '{owner.super_class}'.")
-            ...
-
         SemanticAnalysis.analyse_function_prototype(ast, s, in_class=True)
 
     @staticmethod
@@ -514,12 +508,13 @@ class SemanticAnalysis:
         rhs = Ast.FunctionArgumentAst(None, ast.rhs, None, False, pos)
         fn_call = Ast.PostfixFunctionCallAst([], [rhs], pos)
         fn_call = Ast.PostfixExpressionAst(fn, fn_call, pos)
+        # print(fn_call)
         SemanticAnalysis.analyse_expression(fn_call, s)
 
     @staticmethod
     def analyse_postfix_member_access(ast: Ast.PostfixExpressionAst, s: ScopeHandler, **kwargs):
         lhs_type = TypeInfer.infer_expression(ast.lhs, s)
-        lhs_type = isinstance(lhs_type, Ast.TypeTupleAst) and CommonTypes.tup(lhs_type.types) or lhs_type
+        lhs_type = isinstance(lhs_type, Ast.TypeTupleAst) and CommonTypes.tup(lhs_type.types, s) or lhs_type
         sym = s.current_scope.get_symbol(lhs_type.to_identifier(), SymbolTypes.TypeSymbol)
         if not sym:
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Type '{lhs_type}' not found.")
@@ -700,6 +695,7 @@ class SemanticAnalysis:
         if isinstance(cls_ty, Ast.TypeSingleAst):
             raise SystemExit(ErrFmt.err(ast.lhs._tok) + f"Cannot initialize generic type '{cls_ty}'.")
         cls_ty = cls_ty.to_type()
+        # NsSubstitution.do_substitution(cls_ty, s)
 
         # Generic parameters check
         # SemanticAnalysis.analyse_type_generic_arguments(ast.lhs.parts[-1].generic_arguments, s)
@@ -809,13 +805,15 @@ class SemanticAnalysis:
         # The "let" statement has the same semantics as a regular assignment, so treat it the same way. Assignment has
         # the same semantics as a function call, so treat it like that. Ultimately, "let x = 5" becomes "let x: Num" and
         # "x.set(5)", which is then analysed as a function call. There are some extra checks for the "let" though.
-        if ast.value:
-            SemanticAnalysis.analyse_expression(ast.value, s)
+
+        # if ast.value:
+        #     SemanticAnalysis.analyse_expression(ast.value, s)
 
         # Check that the type of the variable is not "Void". This is because "Void" values don't exist, and therefore
         # cannot be assigned to a variable.
         let_statement_type = ast.type_annotation or TypeInfer.infer_expression(ast.value, s)
-        if let_statement_type == CommonTypes.void():
+
+        if let_statement_type == CommonTypes.void(s):
             raise SystemExit(ErrFmt.err(ast._tok) + f"Cannot define a variable with 'Void' type.")
 
         new_syms = []
@@ -849,7 +847,7 @@ class SemanticAnalysis:
             for statement in ast.if_null.body:
                 SemanticAnalysis.analyse_statement(statement, s)
 
-            else_ty = TypeInfer.infer_expression(ast.if_null.body[-1], s) if ast.if_null.body else CommonTypes.void()
+            else_ty = TypeInfer.infer_expression(ast.if_null.body[-1], s) if ast.if_null.body else CommonTypes.void(s)
             if else_ty != let_statement_type:
                 raise SystemExit(ErrFmt.err(ast.if_null._tok) + f"Type of else clause for let statement is not of type '{let_statement_type}'. Found '{else_ty}'.")
 
@@ -899,7 +897,10 @@ class SemanticAnalysis:
         # Create a mock function call for the assignment, and analyse it. Do 1 per variable, so that the function call
         # analysis can handle the multiple function calls for tuples etc. Don't analyse the RHS, because the mock
         # function call will analyse the RHS value(s) as arguments, and double-analysis will lead to double-moves etc.
-        SemanticAnalysis.analyse_expression(ast.rhs, s)
+
+        # if not kwargs.get("let", False):
+        #     SemanticAnalysis.analyse_expression(ast.rhs, s)
+
         rhs_ty = TypeInfer.infer_expression(ast.rhs, s)
         if len(ast.lhs) == 1:
             # lhs_sym = s.current_scope.get_symbol(ast.lhs[0], SymbolTypes.VariableSymbol)
