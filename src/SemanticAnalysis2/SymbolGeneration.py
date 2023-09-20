@@ -22,12 +22,13 @@ class SymbolGeneration:
     @staticmethod
     def generate_program(ast: Ast.ProgramAst, s: ScopeHandler):
         AstReduction.reduce(ast)
+        # SymbolGeneration.FINAL_TOKEN_INDEX += ast.eof._tok
 
         for member in ast.module.body.members:
             SymbolGeneration.generate_module_member(member, s)
 
         if ast.module.body.import_block:
-            for imp in ast.module.body.import_block.imports: # todo : check against already imported modules
+            for imp in ast.module.body.import_block.imports:
                 SymbolGeneration.generate_import(ast, imp, s)
 
     @staticmethod
@@ -44,6 +45,8 @@ class SymbolGeneration:
 
     @staticmethod
     def generate_import(root: Ast.ProgramAst, ast: Ast.ImportStatementAst, s: ScopeHandler):
+        # Check the import cache to see if the module has already been imported. If it has then just return to prevent
+        # double imports and circular imports.
         if ast.module in SymbolGeneration.IMPORTED:
             return
 
@@ -60,7 +63,8 @@ class SymbolGeneration:
         SymbolGeneration.IMPORTED.append(ast.module)
         open("_out/new_code.spp", "a").write(mod_code)
 
-        new_mod = Parser(new_toks := Lexer(mod_code).lex(), f"{ast.module}.spp").parse()
+        new_toks = Lexer(mod_code).lex()
+        new_mod = Parser(new_toks, f"{ast.module}.spp").parse()
 
         # Separate all the scopes -- for example, if the module is `a.b.c`, then we need to separate the scopes "a",
         # "b", and "c". Set the current scope to the global scope (where modules are all found, then layered from)

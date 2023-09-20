@@ -290,7 +290,6 @@ class Scope:
     def get_child_scope(self, id: Hashable) -> Optional[Scope]:
 
         def inner(part, scope):
-            print(part, scope.name)
             all_scopes_to_check = [scope] + scope.sup_scopes
             children = []
             for sc in all_scopes_to_check:
@@ -314,7 +313,6 @@ class Scope:
             if len(id.parts) > 1 and id.parts[-1].identifier[0].isupper():
                 final_type = Ast.TypeSingleAst([id.parts[-1]], -1)
                 final_type = final_type.without_generics()
-                print(current.name, final_type)
                 return inner(final_type, current)
             return inner(id.without_generics(), current)
         else:
