@@ -275,12 +275,14 @@ class Parser:
     _current: int
 
     def __init__(self, tokens: list[Token], file_path: str):
-
         self._tokens = tokens
         self._current = 0
 
         ErrFmt.TOKENS = self._tokens
         ErrFmt.FILE_PATH = file_path
+
+    def _current_token_index(self) -> int:
+        return self._current
 
     def parse(self) -> Ast.ProgramAst:
         try:
@@ -322,7 +324,7 @@ class Parser:
         @return: The [Program]'s Ast.ProgramAst, the root of the AST for the code being parsed.
         """
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_module_prototype().parse_once()
             p2 = self._parse_eof().parse_once()
             return Ast.ProgramAst(p1, p2, c1)
@@ -359,7 +361,7 @@ class Parser:
         @return:
         """
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_decorators().parse_optional() or []
             p2 = self._parse_token(TokenType.KwMod).parse_once()
             p3 = self._parse_module_identifier().parse_once()
@@ -369,7 +371,7 @@ class Parser:
 
     def _parse_module_implementation(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_import_block().parse_optional()
             p2 = self._parse_module_member().parse_zero_or_more()
             return Ast.ModuleImplementationAst(p1, p2, c1)
@@ -377,7 +379,7 @@ class Parser:
 
     def _parse_module_identifier(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_identifier().parse_once()
             p2 = self._parse_module_identifier_next_part().parse_zero_or_more()
             return Ast.ModuleIdentifierAst([p1, *p2], c1)
@@ -404,14 +406,14 @@ class Parser:
 
     def _parse_import_block(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_import_statement().parse_one_or_more()
             return Ast.ImportBlockAst(p1, c1)
         return BoundParser(self, inner)
 
     def _parse_import_statement(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwUse).parse_once()
             p2 = self._parse_import_identifier().parse_once()
             p3 = self._parse_import_what().parse_once()
@@ -420,7 +422,7 @@ class Parser:
 
     def _parse_import_identifier(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_import_identifier_part().parse_one_or_more()
             return Ast.ImportIdentifierAst(p1, c1)
         return BoundParser(self, inner)
@@ -443,21 +445,21 @@ class Parser:
 
     def _parse_import_all(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.TkMul).parse_once()
             return Ast.ImportTypesAllAst(c1)
         return BoundParser(self, inner)
 
     def _parse_import_single(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_import_type().parse_once()
             return Ast.ImportTypesIndividualAst([p1], c1)
         return BoundParser(self, inner)
 
     def _parse_import_multiple(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.TkBraceL).parse_once()
             p2 = self._parse_import_types().parse_once()
             p3 = self._parse_token(TokenType.TkBraceR).parse_once()
@@ -480,7 +482,7 @@ class Parser:
 
     def _parse_import_type(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_upper_identifier().parse_once()
             p2 = self._parse_import_type_alias().parse_optional()
             return Ast.ImportTypeAst(p1, p2, c1)
@@ -501,7 +503,7 @@ class Parser:
         @return:
         """
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_decorators().parse_optional() or []
             p2 = self._parse_token(TokenType.KwCls).parse_once()
             p3 = self._parse_class_identifier().parse_once()
@@ -515,7 +517,7 @@ class Parser:
 
     def _parse_class_implementation(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_class_member().parse_zero_or_more()
             return Ast.ClassImplementationAst(p1, c1)
         return BoundParser(self, inner)
@@ -528,7 +530,7 @@ class Parser:
 
     def _parse_class_attribute(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_decorators().parse_optional() or []
             p3 = self._parse_class_attribute_identifier().parse_once()
             p4 = self._parse_token(TokenType.TkColon).parse_once()
@@ -561,7 +563,7 @@ class Parser:
 
     def _parse_sup_prototype_normal(self):
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_type_generic_parameters().parse_optional() or []
             p2 = self._parse_sup_identifier().parse_once()
             p3 = self._parse_where_block().parse_optional()
@@ -573,7 +575,7 @@ class Parser:
 
     def _parse_sup_prototype_with_inherit(self):
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_type_generic_parameters().parse_optional() or []
             p2 = self._parse_sup_identifier().parse_once()
             p3 = self._parse_token(TokenType.KwFor).parse_once()
@@ -587,7 +589,7 @@ class Parser:
 
     def _parse_sup_implementation(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_sup_member().parse_zero_or_more()
             return Ast.SupImplementationAst(p1, c1)
         return BoundParser(self, inner)
@@ -608,7 +610,7 @@ class Parser:
 
     def _parse_sup_typedef(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_decorators().parse_optional() or []
             p2 = self._parse_statement_typedef().parse_once()
             return Ast.SupTypedefAst(p2.new_type, p2.old_type, c1, p1)
@@ -624,7 +626,7 @@ class Parser:
 
     def _parse_enum_prototype(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_decorators().parse_optional() or []
             p2 = self._parse_token(TokenType.KwEnum).parse_once()
             p3 = self._parse_enum_identifier().parse_once()
@@ -638,7 +640,7 @@ class Parser:
 
     def _parse_enum_implementation(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_enum_member().parse_once()
             p2 = self._parse_enum_member_next().parse_zero_or_more()
             return Ast.EnumImplementationAst([p1, *p2], c1)
@@ -653,7 +655,7 @@ class Parser:
 
     def _parse_enum_member(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_enum_member_identifier().parse_once()
             p2 = self._parse_enum_member_value_wrapper().parse_optional()
             return Ast.EnumMemberAst(p1, p2, c1)
@@ -697,7 +699,7 @@ class Parser:
 
     def _parse_function_prototype(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_decorators().parse_optional() or []
             p2 = self._parse_function_structure_type().parse_once()
             p3 = self._parse_function_identifier().parse_once()
@@ -714,7 +716,7 @@ class Parser:
 
     def _parse_function_implementation(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_statement().parse_zero_or_more()
             return Ast.FunctionImplementationAst(p1, c1)
         return BoundParser(self, inner)
@@ -759,7 +761,7 @@ class Parser:
 
     def _parse_function_call_normal_argument(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_parameter_passing_convention().parse_optional()
             p2 = self._parse_operator_identifier_variadic().parse_optional() is not None
             p3 = self._parse_non_assignment_expression().parse_once()
@@ -768,7 +770,7 @@ class Parser:
 
     def _parse_function_call_named_argument(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_identifier().parse_once()
             p2 = self._parse_token(TokenType.TkAssign).parse_once()
             p3 = self._parse_parameter_passing_convention().parse_optional()
@@ -816,7 +818,7 @@ class Parser:
 
     def _parse_function_parameter_self(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_function_parameter_self_calling_convention().parse_optional()
             p2 = self._parse_token(TokenType.KwSelf).parse_once()
             return Ast.FunctionParameterSelfAst(p1, c1)
@@ -832,7 +834,7 @@ class Parser:
 
     def _parse_function_parameter_required(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwMut).parse_optional() is not None
             p2 = self._parse_identifier().parse_once()
             p3 = self._parse_token(TokenType.TkColon).parse_once()
@@ -860,7 +862,7 @@ class Parser:
 
     def _parse_where_block(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwWhere).parse_once()
             p2 = self._parse_token(TokenType.TkBrackL).parse_once()
             p3 = self._parse_where_constraints().parse_once()
@@ -884,7 +886,7 @@ class Parser:
 
     def _parse_where_constraint(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_type_identifiers().parse_once()
             p2 = self._parse_token(TokenType.TkColon).parse_once()
             p3 = self._parse_where_constraint_chain().parse_once()
@@ -915,7 +917,7 @@ class Parser:
 
     def _parse_decorator(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.TkAt).parse_once()
             p2 = self._parse_decorator_identifier().parse_once()
             p3 = self._parse_type_generic_arguments().parse_optional() or []
@@ -979,7 +981,7 @@ class Parser:
 
     def _parse_assignment_expression_multiple(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_non_assignment_expression().parse_once()
             p2 = self._parse_assignment_multiple_lhs().parse_zero_or_more()
             p3 = self._parse_token(TokenType.TkAssign).parse_once()
@@ -1032,7 +1034,7 @@ class Parser:
 
     def _parse_postfix_expression(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_primary_expression().parse_once()
             p2 = self._parse_operator_identifier_postfix().parse_zero_or_more()
             return functools.reduce(lambda p, op: Ast.PostfixExpressionAst(p, op, c1), p2, p1)
@@ -1067,7 +1069,7 @@ class Parser:
 
     def _parse_self_keyword(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwSelf).parse_once()
             return Ast.IdentifierAst("self", c1)
         return BoundParser(self, inner)
@@ -1081,7 +1083,7 @@ class Parser:
 
     def _parse_binary_expression(self, __lhs, __op, __rhs) -> BoundParser:
         def inner(lhs, op, rhs):
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = lhs.parse_once()
             p2 = self._parse_binary_expression_rhs(op, rhs).parse_optional()
             return p1 if p2 is None else Ast.BinaryExpressionAst(p1, p2[0], p2[1], c1)
@@ -1096,7 +1098,7 @@ class Parser:
 
     def _parse_expression_placeholder(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.TkUnderscore).parse_once()
             return Ast.PlaceholderAst(c1)
         return BoundParser(self, inner)
@@ -1105,7 +1107,7 @@ class Parser:
 
     def _parse_lambda(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_lambda_capture_list().parse_optional()
             p2 = self._parse_lambda_parameters().parse_once()
             p3 = self._parse_token(TokenType.TkArrowR).parse_once()
@@ -1131,7 +1133,7 @@ class Parser:
 
     def _parse_lambda_capture_item(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_lambda_capture_item_alias().parse_optional()
             p2 = self._parse_parameter_passing_convention().parse_optional()
             p3 = self._parse_identifier().parse_once()
@@ -1169,7 +1171,7 @@ class Parser:
 
     def _parse_lambda_parameter_required(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwMut).parse_optional()
             p2 = self._parse_identifier().parse_once()
             return Ast.LambdaParameterAst(p1, p2, c1)
@@ -1216,7 +1218,7 @@ class Parser:
         """
 
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_single_type_identifier_with_self().delay_parse()
             p2 = self._parse_single_type_identifier_no_self().delay_parse()
             p3 = (p1 | p2).parse_once()
@@ -1235,7 +1237,7 @@ class Parser:
         """
 
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.TkParenL).parse_once()
             p2 = self._parse_type_identifiers().parse_optional() or []
             p3 = self._parse_token(TokenType.TkParenR).parse_once()
@@ -1254,7 +1256,7 @@ class Parser:
         """
 
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwSelfType).parse_once()
             p2 = self._parse_type_identifier_upper_types_following_self().parse_optional() or []
             return Ast.TypeSingleAst([Ast.GenericIdentifierAst("Self", [], c1), *p2], c1)
@@ -1364,14 +1366,14 @@ class Parser:
 
     def _parse_type_generic_argument_normal(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_type_identifier().parse_once()
             return Ast.TypeGenericArgumentNormalAst(p1, c1)
         return BoundParser(self, inner)
 
     def _parse_type_generic_argument_named(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_upper_identifier().parse_once()
             p2 = self._parse_token(TokenType.TkAssign).parse_once()
             p3 = self._parse_type_identifier().parse_once()
@@ -1413,7 +1415,7 @@ class Parser:
 
     def _parse_type_generic_parameter_required(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_upper_identifier().parse_once()
             p2 = self._parse_type_generic_parameter_inline_constraint().parse_optional() or []
             return Ast.TypeGenericParameterRequiredAst(p1, p2, c1)
@@ -1445,7 +1447,7 @@ class Parser:
 
     def _parse_statement_if(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwIf).parse_once()
             p2 = self._parse_non_assignment_expression().parse_once()
             p3 = self._parse_pattern_op().parse_optional()
@@ -1458,7 +1460,7 @@ class Parser:
 
     def _parse_statement_pattern(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_pattern_op().parse_optional()
             p2 = self._parse_pattern_composite().parse_once()
             p3 = self._parse_pattern_guard().parse_optional()
@@ -1468,7 +1470,7 @@ class Parser:
 
     def _parse_statement_pattern_default(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwElse).parse_once()
             p3 = self._parse_statement_new_scope().parse_once()
             return Ast.PatternStatementAst(None, [Ast.PatternAst(Ast.BoolLiteralAst(True, c1), c1)], None, p3.body, c1) # c1?
@@ -1482,7 +1484,7 @@ class Parser:
 
     def _parse_pattern_guard(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.TkDoubleAmpersand).parse_once()
             p2 = self._parse_non_assignment_expression().parse_once()
             return p2
@@ -1497,7 +1499,7 @@ class Parser:
 
     def _parse_pattern_val(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_pattern_match_object().delay_parse()
             p2 = self._parse_literal().delay_parse()
             p3 = (p1 | p2).parse_once()
@@ -1520,7 +1522,7 @@ class Parser:
 
     def _parse_statement_while(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwWhile).parse_once()
             p2 = self._parse_expression().parse_once()
             p4 = self._parse_statement_new_scope().parse_once()
@@ -1530,7 +1532,7 @@ class Parser:
 
     def _parse_statement_with(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwWith).parse_once()
             p2 = self._parse_expression().parse_once()
             p3 = self._parse_statement_alias_for_with_expression().parse_optional()
@@ -1547,7 +1549,7 @@ class Parser:
 
     def _parse_statement_return(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwRet).parse_once()
             p2 = self._parse_expression().parse_optional()
             return Ast.ReturnStatementAst(p2, c1)
@@ -1555,7 +1557,7 @@ class Parser:
 
     def _parse_statement_yield(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwYield).parse_once()
             p2 = self._parse_parameter_passing_convention().parse_optional()
             p3 = self._parse_expression().parse_optional()
@@ -1564,7 +1566,7 @@ class Parser:
 
     def _parse_statement_typedef(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwUse).parse_once()
             p2 = self._parse_generic_identifier().parse_once()
             p3 = self._parse_token(TokenType.KwAs).parse_once()
@@ -1582,7 +1584,7 @@ class Parser:
 
     def _parse_statement_let_with_value(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwLet).parse_once()
             p2 = self._parse_local_variable_identifiers().parse_once()
             p3 = self._parse_token(TokenType.TkAssign).parse_once()
@@ -1593,7 +1595,7 @@ class Parser:
 
     def _parse_statements_residual_action(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwElse).parse_once()
             p2 = self._parse_statement_new_scope().parse_once()
             return Ast.InnerScopeAst(p2.body, c1)
@@ -1601,7 +1603,7 @@ class Parser:
 
     def _parse_statement_let_with_type(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwLet).parse_once()
             p2 = self._parse_local_variable_identifiers().parse_once()
             p3 = self._parse_token(TokenType.TkColon).parse_once()
@@ -1611,7 +1613,7 @@ class Parser:
 
     def _parse_local_variable_identifier(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwMut).parse_optional() is not None
             p2 = self._parse_identifier().parse_once()
             return Ast.LocalVariableAst(p1, p2, c1)
@@ -1633,7 +1635,7 @@ class Parser:
 
     def _parse_statement_new_scope(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.TkBraceL).parse_once()
             p2 = self._parse_statement().parse_zero_or_more()
             p3 = self._parse_token(TokenType.TkBraceR).parse_once()
@@ -1661,21 +1663,21 @@ class Parser:
 
     def _parse_identifier(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_lexeme(TokenType.LxIdentifier).parse_once()
             return Ast.IdentifierAst(p1, c1)
         return BoundParser(self, inner)
 
     def _parse_upper_identifier(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_lexeme(TokenType.LxUpperIdentifier).parse_once()
             return Ast.IdentifierAst(p1, c1)
         return BoundParser(self, inner)
 
     def _parse_generic_identifier(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_lexeme(TokenType.LxUpperIdentifier).parse_once()
             p2 = self._parse_type_generic_arguments().parse_optional() or []
             return Ast.GenericIdentifierAst(p1, p2, c1)
@@ -1685,7 +1687,7 @@ class Parser:
 
     def _parse_postfix_operator_function_call(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_type_generic_arguments().parse_optional() or []
             p2 = self._parse_function_call_arguments().parse_once()
             return Ast.PostfixFunctionCallAst(p1, p2, c1)
@@ -1693,7 +1695,7 @@ class Parser:
 
     def _parse_postfix_operator_member_access(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.TkDot).parse_once()
             p2 = self._parse_identifier().delay_parse()
             p3 = self._parse_number().delay_parse()
@@ -1703,7 +1705,7 @@ class Parser:
 
     def _parse_postfix_operator_struct_initializer(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.TkBraceL).parse_once()
             p2 = self._parse_postfix_operator_struct_initializer_fields().parse_optional() or []
             p3 = self._parse_token(TokenType.TkBraceR).parse_once()
@@ -1726,7 +1728,7 @@ class Parser:
 
     def _parse_postfix_operator_struct_initializer_field(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_postfix_operator_struct_initializer_field_identifier().parse_once()
             p2 = self._parse_postfix_operator_struct_initializer_field_value_different_to_identifier().parse_optional()
             return Ast.PostfixStructInitializerFieldAst(p1, p2, c1)
@@ -1835,7 +1837,7 @@ class Parser:
 
     def _parse_parameter_passing_convention(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.TkAmpersand).parse_once()
             p2 = self._parse_token(TokenType.KwMut).parse_optional() is not None
             return Ast.ParameterPassingConventionReferenceAst(p2, c1)
@@ -1881,14 +1883,14 @@ class Parser:
 
     def _parse_literal_string(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_lexeme(TokenType.LxDoubleQuoteStr).parse_once()
             return Ast.StringLiteralAst(p1, c1)
         return BoundParser(self, inner)
 
     def _parse_literal_array(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.TkBrackL).parse_once()
             p2 = self._parse_expressions().parse_optional() or []
             p3 = self._parse_token(TokenType.TkBrackR).parse_once()
@@ -1897,7 +1899,7 @@ class Parser:
 
     def _parse_literal_boolean(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.KwTrue).delay_parse()
             p2 = self._parse_token(TokenType.KwFalse).delay_parse()
             p3 = (p1 | p2).parse_once()
@@ -1906,14 +1908,14 @@ class Parser:
 
     def _parse_literal_regex(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_lexeme(TokenType.LxRegex).parse_once()
             return Ast.RegexLiteralAst(p1, c1)
         return BoundParser(self, inner)
 
     def _parse_literal_tuple(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_token(TokenType.TkParenL).parse_once()
             p2 = self._parse_expressions().parse_optional() or []
             p3 = self._parse_token(TokenType.TkParenR).parse_once()
@@ -1922,7 +1924,7 @@ class Parser:
 
     def _parse_literal_number_base_02(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_lexeme(TokenType.LxBinDigits).parse_once()
             return Ast.NumberLiteralBase02Ast(p1, c1)
         return BoundParser(self, inner)
@@ -1935,7 +1937,7 @@ class Parser:
 
     def _parse_literal_number_base_16(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_lexeme(TokenType.LxHexDigits).parse_once()
             return Ast.NumberLiteralBase16Ast(p1, c1)
         return BoundParser(self, inner)
@@ -1944,7 +1946,7 @@ class Parser:
 
     def _parse_number(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_numeric_sign().parse_optional()
             p2 = self._parse_numeric_integer().parse_once()
             p3 = self._parse_numeric_decimal().parse_optional()
@@ -1982,7 +1984,7 @@ class Parser:
 
     def _parse_numeric_exponent(self) -> BoundParser:
         def inner():
-            c1 = self._current
+            c1 = self._current_token_index()
             p1 = self._parse_character('e').parse_once()
             p2 = self._parse_operator_identifier_additive().parse_optional()
             p3 = self._parse_numeric_integer().parse_once()
@@ -1995,7 +1997,7 @@ class Parser:
         def inner():
             if token != TokenType.TkNewLine: self._skip(TokenType.TkNewLine)
             self._skip(TokenType.TkWhitespace)
-            c1 = self._current
+            c1 = self._current_token_index()
 
             if self._current >= len(self._tokens):
                 raise ParseSyntaxError(f"Expected '{token.value}', got <EOF>")
