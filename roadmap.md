@@ -33,6 +33,7 @@
 - [ ] Work out all error codes (will have to finish syntactic analysis first).
 - [ ] Change the error handler to receive the extra string as a parameter for multiline support (not just `... + "..."` )
 - [ ] Check that `copy.deepcopy` is called on all types that require it (modifying local AST variable).
+- [ ] Error messages from imported files don't use the correct token stream after the symbol generation stage.
 
 #### Type system
 - [ ] All things `nested types / typedefs`
